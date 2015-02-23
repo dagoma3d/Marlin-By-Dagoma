@@ -1,0 +1,60 @@
+ {1*OVERSAMPLENR,713},
+ {54*OVERSAMPLENR,236},
+ {107*OVERSAMPLENR,195},
+ {160*OVERSAMPLENR,172},
+ {213*OVERSAMPLENR,157},
+ {266*OVERSAMPLENR,144},
+ {319*OVERSAMPLENR,134},
+ {372*OVERSAMPLENR,125},
+ {425*OVERSAMPLENR,117},
+ {478*OVERSAMPLENR,110},
+ {531*OVERSAMPLENR,103},
+ {584*OVERSAMPLENR,96},
+ {637*OVERSAMPLENR,89},
+ {690*OVERSAMPLENR,83},
+ {743*OVERSAMPLENR,75},
+ {796*OVERSAMPLENR,68},
+ {849*OVERSAMPLENR,59},
+ {902*OVERSAMPLENR,48},
+ {955*OVERSAMPLENR,34},
+ {1008*OVERSAMPLENR,3}
+
+
+
+_______
+
+
+ATC Semitec 104GT-2
+Supplier Part Number
+Rapid Electronics 61-0452
+datasheet?
+// /usr/local/bin/createTemperatureLookup.py —r0=100000 —t0=25 —r1=0 —r2=4700 —beta=4267 —max-adc=1023
+// r0: 100000
+// t0: 25
+// r1: 0
+// r2: 4700
+// beta: 4267
+// max adc: 1023
+#define NUMTEMPS 20
+short temptable[NUMTEMPS][2] = {
+ {1, 713},
+ {54, 236},
+ {107, 195},
+ {160, 172},
+ {213, 157},
+ {266, 144},
+ {319, 134},
+ {372, 125},
+ {425, 117},
+ {478, 110},
+ {531, 103},
+ {584, 96},
+ {637, 89},
+ {690, 83},
+ {743, 75},
+ {796, 68},
+ {849, 59},
+ {902, 48},
+ {955, 34},
+ {1008, 3}
+};
