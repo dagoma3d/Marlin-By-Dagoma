@@ -17,6 +17,9 @@
 #define DIGIPOTSS_PIN -1
 #endif
 
+
+
+#define MELZI
 /****************************************************************************************
 * 5DPrint D8 Driver board
 * https://bitbucket.org/makible/5dprint-d8-controller-board
