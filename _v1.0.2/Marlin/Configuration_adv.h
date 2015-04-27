@@ -154,7 +154,7 @@
 //#define Y_DUAL_STEPPER_DRIVERS
 
 // Define if the two Y drives need to rotate in opposite directions
-#define INVERT_Y2_VS_Y_DIR true
+//#define INVERT_Y2_VS_Y_DIR true
 
 #ifdef Y_DUAL_STEPPER_DRIVERS
   #undef EXTRUDERS
