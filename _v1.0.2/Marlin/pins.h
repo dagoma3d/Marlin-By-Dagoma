@@ -20,6 +20,7 @@
 
 
 #define MELZI
+#define SANGUINOLOLU_V_1_2
 /****************************************************************************************
 * 5DPrint D8 Driver board
 * https://bitbucket.org/makible/5dprint-d8-controller-board

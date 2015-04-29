@@ -611,7 +611,7 @@ void setup()
   #if defined(CONTROLLERFAN_PIN) && CONTROLLERFAN_PIN > -1
     SET_OUTPUT(CONTROLLERFAN_PIN); //Set pin used for driver cooling fan
   #endif
-
+    fanSpeed = 200; // jimmy@dagoma : set the fan speed directly at the init step. 
   #ifdef DIGIPOT_I2C
     digipot_i2c_init();
   #endif
