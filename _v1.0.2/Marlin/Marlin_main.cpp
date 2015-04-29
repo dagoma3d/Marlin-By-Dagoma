@@ -2590,7 +2590,7 @@ Sigma_Exit:
         }
         break;
       case 107: //M107 Fan Off
-        fanSpeed = 0;
+        fanSpeed = DISCO_MINI_FAN_SPEED;
         break;
     #endif //FAN_PIN
     #ifdef BARICUDA

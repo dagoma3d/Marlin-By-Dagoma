@@ -218,6 +218,8 @@
 
 #define EXTRUDE_MINTEMP 160 // min for the discovery by dagoma
 
+#define DISCO_MINI_FAN_SPEED 130 //minimum speed for the head fan to prevent head softening over printing
+
 #define EXTRUDE_MAXLENGTH (X_MAX_LENGTH+Y_MAX_LENGTH) //prevent extrusion of very large distances.
 
 /*================== Thermal Runaway Protection ==============================
