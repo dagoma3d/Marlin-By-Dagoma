@@ -510,7 +510,7 @@ void CardReader::checkautostart(bool force)
   }
   
   char autoname[30];
-  sprintf_P(autoname, PSTR("auto%i.g"), lastnr);
+  sprintf_P(autoname, PSTR("dagoma%i.g"), lastnr);
   for(int8_t i=0;i<(int8_t)strlen(autoname);i++)
     autoname[i]=tolower(autoname[i]);
   dir_t p;
