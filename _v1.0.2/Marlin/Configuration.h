@@ -41,7 +41,7 @@
 // The following define selects which electronics board you have.
 // Please choose the name from boards.h that matches your setup
 #ifndef MOTHERBOARD
-  #define MOTHERBOARD BOARD_SANGUINOLOLU_11 // dagoma's board is derived from the sanguinololu board.
+  #define MOTHERBOARD BOARD_MELZI_1284 // dagoma's board is derived from the sanguinololu board.
 #endif
 
 // Define this to set a custom name for your generic Mendel,
@@ -370,7 +370,7 @@ const bool Z_MAX_ENDSTOP_INVERTING = true; // set to true to invert the logic of
 
     // set the rectangle in which to probe
     #define LEFT_PROBE_BED_POSITION 15
-    #define RIGHT_PROBE_BED_POSITION 180
+    #define RIGHT_PROBE_BED_POSITION 170
     #define BACK_PROBE_BED_POSITION 155
     #define FRONT_PROBE_BED_POSITION 50
 
@@ -397,7 +397,7 @@ const bool Z_MAX_ENDSTOP_INVERTING = true; // set to true to invert the logic of
   // X and Y offsets must be integers
   #define X_PROBE_OFFSET_FROM_EXTRUDER 0 //discovery settings
   #define Y_PROBE_OFFSET_FROM_EXTRUDER 0 //discovery settings
-  #define Z_PROBE_OFFSET_FROM_EXTRUDE 1.95 //discovery settings
+  #define Z_PROBE_OFFSET_FROM_EXTRUDER 0 //discovery settings
 
   #define Z_RAISE_BEFORE_HOMING 5       // (in mm) Raise Z before homing (G28) for Probe Clearance.
                                         // Be sure you have this distance over your Z_MAX_POS in case
@@ -408,7 +408,7 @@ const bool Z_MAX_ENDSTOP_INVERTING = true; // set to true to invert the logic of
   #define Z_RAISE_BETWEEN_PROBINGS 15  //How much the extruder will be raised when traveling from between next probing points
 
   //#define Z_PROBE_SLED // turn on if you have a z-probe mounted on a sled like those designed by Charles Bell
-  //#define SLED_DOCKING_OFFSET 5 // the extra distance the X axis must travel to pickup the sled. 0 should be fine but you can push it further if you'd like.
+//  #define SLED_DOCKING_OFFSET 0 // the extra distance the X axis must travel to pickup the sled. 0 should be fine but you can push it further if you'd like.
 
   //If defined, the Probe servo will be turned on only during movement and then turned off to avoid jerk
   //The value is the delay to turn the servo off after powered on - depends on the servo speed; 300ms is good value, but you can try lower it.
