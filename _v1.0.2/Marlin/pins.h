@@ -19,6 +19,7 @@
 
 
 
+
 #define MELZI
 #define SANGUINOLOLU_V_1_2
 /****************************************************************************************
@@ -1184,6 +1185,8 @@
 #error Oops!  Make sure you have 'Sanguino' selected from the 'Tools -> Boards' menu.
 #endif
 #endif
+
+#define BTN_FIL             4
 
 #define X_STEP_PIN         15
 #define X_DIR_PIN          21
