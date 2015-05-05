@@ -194,7 +194,7 @@
 //===========================================================================
 //=============================imported variables============================
 //===========================================================================
-
+bool m600enque = false;
 
 //===========================================================================
 //=============================public variables=============================
@@ -626,6 +626,14 @@ void setup()
 
 void loop()
 {
+  if (!digitalRead(BTN_FIL)){
+    if (!m600enque)
+    {
+      enquecommand_P(PSTR("M600"));
+      m600enque = true;
+      delay(100);
+    }
+  }
   if(buflen < (BUFSIZE-1))
     get_command();
   #ifdef SDSUPPORT
@@ -3634,11 +3642,11 @@ case 404:  //M404 Enter the nominal filament width (3mm, 1.75mm ) N<3.0> or disp
         delay(100);
         LCD_ALERTMESSAGEPGM(MSG_FILAMENTCHANGE);
         uint8_t cnt=0;
-        while(!lcd_clicked()){
+        while(digitalRead(X_STOP_PIN)){
           cnt++;
           manage_heater();
           manage_inactivity(true);
-          lcd_update();
+          //lcd_update();
           if(cnt==0)
           {
           #if BEEPER > 0
@@ -3656,6 +3664,8 @@ case 404:  //M404 Enter the nominal filament width (3mm, 1.75mm ) N<3.0> or disp
 			#endif
           #endif
           }
+          m600enque = false;
+          delay(100);
         }
 
         //return to normal
