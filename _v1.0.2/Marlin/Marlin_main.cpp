@@ -620,6 +620,7 @@ void setup()
   digitalWrite(SERVO0_PIN, LOW); // turn it off
 #endif // Z_PROBE_SLED
   setup_homepin();
+  pinMode(BTN_FIL,INPUT);
 }
 
 
