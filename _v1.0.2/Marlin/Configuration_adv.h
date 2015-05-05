@@ -435,16 +435,16 @@ const unsigned int dropsegments=5; //everything with less than this number of st
 #endif
 
 //adds support for experimental filament exchange support M600; requires display
-#ifdef ULTIPANEL
+//#ifdef ULTIPANEL
   #define FILAMENTCHANGEENABLE
   #ifdef FILAMENTCHANGEENABLE
-    #define FILAMENTCHANGE_XPOS 3
+    #define FILAMENTCHANGE_XPOS 200
     #define FILAMENTCHANGE_YPOS 3
     #define FILAMENTCHANGE_ZADD 10
     #define FILAMENTCHANGE_FIRSTRETRACT -2
     #define FILAMENTCHANGE_FINALRETRACT -100
   #endif
-#endif
+//#endif
 
 #ifdef FILAMENTCHANGEENABLE
   #ifdef EXTRUDER_RUNOUT_PREVENT
