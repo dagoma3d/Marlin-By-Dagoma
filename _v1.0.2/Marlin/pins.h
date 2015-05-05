@@ -1186,7 +1186,7 @@
 #endif
 #endif
 
-#define BTN_FIL             4
+#define BTN_FIL            27
 
 #define X_STEP_PIN         15
 #define X_DIR_PIN          21
