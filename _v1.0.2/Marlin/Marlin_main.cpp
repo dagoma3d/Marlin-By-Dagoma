@@ -626,7 +626,7 @@ void setup()
 
 void loop()
 {
-  if (!digitalRead(BTN_FIL)){
+  if (digitalRead(BTN_FIL)){
     if (!m600enque)
     {
       enquecommand_P(PSTR("M600"));
@@ -3642,6 +3642,7 @@ case 404:  //M404 Enter the nominal filament width (3mm, 1.75mm ) N<3.0> or disp
         delay(100);
         LCD_ALERTMESSAGEPGM(MSG_FILAMENTCHANGE);
         uint8_t cnt=0;
+        //set temp
         while(digitalRead(X_STOP_PIN)){
           cnt++;
           manage_heater();
