@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<title>Logo-Editor</title>
+		<meta http-equiv='Content-Type' content='text/html; charset=UTF-8' />
+		<script type='text/javascript' src='https://code.jquery.com/jquery-1.12.3.min.js'></script>
+		<script type='text/javascript' src='logo-editor.js'></script>
+		<style type='text/css'>
+#left
+{
+	position: relative;
+	float: left;
+	width: 45em;
+}
+#c-code
+{
+	width: 95%;
+	height: 60em;
+}
+#right
+{
+	float: none;
+	overflow: hidden;
+}
+#logo
+{
+	border: solid gray 1px;
+	border-collapse: collapse;
+}
+#logo tr,
+#logo td
+{
+	width: 6px;
+	height: 6px;
+	border: solid 1px #DDD;
+}
+#logo td.enable
+{
+	background-color: orange;
+}
+
+#logo td:hover
+{
+	background-color: yellow;
+}
+
+#logo td.enable:hover
+{
+	background-color: red;
+}
+		</style>
+	</head>
+	<body>
+		<div id='left'>
+			<textarea id='c-code' rows='20' cols='60'></textarea>
+		</div>
+		<div id='right'>
+		</div>
+	</body>
+</html>
