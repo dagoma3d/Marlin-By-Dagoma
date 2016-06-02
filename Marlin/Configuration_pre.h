@@ -1,0 +1,8 @@
+#ifndef CONFIGURATION_PRE_H
+#define CONFIGURATION_PRE_H
+
+#define EEPROM_SETTINGS
+
+#define SDSUPPORT
+
+#endif
