@@ -586,6 +586,29 @@ static bool drain_queued_commands_P() {
 }
 
 /**
+ * Test for all enqueued commands to be processed.
+ * return false if it remains command, true when all commands are done
+ */
+bool enqueued_commands_finished__CALLABLE_FROM_LCD_ONLY() {
+  if ( commands_in_queue > 0) {
+    process_next_command();
+    cmd_queue_index_r = (cmd_queue_index_r + 1) % BUFSIZE;
+    commands_in_queue--;
+    return false;
+  }
+  return true;
+}
+
+/**
+ * Wait for all enqueued commands to be processed.
+ */
+void wait_all_commands_finished__CALLABLE_FROM_LCD_ONLY() {
+  while (!enqueued_commands_finished__CALLABLE_FROM_LCD_ONLY()) {
+    idle();
+  }
+}
+
+/**
  * Record one or many commands to run from program memory.
  * Aborts the current queue, if any.
  * Note: drain_queued_commands_P() must be called repeatedly to drain the commands afterwards
