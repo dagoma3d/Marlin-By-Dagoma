@@ -65,6 +65,7 @@
 #define MSG_EXTRUDE                         "Extrusion"
 #define MSG_RETRACT                         "Retraction"
 #define MSG_MOVE_AXIS                       "Deplacer un axe"
+#define MSG_Z_OFFSET                        "Regl. Z Offset"
 #define MSG_LEVEL_BED                       "Regl. Niv. Plateau"
 #define MSG_MOVE_X                          "Depl. X"
 #define MSG_MOVE_Y                          "Depl. Y"
