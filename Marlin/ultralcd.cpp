@@ -97,6 +97,7 @@ static void lcd_status_screen();
   static void lcd_control_motion_menu();
   static void lcd_control_volumetric_menu();
   static void lcd_set_z_offsets();
+  static void lcd_prepare_advanced_menu();
 
   #if ENABLED(HAS_LCD_CONTRAST)
     static void lcd_set_contrast();
@@ -1092,6 +1093,15 @@ void lcd_cooldown() {
  *
  */
 
+ //Préparer
+   // Déplacer un axes
+   // Préchanffage PLA
+   // Réglage Offset
+   // Refroidir
+   // Eteindre alim.
+   // Tout le reste : Réglages avancés
+     // Préchauffage ABS
+
 static void lcd_prepare_menu() {
   START_MENU();
 
@@ -1100,39 +1110,11 @@ static void lcd_prepare_menu() {
   //
   MENU_ITEM(back, MSG_MAIN);
 
-  //
-  // Auto Home
-  //
-  MENU_ITEM(gcode, MSG_AUTO_HOME, PSTR("G28"));
-
-  //
-  // Set Home Offsets
-  //
-  MENU_ITEM(function, MSG_SET_HOME_OFFSETS, lcd_set_home_offsets);
-  //MENU_ITEM(gcode, MSG_SET_ORIGIN, PSTR("G92 X0 Y0 Z0"));
-
-  //
-  // Level Bed
-  //
-  #if ENABLED(AUTO_BED_LEVELING_FEATURE)
-    MENU_ITEM(submenu, MSG_Z_OFFSET, lcd_set_z_offsets);
-
-    MENU_ITEM(gcode, MSG_LEVEL_BED,
-      axis_homed[X_AXIS] && axis_homed[Y_AXIS] ? PSTR("G29") : PSTR("G28\nG29")
-    );
-  #elif ENABLED(MANUAL_BED_LEVELING)
-    MENU_ITEM(submenu, MSG_LEVEL_BED, lcd_level_bed);
-  #endif
 
   //
   // Move Axis
   //
   MENU_ITEM(submenu, MSG_MOVE_AXIS, lcd_move_menu);
-
-  //
-  // Disable Steppers
-  //
-  MENU_ITEM(gcode, MSG_DISABLE_STEPPERS, PSTR("M84"));
 
   //
   // Preheat PLA
@@ -1141,12 +1123,19 @@ static void lcd_prepare_menu() {
   #if TEMP_SENSOR_0 != 0
     #if TEMP_SENSOR_1 != 0 || TEMP_SENSOR_2 != 0 || TEMP_SENSOR_3 != 0 || TEMP_SENSOR_BED != 0
       MENU_ITEM(submenu, MSG_PREHEAT_PLA, lcd_preheat_pla_menu);
-      MENU_ITEM(submenu, MSG_PREHEAT_ABS, lcd_preheat_abs_menu);
     #else
       MENU_ITEM(function, MSG_PREHEAT_PLA, lcd_preheat_pla0);
-      MENU_ITEM(function, MSG_PREHEAT_ABS, lcd_preheat_abs0);
     #endif
   #endif
+
+  //
+  // Level Bed
+  //
+  #if ENABLED(AUTO_BED_LEVELING_FEATURE)
+    MENU_ITEM(submenu, MSG_Z_OFFSET, lcd_set_z_offsets);
+
+  #endif
+
 
   //
   // Cooldown
@@ -1162,6 +1151,57 @@ static void lcd_prepare_menu() {
     else
       MENU_ITEM(gcode, MSG_SWITCH_PS_ON, PSTR("M80"));
   #endif
+
+  MENU_ITEM(submenu, MSG_PREPARE_ADVENCED, lcd_prepare_advanced_menu);
+
+  END_MENU();
+}
+
+static void lcd_prepare_advanced_menu() {
+  START_MENU();
+
+  //
+  // ^ Main
+  //
+  MENU_ITEM(back, MSG_MAIN);
+  //
+  // Auto Home
+  //
+  MENU_ITEM(gcode, MSG_AUTO_HOME, PSTR("G28"));
+
+  //
+  // Level Bed
+  //
+  #if ENABLED(AUTO_BED_LEVELING_FEATURE)
+    MENU_ITEM(gcode, MSG_LEVEL_BED,
+      axis_homed[X_AXIS] && axis_homed[Y_AXIS] ? PSTR("G29") : PSTR("G28\nG29")
+    );
+  #elif ENABLED(MANUAL_BED_LEVELING)
+    MENU_ITEM(submenu, MSG_LEVEL_BED, lcd_level_bed);
+  #endif
+
+  //
+  // Preheat PLA
+  // Preheat ABS
+  //
+  #if TEMP_SENSOR_0 != 0
+    #if TEMP_SENSOR_1 != 0 || TEMP_SENSOR_2 != 0 || TEMP_SENSOR_3 != 0 || TEMP_SENSOR_BED != 0
+      MENU_ITEM(submenu, MSG_PREHEAT_ABS, lcd_preheat_abs_menu);
+    #else
+      MENU_ITEM(function, MSG_PREHEAT_ABS, lcd_preheat_abs0);
+    #endif
+  #endif
+
+  //
+  // Set Home Offsets
+  //
+  MENU_ITEM(function, MSG_SET_HOME_OFFSETS, lcd_set_home_offsets);
+  //MENU_ITEM(gcode, MSG_SET_ORIGIN, PSTR("G92 X0 Y0 Z0"));
+
+  //
+  // Disable Steppers
+  //
+  MENU_ITEM(gcode, MSG_DISABLE_STEPPERS, PSTR("M84"));
 
   //
   // Autostart
@@ -1348,11 +1388,11 @@ static void _lcd_reinit_z_offsets_saved(){
   MENU_ITEM_DUMMY();
   MENU_ITEM_DUMMY();
 
-  lcd_implementation_drawmenu_generic(0, 1, PSTR("   Parametres"), ' ', ' ');
-  lcd_implementation_drawmenu_generic(0, 2, PSTR("   sauvegardes"), ' ', ' ');
+  lcd_implementation_drawmenu_generic(0, 1, PSTR(MSG_PARAMETERS), ' ', ' ');
+  lcd_implementation_drawmenu_generic(0, 2, PSTR(MSG_SAVED), ' ', ' ');
 
   encoderLine = 4;
-  MENU_ITEM(submenu, "OK", lcd_return_to_status);
+  MENU_ITEM(submenu, MSG_OK, lcd_return_to_status);
 
 
   END_MENU();
@@ -1361,7 +1401,7 @@ static void _lcd_reinit_z_offsets_saved(){
 static void _lcd_reinit_z_offsets_wait(){
   START_MENU();
 
-  lcd_implementation_drawmenu_generic(0, 2, PSTR("    Patientez..."), ' ', ' ');
+  lcd_implementation_drawmenu_generic(0, 2, PSTR(MSG_WAIT), ' ', ' ');
 
   END_MENU();
 }
@@ -1370,10 +1410,6 @@ static void _lcd_reinit_z_offsets_save_back(){
   lcd_goto_menu(_lcd_reinit_z_offsets_wait);
 
   zprobe_zoffset = -4.0+current_position[Z_AXIS];
-  SERIAL_ERROR("zprobe_zoffset ");
-  SERIAL_ERROR(zprobe_zoffset);
-  SERIAL_ERROR(",current_position[Z_AXIS] ");
-  SERIAL_ERROR(current_position[Z_AXIS]);
 
   Config_StoreSettings();
   enqueue_and_echo_commands_P(PSTR("G28")); //origine auto : besoin pour que le z soit pris en compte
@@ -1387,14 +1423,14 @@ static void _lcd_reinit_z_offsets_save_back(){
 
 static void _lcd_reinit_z_offsets_zConfig(){
 
-  lcd_implementation_drawmenu_generic(0, 0, PSTR("Pincez la feuille"), ' ', ' ');
-  lcd_implementation_drawmenu_generic(0, 1, PSTR("en reglant l'offset"), ' ', ' ');
+  lcd_implementation_drawmenu_generic(0, 0, PSTR(MSG_PINCH), ' ', ' ');
+  lcd_implementation_drawmenu_generic(0, 1, PSTR(MSG_SET_OFFSET), ' ', ' ');
 
   //lcd_move_z();
   move_menu_scale = 0.1;
   _lcd_move_callback(PSTR(MSG_MOVE_Z), Z_AXIS, sw_endstop_min[Z_AXIS], sw_endstop_max[Z_AXIS], _lcd_reinit_z_offsets_save_back);
 
-  lcd_implementation_drawmenu_generic(0, 4, PSTR("puis validez"), ' ', ' ');
+  lcd_implementation_drawmenu_generic(0, 4, PSTR(MSG_VALIDATE), ' ', ' ');
 }
 
 
@@ -1406,9 +1442,9 @@ static void _lcd_reinit_z_offsets_screenSheet(){
   MENU_ITEM_DUMMY();
   MENU_ITEM_DUMMY();
 
-  lcd_implementation_drawmenu_generic(0, 0, PSTR("Glissez une feuille"), ' ', ' ');
-  lcd_implementation_drawmenu_generic(0, 1, PSTR("en dessous de la buse"), ' ', ' ');
-  lcd_implementation_drawmenu_generic(0, 2, PSTR("puis appuyer sur OK"), ' ', ' ');
+  lcd_implementation_drawmenu_generic(0, 0, PSTR(MSG_ADD_SHEET), ' ', ' ');
+  lcd_implementation_drawmenu_generic(0, 1, PSTR(MSG_BESIDE_NOZZLE), ' ', ' ');
+  lcd_implementation_drawmenu_generic(0, 2, PSTR(MSG_CLICK_OK), ' ', ' ');
   //_drawLineNr = 3;
   encoderLine = 4;
   MENU_ITEM(submenu, "OK", _lcd_reinit_z_offsets_zConfig);
@@ -1439,17 +1475,6 @@ static void lcd_set_z_offsets_save_config() {
   enqueue_and_echo_commands_P(PSTR("G28"));
   enqueue_and_echo_commands_P(PSTR("G0 Z0")); //origine auto : besoin pour que le z soit pris en compte
 }
-
-//Préparer
-  // Déplacer un axes
-  // Préchanffage PLA
-  // Réglage Offset
-  // Refroidir
-  // Eteindre alim.
-  // Tout le reste : Réglages avancés
-    // Préchauffage ABS
-//Controller OK
-
 
 static void lcd_set_z_offsets() {
   START_MENU();
