@@ -18,3 +18,5 @@ applet/
 *.s
 *.i
 *.ii
+.pioenvs/
+
