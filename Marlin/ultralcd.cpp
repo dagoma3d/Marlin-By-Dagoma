@@ -1215,14 +1215,76 @@ static void lcd_prepare_advanced_menu() {
 
 #if ENABLED(DELTA_CALIBRATION_MENU)
 
+  static void delta_auto_calibration() {
+    lcd_return_to_status();
+
+    enqueue_and_echo_commands_P( PSTR("M117 Calibration (0/3)") );
+    
+    endstop_adj[0] = 0.0;
+    endstop_adj[1] = 0.0;
+    endstop_adj[2] = 0.0;
+
+    delta_diagonal_rod_trim_tower_1 = 0.0;
+    delta_diagonal_rod_trim_tower_2 = 0.0;
+    delta_diagonal_rod_trim_tower_3 = 0.0;
+    enqueue_and_echo_commands_P( PSTR("M665") );
+    wait_all_commands_finished__CALLABLE_FROM_LCD_ONLY();
+
+    enqueue_and_echo_commands_P( PSTR("M117 Calibration (1/3)") );
+    enqueue_and_echo_commands_P( PSTR("G28") );
+    enqueue_and_echo_commands_P( PSTR("G0 F8000 X-77.94 Y-45 Z10") );
+    enqueue_and_echo_commands_P( PSTR("G30") );
+    wait_all_commands_finished__CALLABLE_FROM_LCD_ONLY();
+    float z_adjust_X = current_position[Z_AXIS];
+
+    enqueue_and_echo_commands_P( PSTR("M117 Calibration (2/3)") );
+    enqueue_and_echo_commands_P( PSTR("G0 F8000 X77.94 Y-45 Z10") );
+    enqueue_and_echo_commands_P( PSTR("G30") );
+    wait_all_commands_finished__CALLABLE_FROM_LCD_ONLY();
+    float z_adjust_Y = current_position[Z_AXIS];
+
+    enqueue_and_echo_commands_P( PSTR("M117 Calibration (3/3)") );
+    enqueue_and_echo_commands_P( PSTR("G0 F8000 X0 Y90 Z10") );
+    enqueue_and_echo_commands_P( PSTR("G30") );
+    wait_all_commands_finished__CALLABLE_FROM_LCD_ONLY();
+    float z_adjust_Z = current_position[Z_AXIS];
+
+    SERIAL_ECHO( "z_adjust: X:" );
+    SERIAL_ECHO( z_adjust_X );
+    SERIAL_ECHO( " Y:" );
+    SERIAL_ECHO( z_adjust_Y );
+    SERIAL_ECHO( " Z:" );
+    SERIAL_ECHOLN( z_adjust_Z );
+
+    
+    endstop_adj[0] = z_adjust_X;
+    endstop_adj[1] = z_adjust_Y;
+    endstop_adj[2] = z_adjust_Z;
+    
+
+    delta_diagonal_rod_trim_tower_1 = z_adjust_X;
+    delta_diagonal_rod_trim_tower_2 = z_adjust_Y;
+    delta_diagonal_rod_trim_tower_3 = z_adjust_Z;
+    
+    enqueue_and_echo_commands_P( PSTR("M665") );
+
+    enqueue_and_echo_commands_P( PSTR("G28") );
+    enqueue_and_echo_commands_P( PSTR("M500") );
+    enqueue_and_echo_commands_P( PSTR("M117 Calibration (done)") );
+    wait_all_commands_finished__CALLABLE_FROM_LCD_ONLY();
+  }
+
   static void lcd_delta_calibrate_menu() {
     START_MENU();
     MENU_ITEM(back, MSG_MAIN);
+    MENU_ITEM(function, "Calibration automatique", delta_auto_calibration);
+    /*
     MENU_ITEM(gcode, MSG_AUTO_HOME, PSTR("G28"));
     MENU_ITEM(gcode, MSG_DELTA_CALIBRATE_X, PSTR("G0 F8000 X-77.94 Y-45 Z0"));
     MENU_ITEM(gcode, MSG_DELTA_CALIBRATE_Y, PSTR("G0 F8000 X77.94 Y-45 Z0"));
     MENU_ITEM(gcode, MSG_DELTA_CALIBRATE_Z, PSTR("G0 F8000 X0 Y90 Z0"));
     MENU_ITEM(gcode, MSG_DELTA_CALIBRATE_CENTER, PSTR("G0 F8000 X0 Y0 Z0"));
+    */
     END_MENU();
   }
 
