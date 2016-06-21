@@ -15,12 +15,14 @@ VERBOSE=true
 HUMAN_OUTPUT=true
 BUILD_MATRIX=false
 JSON_CONF=false
+CHECKSUM=
+PATH_CONF=false
 PROFILE_TO_APPLY=
 VARIANT_TO_LIST=
 declare -A VARIANTS_TO_APPLY
 
 usage() {
-	echo "usage: ${BASE_NAME} [options] <profile_name> [<variant:value>+]"
+	echo "usage: ${BASE_NAME} [options] profile_name [variant_name] [checksum] [variant:value]*"
 	echo
 	echo "OPTIONS:"
 	echo "    -l, --list           list available profiles / variants / variant values"
@@ -35,6 +37,10 @@ usage() {
 	echo
 	echo "    -j, --json-conf      output json conf"
 	echo "                         generate a json conf output of input parameters"
+	echo "                         You can provide a checksum value after the profile name"
+	echo
+	echo "    -p, --path-conf      output path conf"
+	echo "                         generate a path output corresponding to actual conf of input parameters"
 	echo
 	echo "    -z, --raz            restore default configuration"
 	echo "                         equivalent to '${BASE_NAME} Default'"
@@ -91,6 +97,10 @@ do
 			JSON_CONF=true
 			debug "JSON conf output enabled."
 			;;
+		-p|--path-conf)
+			PATH_CONF=true
+			debug "PATH conf output enabled."
+			;;
 		-b|--backup)
 			MAKE_BACKUP=true
 			debug "Backup before applying configuration enabled."
@@ -119,7 +129,7 @@ do
 			then
 				if $LIST_ACTION
 				then
-					debug "Cli parsing: List action enabled. Accepted variant name."
+					debug "Cli parsing: List action enabled. Accepts variant name."
 					if test -n "${VARIANT_TO_LIST}"
 					then
 						error "Unrecognized parameter: $1"
@@ -128,11 +138,23 @@ do
 					debug "Cli parsing: Detected variant name to list: $1"
 					VARIANT_TO_LIST="$1"
 				else
-					error "Unrecognized parameter: $1"
-					usage
+					if $JSON_CONF
+					then
+						debug "Cli parsing: JSON conf action enabled. Accepts checksum."
+						if test -n "${CHECKSUM}"
+						then
+							error "Unrecognized parameter: $1"
+							usage
+						fi
+						debug "Cli parsing: Detected checksum: $1"
+						CHECKSUM="$1"
+					else
+						error "Unrecognized parameter: $1"
+						usage
+					fi
 				fi
 			else
-				debug "cli parsing: Detected profile: $1"
+				debug "Cli parsing: Detected profile: $1"
 				PROFILE_TO_APPLY="$1"
 			fi
 			;;
@@ -310,8 +332,22 @@ json_conf_ouput() {
 		variant_value=${VARIANTS_TO_APPLY[$variant_name]}
 		echo "    ,\"${variant_name}\": \"${variant_value}\""
 	done
-
+	if test -n "${CHECKSUM}"
+	then
+		echo "    ,\"checksum\": \"${CHECKSUM}\""
+	fi
 	echo "}"
+	exit 0
+}
+
+path_conf_ouput() {
+	echo -n "${PROFILE_TO_APPLY}"
+	for variant_name in ${!VARIANTS_TO_APPLY[*]}
+	do
+		variant_value=${VARIANTS_TO_APPLY[$variant_name]}
+		echo -n "/${variant_name}/${variant_value}"
+	done
+	echo
 	exit 0
 }
 
@@ -362,6 +398,7 @@ $BUILD_MATRIX && build_matrix
 sanity_checks
 
 $JSON_CONF && json_conf_ouput
+$PATH_CONF && path_conf_ouput
 
 Enable() {
 	debug "Conf: Enable: ${*}"
