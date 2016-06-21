@@ -1,0 +1,407 @@
+#!/bin/bash
+
+DEBUG=false
+DRYRUN=false
+BASE_NAME=$(basename $0)
+TOOL_DIR=$(realpath $(dirname $0))
+MARLIN_DIR=$(realpath ${TOOL_DIR}/../../..)
+#PROFILE_DIR=$(realpath ${MARLIN_DIR}/Marlin/example_configurations/Dagoma)
+PROFILE_DIR=$(realpath ${TOOL_DIR}/../conf/serie)
+DEFAULT_PROFILE_DIR=$(realpath ${TOOL_DIR}/../conf/Default)
+LIST_ACTION=false
+MAKE_BACKUP=false
+RESTORE_DEFAULT=false
+VERBOSE=true
+HUMAN_OUTPUT=true
+BUILD_MATRIX=false
+JSON_CONF=false
+PROFILE_TO_APPLY=
+VARIANT_TO_LIST=
+declare -A VARIANTS_TO_APPLY
+
+usage() {
+	echo "usage: ${BASE_NAME} [options] <profile_name> [<variant:value>+]"
+	echo
+	echo "OPTIONS:"
+	echo "    -l, --list           list available profiles / variants / variant values"
+	echo "                         if a profile name is specified, list available variants"
+	echo "                         if a profile and a variant name are specified, list available variant values"
+	echo 
+	echo "    -b, --backend        use backend output style"
+	echo "                         do not output human readable information"
+	echo
+	echo "    -bm, --build-matrix  output build matrix"
+	echo "                         assume --backend"
+	echo
+	echo "    -j, --json-conf      output json conf"
+	echo "                         generate a json conf output of input parameters"
+	echo
+	echo "    -z, --raz            restore default configuration"
+	echo "                         equivalent to '${BASE_NAME} Default'"
+	echo
+	echo "    -r, --dryrun         enable dryrun"
+	echo "                         do not apply porfile. Print to stdout actions instead"
+	echo
+	echo "    -d, --debug          enable debug"
+	echo "                         should be the first option"
+	echo
+	echo "    -q, --quiet          do job silently"
+	echo
+	echo "    -h, --help           display this help and exit"
+	echo
+	exit 1
+}
+
+debug() {
+	$DEBUG && echo "debug: ${1}"
+}
+
+error() {
+	echo "error: ${1}"
+}
+
+dryrun() {
+	$DRYRUN && echo "dryrun: ${*}" || ${*}
+}
+
+while test -n "$1"
+do
+	case "$1" in
+		-h|--help)
+			usage
+			;;
+		-d|--debug)
+			DEBUG=true
+			debug "Debug enabled."
+			;;
+		-l|--list)
+			LIST_ACTION=true
+			debug "Profile listing."
+			;;
+		-b|--backend)
+			HUMAN_OUTPUT=false
+			debug "Backend output enabled."
+			;;
+		-bm|--build-matrix)
+			HUMAN_OUTPUT=false
+			BUILD_MATRIX=true
+			debug "Build matrix output enabled."
+			;;
+		-j|--json-conf)
+			JSON_CONF=true
+			debug "JSON conf output enabled."
+			;;
+		-b|--backup)
+			MAKE_BACKUP=true
+			debug "Backup before applying configuration enabled."
+			;;
+		-r|--dryrun)
+			DRYRUN=true
+			debug "Enabling dryrun"
+			;;
+		-z|--raz)
+			RESTORE_DEFAULT=true
+			debug "Restore default configuration"
+			;;
+		-q|--quiet)
+			VERBOSE=false
+			debug "Quiet enable"
+			;;
+		*)
+			debug "Cli parsing: option other : $1."
+			if echo "${1}" | grep --quiet ':'
+			then
+				debug "Cli parsing: Variant:Value pair detected: $1"
+				variant_name=$(echo $1 | cut -f1 -d\:)
+				variant_value=$(echo $1 | cut -f2 -d\:)
+				VARIANTS_TO_APPLY[$variant_name]=$variant_value
+			elif test -n "${PROFILE_TO_APPLY}"
+			then
+				if $LIST_ACTION
+				then
+					debug "Cli parsing: List action enabled. Accepted variant name."
+					if test -n "${VARIANT_TO_LIST}"
+					then
+						error "Unrecognized parameter: $1"
+						usage
+					fi
+					debug "Cli parsing: Detected variant name to list: $1"
+					VARIANT_TO_LIST="$1"
+				else
+					error "Unrecognized parameter: $1"
+					usage
+				fi
+			else
+				debug "cli parsing: Detected profile: $1"
+				PROFILE_TO_APPLY="$1"
+			fi
+			;;
+	esac
+	shift
+done
+
+debug "BASE_NAME:           ${BASE_NAME}"
+debug "TOOL_DIR:            ${TOOL_DIR}"
+debug "MARLIN_DIR:          ${MARLIN_DIR}"
+debug "PROFILE_DIR:         ${PROFILE_DIR}"
+debug "DEFAULT_PROFILE_DIR: ${DEFAULT_PROFILE_DIR}"
+
+variant_value_exists()
+{
+	test -f "${PROFILE_DIR}/${1}/variants/${2}/${3}"
+}
+
+variant_exists()
+{
+	test -d "${PROFILE_DIR}/${1}/variants/${2}"
+}
+
+list_variants_values() {
+	NEXT=
+	for variant_value in $(find "${PROFILE_DIR}/$1/variants/$2" -mindepth 1 -maxdepth 1 -type f)
+		do
+			if $HUMAN_OUTPUT
+			then
+				echo -n "${NEXT} $(basename ${variant_value})"
+				NEXT=" |"
+			else
+				echo "$(basename ${variant_value})"
+			fi
+		done
+		$HUMAN_OUTPUT && echo
+}
+
+list_variants() {
+	
+	debug "List variants"
+	
+	if ! profile_exists $1
+	then
+		error "Profile does not exists: $1"
+		exit 1
+	fi
+
+	if variants_exists $1
+	then
+		$HUMAN_OUTPUT && echo "Available variants for profile $1:"
+		for variant in $(find "${PROFILE_DIR}/$1/variants" -mindepth 1 -maxdepth 1 -type d)
+		do
+			variant="$(basename ${variant})"
+			if $HUMAN_OUTPUT
+			then
+				echo "    ${variant}: $(list_variants_values $1 ${variant})"
+			else
+				echo "${variant}"
+			fi
+		done
+	else
+		$HUMAN_OUTPUT && echo "No variant available for profile $1."
+	fi
+}
+
+profile_exists() {
+	test -f "${PROFILE_DIR}/$1/Base" #test -d "${PROFILE_DIR}/$1/files"
+}
+
+variants_exists() {
+	test -d "${PROFILE_DIR}/$1/variants"
+}
+
+list_profile() {
+
+	debug "List profiles"
+
+	$HUMAN_OUTPUT && echo "Avaialble profiles:"
+	for profile in $(find ${PROFILE_DIR} -mindepth 1 -maxdepth 1 -type d)
+	do
+		echo "    $(basename ${profile})"
+	done
+}
+
+list() {
+
+	debug "List"
+
+	if test -z "${PROFILE_TO_APPLY}"
+	then
+		list_profile
+	elif test -z "${VARIANT_TO_LIST}"
+	then
+		list_variants ${PROFILE_TO_APPLY}
+	else
+		list_variants_values ${PROFILE_TO_APPLY} ${VARIANT_TO_LIST}
+	fi
+
+	exit 0
+}
+
+recursive_variant_value() {
+	# $1 : serie
+	# $2 : LAST_VARIANT_NAME
+	# $3 : current variant
+	echo "CURRENT_MATRIX_SERIE: ${CURRENT_MATRIX_SERIE}"
+	echo "${2}"
+	for variant in $(list_variants ${1} ${2})
+	do
+		echo "Remaining variants: ${variant}"
+
+	done
+}
+
+build_matrix() {
+
+	
+	for serie in $(list_profile)
+	do
+		unset matrix
+		declare -a matrix
+
+		index=0
+		first_variant=true
+		for variant in $(list_variants ${serie})
+		do
+			unset tmp_matrix
+			declare -a tmp_matrix
+
+			for variant_value in $(list_variants_values ${serie} ${variant})
+			do
+				
+				if $first_variant
+				then
+					# first variant: we simply iterate through variant values
+					tmp_matrix[$index]="${serie} ${variant}:${variant_value}"
+					index=$(expr $index + 1)
+				else
+					for m_idx in ${!matrix[*]}
+					do
+						tmp_matrix[${index}]="${matrix["${m_idx}"]} ${variant}:${variant_value}"
+						index=$(expr $index + 1)
+					done
+				fi
+			done
+
+			# swap from tmp_matrix to matrix
+			for m_idx in ${!matrix[*]}
+			do
+				unset matrix[${m_idx}]
+			done
+			for m_idx in ${!tmp_matrix[*]}
+			do
+				matrix[${m_idx}]="${tmp_matrix[${m_idx}]}"	
+			done
+			
+			first_variant=false
+		done
+
+		for m_idx in ${!matrix[*]}
+		do
+			echo "${matrix["${m_idx}"]}"
+		done
+	done
+
+	exit 0
+}
+
+json_conf_ouput() {
+	echo "{"
+	echo "    \"serie\": \"${PROFILE_TO_APPLY}\""
+	for variant_name in ${!VARIANTS_TO_APPLY[*]}
+	do
+		variant_value=${VARIANTS_TO_APPLY[$variant_name]}
+		echo "    ,\"${variant_name}\": \"${variant_value}\""
+	done
+
+	echo "}"
+	exit 0
+}
+
+sanity_checks() {
+
+	debug "Sanity check"
+
+	# Profile to apply not null
+	if test -z "${PROFILE_TO_APPLY}"
+	then
+		error "Profile to apply not specified";
+		usage
+	fi
+
+	# Profile exists
+	if ! profile_exists ${PROFILE_TO_APPLY}
+	then
+		error "Profile does not exist: ${PROFILE_TO_APPLY}."
+		list_profile
+		exit 1
+	fi
+
+	# All variants exists
+	for variant_name in ${!VARIANTS_TO_APPLY[*]}
+	do
+		debug "Given variant name: ${variant_name}"
+		if ! variant_exists ${PROFILE_TO_APPLY} ${variant_name}
+		then
+			error "Variant does not exist for profile ${PROFILE_TO_APPLY}: ${variant_name}"
+			list_variants ${PROFILE_TO_APPLY}
+			exit 1
+		fi
+		variant_value=${VARIANTS_TO_APPLY[$variant_name]}
+		debug "Given variant value: ${variant_value}"
+		if ! variant_value_exists ${PROFILE_TO_APPLY} ${variant_name} ${variant_value}
+		then
+			error "Variant value does not exist for profile ${PROFILE_TO_APPLY} and variant ${variant_name}: ${variant_value}"
+			list_variants ${PROFILE_TO_APPLY}
+			exit 1
+		fi
+	done
+}
+
+$LIST_ACTION && list
+
+$BUILD_MATRIX && build_matrix
+
+sanity_checks
+
+$JSON_CONF && json_conf_ouput
+
+Enable() {
+	debug "Conf: Enable: ${*}"
+	dryrun eval "sed -i 's/\/\/ *\(#define *${1}\)/\1/g' ${MARLIN_DIR}/Marlin/Configuration.h"
+}
+
+Disable() {
+	debug "Conf: Disable: ${*}"
+	dryrun eval "sed -i 's/\(\/\/ *\)*\(\#define *${1}\)/\/\/\2/g' ${MARLIN_DIR}/Marlin/Configuration.h"
+}
+
+Set() {
+	debug "Conf: Set: ${*}"
+	dryrun eval "sed -i 's/\(#define *${1}\) *.*\$/\1 ${2}/g' ${MARLIN_DIR}/Marlin/Configuration.h"
+	dryrun eval "sed -i 's/\(${1}\)\( *= *\)[^;]\+;.*\$/\1 = ${2};/g' ${MARLIN_DIR}/Marlin/Configuration.h"
+}
+
+apply_configuration_file() {
+	debug "Applying configuration file: ${1}"
+	while read line
+	do
+		eval "$line"
+	done < "${1}"
+}
+
+echo "Applying base profile: ${PROFILE_TO_APPLY}"
+
+dryrun cp ${PROFILE_DIR}/${PROFILE_TO_APPLY}/files/* ${MARLIN_DIR}/Marlin
+
+echo "Applying base configuration profile: ${PROFILE_TO_APPLY}"
+apply_configuration_file "${PROFILE_DIR}/${PROFILE_TO_APPLY}/Base"
+
+for variant_name in ${!VARIANTS_TO_APPLY[*]}
+do
+	variant_value=${VARIANTS_TO_APPLY[$variant_name]}
+
+	echo "Applying variant: ${variant_name}=${variant_value}"
+
+	apply_configuration_file "${PROFILE_DIR}/${PROFILE_TO_APPLY}/variants/${variant_name}/${variant_value}"
+done
+
+
+$DRYRUN && exit 1 || exit 0
