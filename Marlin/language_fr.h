@@ -46,7 +46,7 @@
 #define MSG_ADD_SHEET                       "Glissez une feuille"
 #define MSG_BESIDE_NOZZLE                   "en dessous de la buse"
 #define MSG_CLICK_OK                        "puis appuyez sur OK"
-
+#define MSG_PARALLEL_X                      "Parrallel X"
 #define MSG_AUTOSTART                       "Demarrage auto"
 #define MSG_DISABLE_STEPPERS                "Arreter moteurs"
 #define MSG_AUTO_HOME                       "Origine auto."

@@ -875,6 +875,32 @@ void lcd_cooldown() {
   lcd_return_to_status();
 }
 
+void lcd_parallel_x(){
+  lcd_return_to_status();
+
+  enqueue_and_echo_commands_P( PSTR("M117 Origine Machine") );  //      ; Message sur afficheur
+  enqueue_and_echo_commands_P( PSTR("G28") );  //             	    ; Home X Y Z
+  enqueue_and_echo_commands_P( PSTR("G90") );  //                	 ; Passage coordonnees absolues
+  wait_all_commands_finished__CALLABLE_FROM_LCD_ONLY();
+
+  //;Parallelisme Axe X
+  enqueue_and_echo_commands_P( PSTR("M117 Parallelisme X") );  //      ; Message sur afficheur
+  enqueue_and_echo_commands_P( PSTR("G1 Z5 F9000") );  //           ; lift nozzle
+  wait_all_commands_finished__CALLABLE_FROM_LCD_ONLY();
+
+  enqueue_and_echo_commands_P( PSTR("G1 X-24 Y-14 F9000") );  //
+  enqueue_and_echo_commands_P( PSTR("G92 Z20") );  //
+  enqueue_and_echo_commands_P( PSTR("G91") );  //                   ; Passage coordonnees relatives
+  wait_all_commands_finished__CALLABLE_FROM_LCD_ONLY();
+
+  enqueue_and_echo_commands_P( PSTR("G1 Z-15 F200") );  //		     ; Descente en dessous du plateau
+  enqueue_and_echo_commands_P( PSTR("G1 Z15 F9000") );  //
+  enqueue_and_echo_commands_P( PSTR("G28") );  //		            ; Home
+  wait_all_commands_finished__CALLABLE_FROM_LCD_ONLY();
+
+  enqueue_and_echo_commands_P( PSTR("G90") );  //                   ; Passage coordonnees absolues
+}
+
 #if ENABLED(SDSUPPORT) && ENABLED(MENU_ADDAUTOSTART)
 
   static void lcd_autostart_sd() {
@@ -1128,12 +1154,15 @@ static void lcd_prepare_menu() {
     #endif
   #endif
 
+  #if ENABLED(PARALLEL_X_FEATURE)
+    MENU_ITEM(function, MSG_PARALLEL_X, lcd_parallel_x);
+  #endif
+
   //
   // Level Bed
   //
   #if ENABLED(AUTO_BED_LEVELING_FEATURE)
     MENU_ITEM(submenu, MSG_Z_OFFSET, lcd_set_z_offsets);
-
   #endif
 
 
@@ -1219,7 +1248,7 @@ static void lcd_prepare_advanced_menu() {
     lcd_return_to_status();
 
     enqueue_and_echo_commands_P( PSTR("M117 Calibration (0/3)") );
-    
+
     endstop_adj[0] = 0.0;
     endstop_adj[1] = 0.0;
     endstop_adj[2] = 0.0;
@@ -1256,16 +1285,16 @@ static void lcd_prepare_advanced_menu() {
     SERIAL_ECHO( " Z:" );
     SERIAL_ECHOLN( z_adjust_Z );
 
-    
+
     endstop_adj[0] = z_adjust_X;
     endstop_adj[1] = z_adjust_Y;
     endstop_adj[2] = z_adjust_Z;
-    
+
 
     delta_diagonal_rod_trim_tower_1 = z_adjust_X;
     delta_diagonal_rod_trim_tower_2 = z_adjust_Y;
     delta_diagonal_rod_trim_tower_3 = z_adjust_Z;
-    
+
     enqueue_and_echo_commands_P( PSTR("M665") );
 
     enqueue_and_echo_commands_P( PSTR("G28") );

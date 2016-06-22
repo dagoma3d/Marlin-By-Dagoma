@@ -273,7 +273,7 @@
    #define  DEFAULT_Kp 10.66
    #define  DEFAULT_Ki 1.66
    #define  DEFAULT_Kd 14.41
-    
+
   // find our own PID extruder : M303 E0 C8 S210 (or E1 E2 E3)
 
 #endif // PIDTEMP
@@ -334,7 +334,7 @@
   //#define  DEFAULT_bedKp 97.1
   //#define  DEFAULT_bedKi 1.41
   //#define  DEFAULT_bedKd 1675.16
-  
+
   //230v 700W silicone heater
   //from pidautotune
   #define  DEFAULT_bedKp 97.1
@@ -535,6 +535,8 @@ const bool Z_MIN_PROBE_ENDSTOP_INVERTING = false; // set to true to invert the l
 #define Y_MAX_POS 400
 #define Z_MAX_POS 350
 
+#define PARALLEL_X_FEATURE
+
 //===========================================================================
 //========================= Filament Runout Sensor ==========================
 //===========================================================================
@@ -646,21 +648,21 @@ const bool Z_MIN_PROBE_ENDSTOP_INVERTING = false; // set to true to invert the l
   //#define Y_PROBE_OFFSET_FROM_EXTRUDER 10  // Y offset: -front +behind [the nozzle]
   //#define Z_PROBE_OFFSET_FROM_EXTRUDER 0   // Z offset: -below +above  [the nozzle]
 
-  // DUAL E3D v6 
+  // DUAL E3D v6
   //#define X_PROBE_OFFSET_FROM_EXTRUDER 22     // Z probe to nozzle X offset: -left  +right
   //#define Y_PROBE_OFFSET_FROM_EXTRUDER 15     // Z probe to nozzle Y offset: -front +behind
   //#define Z_PROBE_OFFSET_FROM_EXTRUDER 0  // Z probe to nozzle Z offset: -below (always!)
-  
-  // Chimera v6 
+
+  // Chimera v6
   #define X_PROBE_OFFSET_FROM_EXTRUDER 41     // @julien:etait 37 - Z probe to nozzle X offset: -left  +right
   #define Y_PROBE_OFFSET_FROM_EXTRUDER 0     // Z probe to nozzle Y offset: -front +behind
   #define Z_PROBE_OFFSET_FROM_EXTRUDER 0  // Z probe to nozzle Z offset: -below (always!)
-  
-  // CYCLOP v6 
+
+  // CYCLOP v6
   //#define X_PROBE_OFFSET_FROM_EXTRUDER 32     // Z probe to nozzle X offset: -left  +right
   //#define Y_PROBE_OFFSET_FROM_EXTRUDER 0     // Z probe to nozzle Y offset: -front +behind
   //#define Z_PROBE_OFFSET_FROM_EXTRUDER 0  // Z probe to nozzle Z offset: -below (always!)
-  
+
   #define XY_TRAVEL_SPEED 9000         // X and Y axis travel speed between probes, in mm/min.
 
   #define Z_RAISE_BEFORE_PROBING 5   // How much the Z axis will be raised before traveling to the first probing point.
