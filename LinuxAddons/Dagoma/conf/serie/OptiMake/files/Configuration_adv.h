@@ -296,6 +296,13 @@
 
 // @section lcd
 
+#if ENABLED(ULTIPANEL)
+  #define MANUAL_FEEDRATE {50*60, 50*60, 4*60, 60} // Feedrates for manual moves along X, Y, Z, E from panel
+  #define ULTIPANEL_FEEDMULTIPLY  // Comment to disable setting feedrate multiplier via encoder
+#endif
+
+// @section lcd
+
 // Babystepping enables the user to control the axis in tiny amounts, independently from the normal printing process
 // it can e.g. be used to change z-positions in the print startup phase in real-time
 // does not respect endstops!

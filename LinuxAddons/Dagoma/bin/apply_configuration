@@ -315,10 +315,19 @@ build_matrix() {
 			first_variant=false
 		done
 
-		for m_idx in ${!matrix[*]}
-		do
-			echo "${matrix["${m_idx}"]}"
-		done
+		if test ${index} -eq 0
+		then
+			debug "No variant for serie: ${serie}"
+			echo "${serie}"
+		else
+			# Output variants permutations
+			for m_idx in ${!matrix[*]}
+			do
+				echo "${matrix["${m_idx}"]}"
+			done
+		fi
+
+		
 	done
 
 	exit 0
@@ -403,11 +412,13 @@ $PATH_CONF && path_conf_ouput
 Enable() {
 	debug "Conf: Enable: ${*}"
 	dryrun eval "sed -i 's/\/\/ *\(#define *${1}\)/\1/g' ${MARLIN_DIR}/Marlin/Configuration.h"
+	dryrun eval "sed -i 's/\/\/ *\(#define *${1}\)/\1/g' ${MARLIN_DIR}/Marlin/Configuration_adv.h"
 }
 
 Disable() {
 	debug "Conf: Disable: ${*}"
 	dryrun eval "sed -i 's/\(\/\/ *\)*\(\#define *${1}\)/\/\/\2/g' ${MARLIN_DIR}/Marlin/Configuration.h"
+	dryrun eval "sed -i 's/\(\/\/ *\)*\(\#define *${1}\)/\/\/\2/g' ${MARLIN_DIR}/Marlin/Configuration_adv.h"
 }
 
 Set() {
@@ -424,9 +435,12 @@ apply_configuration_file() {
 	done < "${1}"
 }
 
-echo "Applying base profile: ${PROFILE_TO_APPLY}"
+if test -d "${PROFILE_DIR}/${PROFILE_TO_APPLY}/files"
+then
+	echo "Applying base profile static files: ${PROFILE_TO_APPLY}"
 
-dryrun cp ${PROFILE_DIR}/${PROFILE_TO_APPLY}/files/* ${MARLIN_DIR}/Marlin
+	dryrun cp ${PROFILE_DIR}/${PROFILE_TO_APPLY}/files/* ${MARLIN_DIR}/Marlin
+fi
 
 echo "Applying base configuration profile: ${PROFILE_TO_APPLY}"
 apply_configuration_file "${PROFILE_DIR}/${PROFILE_TO_APPLY}/Base"
