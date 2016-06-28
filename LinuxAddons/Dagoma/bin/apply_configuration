@@ -453,6 +453,11 @@ apply_configuration_file() {
 	do
 		eval "$line"
 	done < "${1}"
+
+	if test -n "${line}"
+	then
+		eval "$line"
+	fi
 }
 
 if test -d "${PROFILE_DIR}/${PROFILE_TO_APPLY}/files"
