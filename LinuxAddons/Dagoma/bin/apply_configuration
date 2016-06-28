@@ -447,6 +447,17 @@ Set() {
 	fi
 }
 
+Pin() {
+	debug "Conf: Pin: ${*}"
+	
+	debug "      Adding non existing entry: ${1}"
+	iln="$(grep -n '__PINS_H' ${MARLIN_DIR}/Marlin/pins.h | cut -f1 -d:)"
+	iln="$(expr $iln)"
+	debug "      Insertion line number: ${iln}"
+	dryrun eval "sed -i '${iln}i\\\\#undef ${1}\\n#define ${1} ${2}' ${MARLIN_DIR}/Marlin/pins.h"
+	
+}
+
 apply_configuration_file() {
 	debug "Applying configuration file: ${1}"
 	while read line
