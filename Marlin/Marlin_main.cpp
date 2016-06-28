@@ -7860,6 +7860,29 @@ void manage_inactivity(bool ignore_stepper_queue/*=false*/) {
     }
   #endif
 
+  #if ENABLED(IS_MONO_FAN)
+    float max_temp = 0.0;
+    for (int8_t cur_extruder = 0; cur_extruder < EXTRUDERS; ++cur_extruder)
+      max_temp = max(max_temp, degHotend(cur_extruder));
+    // Clamp/Map 50 < max_temp < 100 to 0 < fan_speed < 255
+
+    short fs = 0;
+    if ( max_temp < MONO_FAN_MIN_TEMP ) {
+      fs = 0;
+    }
+    else if ( max_temp > MONO_FAN_MAX_TEMP ) {
+      fs = 255;
+    }
+    else {
+      float map_factor = 255.0 / ( MONO_FAN_MAX_TEMP - MONO_FAN_MIN_TEMP );
+      fs = (short) ( (max_temp - MONO_FAN_MIN_TEMP) * map_factor );
+      NOLESS(fs, 0);
+      NOMORE(fs, 255);
+    }
+
+    fanSpeeds[0] = fs;
+  #endif
+
   #if HAS_CONTROLLERFAN
     controllerFan(); // Check if fan should be turned on to cool stepper drivers down
   #endif
