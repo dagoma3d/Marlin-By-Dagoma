@@ -693,6 +693,7 @@ static void lcd_tune_menu() {
   //
   // Fan Speed:
   //
+
   #if FAN_COUNT > 0
     #if HAS_FAN0
       #if FAN_COUNT > 1
@@ -1757,7 +1758,7 @@ static void lcd_control_temperature_menu() {
   //
   // Fan Speed:
   //
-  #if FAN_COUNT > 0
+  #if (FAN_COUNT > 0) && (DISABLED (IS_MONO_FAN))
     #if HAS_FAN0
       #if FAN_COUNT > 1
         #define MSG_1ST_FAN_SPEED MSG_FAN_SPEED " 1"
