@@ -20,3 +20,5 @@ applet/
 *.ii
 .pioenvs/
 build/
+ArduinoAddons/Arduino_1.6.x/libraries/U8glib_ID7/
+
