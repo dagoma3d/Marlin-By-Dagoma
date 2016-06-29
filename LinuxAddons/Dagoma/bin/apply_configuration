@@ -412,7 +412,7 @@ $PATH_CONF && path_conf_ouput
 Enable() {
 	debug "Conf: Enable: ${*}"
 	
-	if test -z "$(grep "${1}" ${MARLIN_DIR}/Marlin/Configuration.h)"
+	if test -z "$(grep "\ ${1}\ " ${MARLIN_DIR}/Marlin/Configuration.h)"
 	then
 		debug "      Adding non existing entry: ${1}"
 		iln="$(grep -n 'macros.h' ${MARLIN_DIR}/Marlin/Configuration.h | cut -f1 -d:)"
@@ -434,7 +434,7 @@ Disable() {
 Set() {
 	debug "Conf: Set: ${*}"
 	
-	if test -z "$(grep "${1}" ${MARLIN_DIR}/Marlin/Configuration.h)"
+	if test -z "$(grep "\ ${1}\ " ${MARLIN_DIR}/Marlin/Configuration.h)"
 	then
 		debug "      Adding non existing entry: ${1}"
 		iln="$(grep -n 'macros.h' ${MARLIN_DIR}/Marlin/Configuration.h | cut -f1 -d:)"
