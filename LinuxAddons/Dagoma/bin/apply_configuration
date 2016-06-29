@@ -411,8 +411,18 @@ $PATH_CONF && path_conf_ouput
 
 Enable() {
 	debug "Conf: Enable: ${*}"
-	dryrun eval "sed -i 's/\/\/ *\(#define *${1}\)/\1/g' ${MARLIN_DIR}/Marlin/Configuration.h"
-	dryrun eval "sed -i 's/\/\/ *\(#define *${1}\)/\1/g' ${MARLIN_DIR}/Marlin/Configuration_adv.h"
+	
+	if test -z "$(grep "\ ${1}\ " ${MARLIN_DIR}/Marlin/Configuration.h)"
+	then
+		debug "      Adding non existing entry: ${1}"
+		iln="$(grep -n 'macros.h' ${MARLIN_DIR}/Marlin/Configuration.h | cut -f1 -d:)"
+		iln="$(expr $iln + 2)"
+		debug "      Insertion line number: ${iln}"
+		dryrun eval "sed -i '${iln}i\\\\#define ${1}' ${MARLIN_DIR}/Marlin/Configuration.h"
+	else
+		dryrun eval "sed -i 's/\/\/ *\(#define *${1}\)/\1/g' ${MARLIN_DIR}/Marlin/Configuration.h"
+		dryrun eval "sed -i 's/\/\/ *\(#define *${1}\)/\1/g' ${MARLIN_DIR}/Marlin/Configuration_adv.h"
+	fi
 }
 
 Disable() {
@@ -423,8 +433,29 @@ Disable() {
 
 Set() {
 	debug "Conf: Set: ${*}"
-	dryrun eval "sed -i 's/\(#define *${1}\) *.*\$/\1 ${2}/g' ${MARLIN_DIR}/Marlin/Configuration.h"
-	dryrun eval "sed -i 's/\(${1}\)\( *= *\)[^;]\+;.*\$/\1 = ${2};/g' ${MARLIN_DIR}/Marlin/Configuration.h"
+	
+	if test -z "$(grep "\ ${1}\ " ${MARLIN_DIR}/Marlin/Configuration.h)"
+	then
+		debug "      Adding non existing entry: ${1}"
+		iln="$(grep -n 'macros.h' ${MARLIN_DIR}/Marlin/Configuration.h | cut -f1 -d:)"
+		iln="$(expr $iln + 2)"
+		debug "      Insertion line number: ${iln}"
+		dryrun eval "sed -i '${iln}i\\\\#define ${1} ${2}' ${MARLIN_DIR}/Marlin/Configuration.h"
+	else
+		dryrun eval "sed -i 's/\(#define *${1}\) *.*\$/\1 ${2}/g' ${MARLIN_DIR}/Marlin/Configuration.h"
+		dryrun eval "sed -i 's/\(${1}\)\( *= *\)[^;]\+;.*\$/\1 = ${2};/g' ${MARLIN_DIR}/Marlin/Configuration.h"
+	fi
+}
+
+Pin() {
+	debug "Conf: Pin: ${*}"
+	
+	debug "      Adding non existing entry: ${1}"
+	iln="$(grep -n '__PINS_H' ${MARLIN_DIR}/Marlin/pins.h | cut -f1 -d:)"
+	iln="$(expr $iln)"
+	debug "      Insertion line number: ${iln}"
+	dryrun eval "sed -i '${iln}i\\\\#undef ${1}\\n#define ${1} ${2}' ${MARLIN_DIR}/Marlin/pins.h"
+	
 }
 
 apply_configuration_file() {
@@ -433,6 +464,11 @@ apply_configuration_file() {
 	do
 		eval "$line"
 	done < "${1}"
+
+	if test -n "${line}"
+	then
+		eval "$line"
+	fi
 }
 
 if test -d "${PROFILE_DIR}/${PROFILE_TO_APPLY}/files"

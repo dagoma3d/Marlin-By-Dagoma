@@ -40,7 +40,6 @@
 
 #include "boards.h"
 #include "macros.h"
-#include "Configuration_pre.h"
 
 //===========================================================================
 //============================= Getting Started =============================
@@ -112,7 +111,6 @@
 // Optional custom name for your RepStrap or other custom machine
 // Displayed in the LCD "Ready" message
 //#define CUSTOM_MACHINE_NAME "3D Printer"
-#define CUSTOM_MACHINE_NAME "Disco MKS"
 
 // Define this to set a unique identifier for this printer, (Used by some programs to differentiate between machines)
 // You can use an online service to generate a random UUID. (eg http://www.uuidgenerator.net/version4)
@@ -1136,6 +1134,5 @@ const bool Z_MIN_PROBE_ENDSTOP_INVERTING = false; // set to true to invert the l
 
 #include "Configuration_adv.h"
 #include "thermistortables.h"
-#include "Configuration_post.h"
 
 #endif //CONFIGURATION_H
