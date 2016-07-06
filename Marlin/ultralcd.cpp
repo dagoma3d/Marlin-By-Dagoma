@@ -1570,8 +1570,8 @@ static void lcd_set_z_offsets_save_config() {
 
 static void lcd_set_z_offsets() {
   START_MENU();
-  MENU_ITEM(back, MSG_LEVEL_BED_CANCEL);
-
+  MENU_ITEM(back, MSG_PREPARE);
+  
   MENU_ITEM(function, "Reinitialiser", lcd_reinit_z_offsets);
   //zprobe_zoffset = -4.0;
   //Config_StoreSettings();
