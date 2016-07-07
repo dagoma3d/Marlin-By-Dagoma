@@ -3223,6 +3223,102 @@ inline void gcode_G28() {
     SERIAL_PROTOCOLLNPGM(" position out of range.");
   }
 
+   #if ENABLED(SUPERSEDE_DELTA_G29)
+
+    // Predefine used functions
+    inline void gcode_M500();
+    inline void gcode_M665();
+    inline void gcode_G30();
+
+    inline void gcode_G29() {
+      // enqueue_and_echo_commands_P( PSTR("M117 Calibration (0/3)") );
+      endstop_adj[0] = 0.0;
+      endstop_adj[1] = 0.0;
+      endstop_adj[2] = 0.0;
+
+      delta_diagonal_rod_trim_tower_1 = 0.0;
+      delta_diagonal_rod_trim_tower_2 = 0.0;
+      delta_diagonal_rod_trim_tower_3 = 0.0;
+      // enqueue_and_echo_commands_P( PSTR("M665") );
+      gcode_M665();
+      
+      // wait_all_commands_finished__CALLABLE_FROM_LCD_ONLY();
+
+      // enqueue_and_echo_commands_P( PSTR("M117 Calibration (1/3)") );
+      // enqueue_and_echo_commands_P( PSTR("G28") );
+      gcode_G28();
+      
+      // enqueue_and_echo_commands_P( PSTR("G0 F8000 X-77.94 Y-45 Z10") );
+      destination[X_AXIS] = -77.94f;
+      destination[Y_AXIS] = -45.0f;
+      destination[Z_AXIS] = 10.0f;
+      feedrate = 8000;
+      prepare_move();
+      st_synchronize();
+
+      // enqueue_and_echo_commands_P( PSTR("G30") );
+      gcode_G30();
+
+      // wait_all_commands_finished__CALLABLE_FROM_LCD_ONLY();
+      float z_adjust_X = current_position[Z_AXIS];
+
+      // enqueue_and_echo_commands_P( PSTR("M117 Calibration (2/3)") );
+      // enqueue_and_echo_commands_P( PSTR("G0 F8000 X77.94 Y-45 Z10") );
+      destination[X_AXIS] = 77.94f;
+      destination[Y_AXIS] = -45.0f;
+      destination[Z_AXIS] = 10.0f;
+      feedrate = 8000;
+      prepare_move();
+      st_synchronize();
+
+      // enqueue_and_echo_commands_P( PSTR("G30") );
+      gcode_G30();
+
+      // wait_all_commands_finished__CALLABLE_FROM_LCD_ONLY();
+      float z_adjust_Y = current_position[Z_AXIS];
+
+      // enqueue_and_echo_commands_P( PSTR("M117 Calibration (3/3)") );
+      // enqueue_and_echo_commands_P( PSTR("G0 F8000 X0 Y90 Z10") );
+      destination[X_AXIS] = 0.0f;
+      destination[Y_AXIS] = 90.0f;
+      destination[Z_AXIS] = 10.0f;
+      feedrate = 8000;
+      prepare_move();
+      st_synchronize();
+
+      // enqueue_and_echo_commands_P( PSTR("G30") );
+      gcode_G30();
+
+      // wait_all_commands_finished__CALLABLE_FROM_LCD_ONLY();
+      float z_adjust_Z = current_position[Z_AXIS];
+
+      SERIAL_ECHO( "z_adjust: X:" );
+      SERIAL_ECHO( z_adjust_X );
+      SERIAL_ECHO( " Y:" );
+      SERIAL_ECHO( z_adjust_Y );
+      SERIAL_ECHO( " Z:" );
+      SERIAL_ECHOLN( z_adjust_Z );
+          
+      endstop_adj[0] = z_adjust_X + zprobe_zoffset;
+      endstop_adj[1] = z_adjust_Y + zprobe_zoffset;
+      endstop_adj[2] = z_adjust_Z + zprobe_zoffset;
+      
+      // enqueue_and_echo_commands_P( PSTR("M665") );
+      gcode_M665();
+
+      // enqueue_and_echo_commands_P( PSTR("G28") );
+      gcode_G28();
+
+      // enqueue_and_echo_commands_P( PSTR("M500") );
+      gcode_M500();
+
+      // enqueue_and_echo_commands_P( PSTR("M117 Calibration (done)") );
+      // wait_all_commands_finished__CALLABLE_FROM_LCD_ONLY();
+
+    }
+
+  #else // ELSE: SUPERSEDE_DELTA_G29
+
   /**
    * G29: Detailed Z probe, probes the bed at 3 or more points.
    *      Will fail if the printer has not been homed with G28.
@@ -3748,6 +3844,8 @@ inline void gcode_G28() {
     gcode_M114(); // Send end position to RepetierHost
 
   }
+
+  #endif //!SUPERSEDE_DELTA_G29
 
   #if DISABLED(Z_PROBE_SLED) // could be avoided
 
@@ -7899,7 +7997,7 @@ void idle(
   );
   host_keepalive();
   lcd_update();
-  
+
   #if ENABLED( WIFI_PRINT )
     manage_second_serial_status();
   #endif
