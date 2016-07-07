@@ -17,6 +17,7 @@ BUILD_MATRIX=false
 JSON_CONF=false
 CHECKSUM=
 PATH_CONF=false
+GIT_CHECKOUT_FIRST=false
 PROFILE_TO_APPLY=
 VARIANT_TO_LIST=
 declare -A VARIANTS_TO_APPLY
@@ -54,6 +55,8 @@ usage() {
 	echo "    -q, --quiet          do job silently"
 	echo
 	echo "    -h, --help           display this help and exit"
+	echo
+	echo "    -gcof, --git-checkout-first           make a git checkout first of modified file"
 	echo
 	exit 1
 }
@@ -104,6 +107,10 @@ do
 		-b|--backup)
 			MAKE_BACKUP=true
 			debug "Backup before applying configuration enabled."
+			;;
+		-gcof|--git-checkout-first)
+			GIT_CHECKOUT_FIRST=true
+			debug "Git checkout first enabled."
 			;;
 		-r|--dryrun)
 			DRYRUN=true
@@ -411,8 +418,7 @@ $PATH_CONF && path_conf_ouput
 
 Enable() {
 	debug "Conf: Enable: ${*}"
-	
-	if test -z "$(grep "\ ${1}\ " ${MARLIN_DIR}/Marlin/Configuration.h)"
+	if test -z "$(grep -e "#define \+${1}\( \|$\)" ${MARLIN_DIR}/Marlin/Configuration.h)"
 	then
 		debug "      Adding non existing entry: ${1}"
 		iln="$(grep -n 'macros.h' ${MARLIN_DIR}/Marlin/Configuration.h | cut -f1 -d:)"
@@ -470,6 +476,16 @@ apply_configuration_file() {
 		eval "$line"
 	fi
 }
+
+if ${GIT_CHECKOUT_FIRST}
+then
+	echo "Checking out back some known modified files ..."
+	git checkout Marlin/Configuration.h
+	git checkout Marlin/Configuration_adv.h
+	git checkout Marlin/platformio.ini
+	git checkout Marlin/pins.h
+	echo "Checking out back done."
+fi
 
 if test -d "${PROFILE_DIR}/${PROFILE_TO_APPLY}/files"
 then
