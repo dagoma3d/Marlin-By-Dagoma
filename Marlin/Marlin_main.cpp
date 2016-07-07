@@ -4638,9 +4638,6 @@ inline void gcode_M109() {
       #else
         SERIAL_EOL;
       #endif
-      #if ENABLED( WIFI_PRINT )
-        manage_second_serial_status();
-      #endif
     }
 
     idle();
@@ -7902,6 +7899,10 @@ void idle(
   );
   host_keepalive();
   lcd_update();
+  
+  #if ENABLED( WIFI_PRINT )
+    manage_second_serial_status();
+  #endif
 }
 
 /**
