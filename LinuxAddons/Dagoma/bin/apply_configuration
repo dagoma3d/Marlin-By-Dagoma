@@ -22,6 +22,7 @@ BUILD_CODE=false
 PROFILE_TO_APPLY=
 VARIANT_TO_LIST=
 declare -A VARIANTS_TO_APPLY
+declare -a VARIANTS_TO_APPLY_orders
 
 usage() {
 	echo "usage: ${BASE_NAME} [options] profile_name [variant_name] [checksum] [variant:value]*"
@@ -139,6 +140,7 @@ do
 				variant_name=$(echo $1 | cut -f1 -d\:)
 				variant_value=$(echo $1 | cut -f2 -d\:)
 				VARIANTS_TO_APPLY[$variant_name]=$variant_value
+				VARIANTS_TO_APPLY_orders+=( "$variant_name" )
 			elif test -n "${PROFILE_TO_APPLY}"
 			then
 				if $LIST_ACTION
@@ -439,12 +441,14 @@ build_code() {
 
 	echo -n $(codify ${PROFILE_TO_APPLY})
 
-	for variant_name in ${!VARIANTS_TO_APPLY[*]}
+	for i in "${!VARIANTS_TO_APPLY_orders[@]}"
 	do
-		variant_value=${VARIANTS_TO_APPLY[$variant_name]}
+		variant_name="${VARIANTS_TO_APPLY_orders[$i]}"
+		variant_value="${VARIANTS_TO_APPLY[${variant_name}]}"
 		echo -n '-'
 		echo -n $(codify ${variant_name}:${variant_value})
 	done
+
 	echo
 	exit 0
 }
