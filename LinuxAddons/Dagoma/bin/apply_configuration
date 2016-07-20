@@ -18,6 +18,7 @@ JSON_CONF=false
 CHECKSUM=
 PATH_CONF=false
 GIT_CHECKOUT_FIRST=false
+BUILD_CODE=false
 PROFILE_TO_APPLY=
 VARIANT_TO_LIST=
 declare -A VARIANTS_TO_APPLY
@@ -26,37 +27,39 @@ usage() {
 	echo "usage: ${BASE_NAME} [options] profile_name [variant_name] [checksum] [variant:value]*"
 	echo
 	echo "OPTIONS:"
-	echo "    -l, --list           list available profiles / variants / variant values"
-	echo "                         if a profile name is specified, list available variants"
-	echo "                         if a profile and a variant name are specified, list available variant values"
-	echo 
 	echo "    -b, --backend        use backend output style"
 	echo "                         do not output human readable information"
 	echo
+	echo "    -bc, --build-code    output build code against given cli configuration"
+	echo
 	echo "    -bm, --build-matrix  output build matrix"
 	echo "                         assume --backend"
+	echo
+	echo "    -d, --debug          enable debug"
+	echo "                         should be the first option"
+	echo
+	echo "    -h, --help           display this help and exit"
+	echo
+	echo "    -gcof, --git-checkout-first           make a git checkout first of modified file"
 	echo
 	echo "    -j, --json-conf      output json conf"
 	echo "                         generate a json conf output of input parameters"
 	echo "                         You can provide a checksum value after the profile name"
 	echo
+	echo "    -l, --list           list available profiles / variants / variant values"
+	echo "                         if a profile name is specified, list available variants"
+	echo "                         if a profile and a variant name are specified, list available variant values"
+	echo 
 	echo "    -p, --path-conf      output path conf"
 	echo "                         generate a path output corresponding to actual conf of input parameters"
 	echo
-	echo "    -z, --raz            restore default configuration"
-	echo "                         equivalent to '${BASE_NAME} Default'"
+	echo "    -q, --quiet          do job silently"
 	echo
 	echo "    -r, --dryrun         enable dryrun"
 	echo "                         do not apply porfile. Print to stdout actions instead"
 	echo
-	echo "    -d, --debug          enable debug"
-	echo "                         should be the first option"
-	echo
-	echo "    -q, --quiet          do job silently"
-	echo
-	echo "    -h, --help           display this help and exit"
-	echo
-	echo "    -gcof, --git-checkout-first           make a git checkout first of modified file"
+	echo "    -z, --raz            restore default configuration"
+	echo "                         equivalent to '${BASE_NAME} Default'"
 	echo
 	exit 1
 }
@@ -95,6 +98,10 @@ do
 			HUMAN_OUTPUT=false
 			BUILD_MATRIX=true
 			debug "Build matrix output enabled."
+			;;
+		-bc|--build-code)
+			BUILD_CODE=true
+			debug "Build code output enabled."
 			;;
 		-j|--json-conf)
 			JSON_CONF=true
@@ -407,6 +414,41 @@ sanity_checks() {
 	done
 }
 
+codify() {
+	if test -n "$(echo $1 | grep ':')"
+	then
+		echo -n $(codify $(echo $1 | cut -f1 -d:))
+		echo -n ':'
+		echo -n $(codify $(echo $1 | cut -f2 -d:))
+	elif test -n "$(echo $1 | grep '-')"
+	then
+		echo -n $(codify $(echo $1 | cut -f1 -d\-))
+		echo -n $(codify $(echo $1 | cut -f2 -d\-))
+	elif test -n "$(echo $1 | grep '_')"
+	then
+		echo -n $(codify $(echo $1 | cut -f1 -d_))
+		echo -n $(codify $(echo $1 | cut -f2 -d_))
+	else
+		echo $(echo $1 | cut -b-3 | tr [A-Z] [a-z])
+	fi
+}
+
+build_code() {
+
+	debug "Build code"
+
+	echo -n $(codify ${PROFILE_TO_APPLY})
+
+	for variant_name in ${!VARIANTS_TO_APPLY[*]}
+	do
+		variant_value=${VARIANTS_TO_APPLY[$variant_name]}
+		echo -n '-'
+		echo -n $(codify ${variant_name}:${variant_value})
+	done
+	echo
+	exit 0
+}
+
 $LIST_ACTION && list
 
 $BUILD_MATRIX && build_matrix
@@ -415,6 +457,7 @@ sanity_checks
 
 $JSON_CONF && json_conf_ouput
 $PATH_CONF && path_conf_ouput
+$BUILD_CODE && build_code
 
 Enable() {
 	debug "Conf: Enable: ${*}"
