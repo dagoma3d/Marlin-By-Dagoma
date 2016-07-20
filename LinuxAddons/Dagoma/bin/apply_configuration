@@ -187,7 +187,7 @@ variant_exists()
 
 list_variants_values() {
 	NEXT=
-	for variant_value in $(find "${PROFILE_DIR}/$1/variants/$2" -mindepth 1 -maxdepth 1 -type f)
+	for variant_value in $(find "${PROFILE_DIR}/$1/variants/$2" -mindepth 1 -maxdepth 1 -type f | sort)
 		do
 			if $HUMAN_OUTPUT
 			then
@@ -213,7 +213,7 @@ list_variants() {
 	if variants_exists $1
 	then
 		$HUMAN_OUTPUT && echo "Available variants for profile $1:"
-		for variant in $(find "${PROFILE_DIR}/$1/variants" -mindepth 1 -maxdepth 1 -type d)
+		for variant in $(find "${PROFILE_DIR}/$1/variants" -mindepth 1 -maxdepth 1 -type d | sort)
 		do
 			variant="$(basename ${variant})"
 			if $HUMAN_OUTPUT
@@ -241,7 +241,7 @@ list_profile() {
 	debug "List profiles"
 
 	$HUMAN_OUTPUT && echo "Avaialble profiles:"
-	for profile in $(find ${PROFILE_DIR} -mindepth 1 -maxdepth 1 -type d)
+	for profile in $(find ${PROFILE_DIR} -mindepth 1 -maxdepth 1 -type d | sort)
 	do
 		echo "    $(basename ${profile})"
 	done
