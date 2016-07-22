@@ -235,6 +235,15 @@
  * M365 - SCARA calibration: Scaling factor, X, Y, Z axis
  * ************* SCARA End ***************
  *
+ * ************ DAGOMA.FR Specific - This can change to suit future G-code regulations
+ * M700 - Wifi : Set SSID to use.
+ * M701 - Wifi : Set Password to use and connect !
+ * M702 - Wifi : Get current local IP Address if wifi is ready, 0 otherwize.
+ * M710 - Wifi : Set printer technical name.
+ * M711 - Wifi : Set API Url to use.
+ * M712 - Wifi : Set API Key to use.
+ * ************ DAGOMA.FR End ***************
+ *
  * ************ Custom codes - This can change to suit future G-code regulations
  * M100 - Watch Free Memory (For Debugging Only)
  * M851 - Set Z probe's Z offset (mm above extruder -- The value will always be negative)
@@ -6432,6 +6441,40 @@ inline void gcode_M503() {
 
 #endif // DUAL_X_CARRIAGE
 
+/*****************************************************************************
+ * DAGOMA.FR Specific
+ *****************************************************************************/
+#if ENABLED(WIFI_PRINT)
+inline void gcode_M700() {
+  SECOND_SERIAL.print(PSTR("SSID:"));
+  SECOND_SERIAL.println(current_command_args);
+}
+
+inline void gcode_M701() {
+  SECOND_SERIAL.print(PSTR("PSWD:"));
+  SECOND_SERIAL.println(current_command_args);
+}
+
+inline void gcode_M702() {
+  SECOND_SERIAL.println(PSTR("REDY"));
+}
+
+inline void gcode_M710() {
+  SECOND_SERIAL.print(PSTR("PNAM:"));
+  SECOND_SERIAL.println(current_command_args);
+}
+
+inline void gcode_M711() {
+  SECOND_SERIAL.print(PSTR("APIU:"));
+  SECOND_SERIAL.println(current_command_args);
+}
+
+inline void gcode_M712() {
+  SECOND_SERIAL.print(PSTR("APIK:"));
+  SECOND_SERIAL.println(current_command_args);
+}
+#endif
+
 /**
  * M907: Set digital trimpot motor current using axis codes X, Y, Z, E, B, S
  */
@@ -7245,6 +7288,29 @@ void process_next_command() {
           gcode_M605();
           break;
       #endif // DUAL_X_CARRIAGE
+
+      // DAGOMA.FR Specific
+      #if ENABLED(WIFI_PRINT)
+        case 700:
+          gcode_M700(); // SSID
+          break;
+        case 701:
+          gcode_M701(); // PSWD
+          break;
+        case 702:
+          gcode_M702(); // REDY? get ip
+          break;
+        case 710:
+          gcode_M710(); // Tech name
+          break;
+        case 711:
+          gcode_M711(); // API Url
+          break;
+        case 712:
+          gcode_M712(); // API Key
+          break;
+      #endif
+      // DAGOMA.FR End
 
       case 907: // M907 Set digital trimpot motor current using axis codes.
         gcode_M907();
