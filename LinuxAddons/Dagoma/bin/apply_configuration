@@ -465,7 +465,11 @@ $BUILD_CODE && build_code
 
 Enable() {
 	debug "Conf: Enable: ${*}"
-	if test -z "$(grep -e "#define \+${1}\( \|$\)" ${MARLIN_DIR}/Marlin/Configuration.h)"
+	
+	IN_CONF="$(grep -e "#define \+${1}\( \|$\)" ${MARLIN_DIR}/Marlin/Configuration.h)"
+	IN_CONF_ADV="$(grep -e "#define \+${1}\( \|$\)" ${MARLIN_DIR}/Marlin/Configuration_adv.h)"
+
+	if test -z "${IN_CONF}" && test -z "${IN_CONF_ADV}"
 	then
 		debug "      Adding non existing entry: ${1}"
 		iln="$(grep -n 'macros.h' ${MARLIN_DIR}/Marlin/Configuration.h | cut -f1 -d:)"
@@ -480,14 +484,17 @@ Enable() {
 
 Disable() {
 	debug "Conf: Disable: ${*}"
-	dryrun eval "sed -i 's/\(\/\/ *\)*\(\#define *${1}\)/\/\/\2/g' ${MARLIN_DIR}/Marlin/Configuration.h"
-	dryrun eval "sed -i 's/\(\/\/ *\)*\(\#define *${1}\)/\/\/\2/g' ${MARLIN_DIR}/Marlin/Configuration_adv.h"
+	dryrun eval "sed -i 's/\(\/\/ *\)*\(\#define *${1}\)\( \|\$\)/\/\/\2\3/g' ${MARLIN_DIR}/Marlin/Configuration.h"
+	dryrun eval "sed -i 's/\(\/\/ *\)*\(\#define *${1}\)\( \|\$\)/\/\/\2\3/g' ${MARLIN_DIR}/Marlin/Configuration_adv.h"
 }
 
 Set() {
 	debug "Conf: Set: ${*}"
 	
-	if test -z "$(grep "\ ${1}\ " ${MARLIN_DIR}/Marlin/Configuration.h)"
+	IN_CONF="$(grep "\ ${1}\ " ${MARLIN_DIR}/Marlin/Configuration.h)"
+	IN_CONF_ADV="$(grep "\ ${1}\ " ${MARLIN_DIR}/Marlin/Configuration_adv.h)"
+
+	if test -z "${IN_CONF}" && test -z "${IN_CONF_ADV}"
 	then
 		debug "      Adding non existing entry: ${1}"
 		iln="$(grep -n 'macros.h' ${MARLIN_DIR}/Marlin/Configuration.h | cut -f1 -d:)"
@@ -497,6 +504,8 @@ Set() {
 	else
 		dryrun eval "sed -i 's/\(#define *${1}\) *.*\$/\1 ${2}/g' ${MARLIN_DIR}/Marlin/Configuration.h"
 		dryrun eval "sed -i 's/\(${1}\)\( *= *\)[^;]\+;.*\$/\1 = ${2};/g' ${MARLIN_DIR}/Marlin/Configuration.h"
+		dryrun eval "sed -i 's/\(#define *${1}\) *.*\$/\1 ${2}/g' ${MARLIN_DIR}/Marlin/Configuration_adv.h"
+		dryrun eval "sed -i 's/\(${1}\)\( *= *\)[^;]\+;.*\$/\1 = ${2};/g' ${MARLIN_DIR}/Marlin/Configuration_adv.h"
 	fi
 }
 
