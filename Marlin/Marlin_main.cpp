@@ -6520,31 +6520,31 @@ inline void gcode_M503() {
  *****************************************************************************/
 #if ENABLED(WIFI_PRINT)
 inline void gcode_D700() {
-  SECOND_SERIAL.print(PSTR("SSID:"));
+  SECOND_SERIAL.print("SSID:");
   SECOND_SERIAL.println(current_command_args);
 }
 
 inline void gcode_D701() {
-  SECOND_SERIAL.print(PSTR("PSWD:"));
+  SECOND_SERIAL.print("PSWD:");
   SECOND_SERIAL.println(current_command_args);
 }
 
 inline void gcode_D702() {
-  SECOND_SERIAL.println(PSTR("REDY"));
+  SECOND_SERIAL.println("REDY");
 }
 
 inline void gcode_D710() {
-  SECOND_SERIAL.print(PSTR("PNAM:"));
+  SECOND_SERIAL.print("PNAM:");
   SECOND_SERIAL.println(current_command_args);
 }
 
 inline void gcode_D711() {
-  SECOND_SERIAL.print(PSTR("APIU:"));
+  SECOND_SERIAL.print("APIU:");
   SECOND_SERIAL.println(current_command_args);
 }
 
 inline void gcode_D712() {
-  SECOND_SERIAL.print(PSTR("APIK:"));
+  SECOND_SERIAL.print("APIK:");
   SECOND_SERIAL.println(current_command_args);
 }
 
