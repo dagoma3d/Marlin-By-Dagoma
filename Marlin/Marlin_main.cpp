@@ -242,6 +242,8 @@
  * M710 - Wifi : Set printer technical name.
  * M711 - Wifi : Set API Url to use.
  * M712 - Wifi : Set API Key to use.
+ * M720 - Wifi : Echo the string in serial .
+
  * ************ DAGOMA.FR End ***************
  *
  * ************ Custom codes - This can change to suit future G-code regulations
@@ -256,6 +258,7 @@
  *
  * T0-T3 - Select a tool by index (usually an extruder) [ F<mm/min> ]
  *
+
  */
 
 #if ENABLED(M100_FREE_MEMORY_WATCHER)
@@ -902,7 +905,7 @@ void setup() {
   void manage_second_serial_status() {
     if ( millis() - last_status_timestamp > 10000 ) {
       SECOND_SERIAL.print( "STAT:" );
-      
+
       SECOND_SERIAL.print( "tstp:" );
       SECOND_SERIAL.print(  millis()  );
 
@@ -940,7 +943,7 @@ void setup() {
       #endif
 
       SECOND_SERIAL.println();
-      
+
       last_status_timestamp = millis();
     }
   }
@@ -3250,13 +3253,13 @@ inline void gcode_G28() {
       delta_diagonal_rod_trim_tower_3 = 0.0;
       // enqueue_and_echo_commands_P( PSTR("M665") );
       gcode_M665();
-      
+
       // wait_all_commands_finished__CALLABLE_FROM_LCD_ONLY();
 
       // enqueue_and_echo_commands_P( PSTR("M117 Calibration (1/3)") );
       // enqueue_and_echo_commands_P( PSTR("G28") );
       gcode_G28();
-      
+
       // enqueue_and_echo_commands_P( PSTR("G0 F8000 X-77.94 Y-45 Z10") );
       destination[X_AXIS] = -77.94f;
       destination[Y_AXIS] = -45.0f;
@@ -3307,11 +3310,11 @@ inline void gcode_G28() {
       SERIAL_ECHO( z_adjust_Y );
       SERIAL_ECHO( " Z:" );
       SERIAL_ECHOLN( z_adjust_Z );
-          
+
       endstop_adj[0] = z_adjust_X + zprobe_zoffset;
       endstop_adj[1] = z_adjust_Y + zprobe_zoffset;
       endstop_adj[2] = z_adjust_Z + zprobe_zoffset;
-      
+
       // enqueue_and_echo_commands_P( PSTR("M665") );
       gcode_M665();
 
@@ -6445,34 +6448,41 @@ inline void gcode_M503() {
  * DAGOMA.FR Specific
  *****************************************************************************/
 #if ENABLED(WIFI_PRINT)
-inline void gcode_M700() {
+inline void gcode_D700() {
   SECOND_SERIAL.print(PSTR("SSID:"));
   SECOND_SERIAL.println(current_command_args);
 }
 
-inline void gcode_M701() {
+inline void gcode_D701() {
   SECOND_SERIAL.print(PSTR("PSWD:"));
   SECOND_SERIAL.println(current_command_args);
 }
 
-inline void gcode_M702() {
+inline void gcode_D702() {
   SECOND_SERIAL.println(PSTR("REDY"));
 }
 
-inline void gcode_M710() {
+inline void gcode_D710() {
   SECOND_SERIAL.print(PSTR("PNAM:"));
   SECOND_SERIAL.println(current_command_args);
 }
 
-inline void gcode_M711() {
+inline void gcode_D711() {
   SECOND_SERIAL.print(PSTR("APIU:"));
   SECOND_SERIAL.println(current_command_args);
 }
 
-inline void gcode_M712() {
+inline void gcode_D712() {
   SECOND_SERIAL.print(PSTR("APIK:"));
   SECOND_SERIAL.println(current_command_args);
 }
+
+inline void gcode_D720() {
+  SERIAL_ECHO_START;
+  SERIAL_ECHOPGM("D:");
+  SERIAL_ECHOLN(current_command_args);
+}
+
 #endif
 
 /**
@@ -7289,29 +7299,6 @@ void process_next_command() {
           break;
       #endif // DUAL_X_CARRIAGE
 
-      // DAGOMA.FR Specific
-      #if ENABLED(WIFI_PRINT)
-        case 700:
-          gcode_M700(); // SSID
-          break;
-        case 701:
-          gcode_M701(); // PSWD
-          break;
-        case 702:
-          gcode_M702(); // REDY? get ip
-          break;
-        case 710:
-          gcode_M710(); // Tech name
-          break;
-        case 711:
-          gcode_M711(); // API Url
-          break;
-        case 712:
-          gcode_M712(); // API Key
-          break;
-      #endif
-      // DAGOMA.FR End
-
       case 907: // M907 Set digital trimpot motor current using axis codes.
         gcode_M907();
         break;
@@ -7358,6 +7345,34 @@ void process_next_command() {
       gcode_T(codenum);
       break;
 
+    case 'D': switch (codenum) {
+      // DAGOMA.FR Specific
+      #if ENABLED(WIFI_PRINT)
+        case 700:
+          gcode_D700(); // SSID
+          break;
+        case 701:
+          gcode_D701(); // PSWD
+          break;
+        case 702:
+          gcode_D702(); // REDY? get ip
+          break;
+        case 710:
+          gcode_D710(); // Tech name
+          break;
+        case 711:
+          gcode_D711(); // API Url
+          break;
+        case 712:
+          gcode_D712(); // API Key
+          break;
+        case 720:
+          gcode_D720(); // ECHO
+          break;
+      #endif
+      // DAGOMA.FR End
+      }
+    break;
     default: code_is_good = false;
   }
 
