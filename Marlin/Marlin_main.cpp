@@ -1235,6 +1235,17 @@ inline void get_serial_commands() {
              ) && !sd_comment_mode)
 
       ) {
+        if (sd_char == '#') stop_buffering = true;
+
+        sd_comment_mode = false; //for new command
+
+        if (sd_count) {
+          command_queue[cmd_queue_index_w][sd_count] = '\0'; //terminate string
+          sd_count = 0; //clear buffer
+
+          _commit_command(false);
+        }
+
         if (card_eof) {
           SERIAL_PROTOCOLLNPGM(MSG_FILE_PRINTED);
           print_job_timer.stop();
@@ -1248,16 +1259,8 @@ inline void get_serial_commands() {
           card.printingHasFinished();
           card.checkautostart(true);
         }
-        if (sd_char == '#') stop_buffering = true;
-
-        sd_comment_mode = false; //for new command
 
         if (!sd_count) continue; //skip empty lines
-
-        command_queue[cmd_queue_index_w][sd_count] = '\0'; //terminate string
-        sd_count = 0; //clear buffer
-
-        _commit_command(false);
       }
       else if (sd_count >= MAX_CMD_SIZE - 1) {
         /**
@@ -8257,7 +8260,7 @@ void manage_inactivity(bool ignore_stepper_queue/*=false*/) {
     else {
       float map_factor = 255.0 / ( MONO_FAN_MAX_TEMP - MONO_FAN_MIN_TEMP );
       fs = (short) ( (max_temp - MONO_FAN_MIN_TEMP) * map_factor );
-      NOLESS(fs, 0);
+      NOLESS(fs, 100); // 40%
       NOMORE(fs, 255);
     }
 
