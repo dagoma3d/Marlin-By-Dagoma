@@ -6,13 +6,13 @@ Set STRING_CONFIG_H_AUTHOR '"Dagoma.Fr"'
 
 Set MOTHERBOARD BOARD_MKS_BASE
 Enable CUSTOM_MACHINE_NAME
-Set CUSTOM_MACHINE_NAME '"Discovery 200.2"'
+Set CUSTOM_MACHINE_NAME '"DiscEasy200"'
 
 #
 # Temp stuff
 ###############################################################################
 
-Set TEMP_SENSOR_0 16
+Set TEMP_SENSOR_0 17
 
 Set TEMP_WINDOW 3
 Set TEMP_BED_WINDOW 3
@@ -40,9 +40,9 @@ Set MIN_Z_HEIGHT_FOR_HOMING 7
 
 Enable Z_SAFE_HOMING
 
-#Enable IS_MONO_FAN
-#Set MONO_FAN_MIN_TEMP 50.0
-#Set MONO_FAN_MAX_TEMP 100.0
+Enable IS_MONO_FAN
+Set MONO_FAN_MIN_TEMP 50.0
+Set MONO_FAN_MAX_TEMP 100.0
 
 Set DEFAULT_AXIS_STEPS_PER_UNIT '{80,80,2560,98}'
 Set DEFAULT_MAX_FEEDRATE '{500, 500, 4, 25}'
@@ -115,8 +115,10 @@ Set SECOND_SERIAL_BAUDRATE 115200
 Enable WIFI_PRINT
 
 #
-# LCD Stuff
+# LCD Stuff, even if not enabled
 ###############################################################################
 
 Set PLA_PREHEAT_HPB_TEMP 60
 Set ABS_PREHEAT_HPB_TEMP 90
+
+Set LANGUAGE_INCLUDE 'GENERATE_LANGUAGE_INCLUDE(fr)'
