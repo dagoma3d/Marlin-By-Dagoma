@@ -14,26 +14,24 @@ jQuery(function($) {
 		return "0x" + s.toUpperCase();
 	}
 
-	var updateCCode = function( pixOnDatas ) {
+	var updateCCode = function() {
 		var lines = [];
-
-		var pix, pixN = pixOnDatas.length;
-		for(var i=0; i<38; i++) {
+		$('#logo tr').each( function(i, tr) {
 			var line = [];
-			for(var j=0; j<112; j++) {
-				var inLineIdx = Math.floor(j / 8);
+			$(tr).find('td').each( function(j, td) {
+				var lineIdx = Math.floor(j / 8);
 				var bitIdx = j % 8;
-				line[inLineIdx] = line[inLineIdx] || 0x00;
-				if ( pixOnDatas[i*112+j] ) {
-					line[inLineIdx] = line[inLineIdx] | ( 0x80 >> bitIdx );
+				line[lineIdx] = line[lineIdx] || 0x00;
+				if ( $(this).hasClass('enable') ) {
+					line[lineIdx] = line[lineIdx] | ( 0x80 >> bitIdx );
 				}
-			}
+			});
 			var e,n=line.length;
 			for(e=0; e<n; e++) {
 				line[e] = toByteStr( line[e] );
 			}
-			lines.push(line.join(', '));
-		}
+			lines.push(line.join(', '))
+		});
 		$('#c-code').val( lines.join( ", \n" ) );
 	};
 
@@ -105,49 +103,7 @@ jQuery(function($) {
 		$('#right').append( jTable );
 	};
 
-	var generateThresoldedAndBWImage = function() {
-		var img = document.getElementById('original-image');
-		var canvas = document.createElement('canvas');
-		var context = canvas.getContext('2d');
-		context.imageSmoothingEnabled = false;
-		canvas.width = 112;
-		canvas.height = 38;
-		context.drawImage(img, 0, 0, 112, 38 );
-		var myData = context.getImageData(0, 0, 112, 38);
-
-		var threshold = parseInt($('#threshold-value').val());
-
-		var imgBuffer = myData.data;
-		var pixIdx = 0, nPix = imgBuffer.length / 4;
-		var onData = [];
-		for( pixIdx=0; pixIdx < nPix; pixIdx++ ) {
-			var r = imgBuffer[pixIdx*4+0];
-			var g = imgBuffer[pixIdx*4+1];
-			var b = imgBuffer[pixIdx*4+2];
-			var a = imgBuffer[pixIdx*4+3];
-
-			var on = (( r + g + b ) / 3.0) < threshold;
-
-			imgBuffer[pixIdx*4+0] = on ? 0 : 255;
-			imgBuffer[pixIdx*4+1] = on ? 0 : 255;
-			imgBuffer[pixIdx*4+2] = on ? 0 : 255;
-			imgBuffer[pixIdx*4+3] = 255;
-
-			onData.push(on);
-		}
-
-		context.putImageData( myData, 0, 0 );
-
-		$('#tabw-image').attr( 'src', canvas.toDataURL("image/png") );
-
-		updateCCode( onData );
-	};
-
-	$('#c-code').change(generateThresoldedAndBWImage);
-	$('#c-code').keyup(generateThresoldedAndBWImage);
-	$('#threshold-value').keyup(generateThresoldedAndBWImage);
-	$('#threshold-value').change(generateThresoldedAndBWImage);
-
-	generateThresoldedAndBWImage();
+	$('#c-code').change(generateGrid);
+	$('#c-code').keyup(generateGrid);
 
 });

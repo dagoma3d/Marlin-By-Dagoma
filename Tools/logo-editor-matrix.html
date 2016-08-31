@@ -4,7 +4,7 @@
 		<title>Logo-Editor</title>
 		<meta http-equiv='Content-Type' content='text/html; charset=UTF-8' />
 		<script type='text/javascript' src='https://code.jquery.com/jquery-1.12.3.min.js'></script>
-		<script type='text/javascript' src='logo-editor.js'></script>
+		<script type='text/javascript' src='logo-editor-matrix.js'></script>
 		<style type='text/css'>
 #left
 {
@@ -48,12 +48,6 @@
 {
 	background-color: red;
 }
-#right img
-{
-	width: calc(100% - 1em);
-	image-rendering: pixelated;
-	-moz-image-rendering: pixelated;
-}
 		</style>
 	</head>
 	<body>
@@ -61,10 +55,6 @@
 			<textarea id='c-code' rows='20' cols='60'></textarea>
 		</div>
 		<div id='right'>
-			<h2>Original</h2>
-			<img id='original-image' src='marlin-dagoma-splash-screen.png' />
-			<h2>Thresholded + B&amp;W <input id='threshold-value' type='number' value='128' /></h2>
-			<img id='tabw-image' />
 		</div>
 	</body>
 </html>
