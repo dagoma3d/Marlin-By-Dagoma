@@ -4656,18 +4656,22 @@ inline void gcode_M105() {
    *  P<index> Fan index, if more than one fan
    */
   inline void gcode_M106() {
-    uint16_t s = code_seen('S') ? code_value_short() : 255,
-             p = code_seen('P') ? code_value_short() : 0;
-    NOMORE(s, 255);
-    if (p < FAN_COUNT) fanSpeeds[p] = s;
+    #if DISABLED(IS_MONO_FAN)
+      uint16_t s = code_seen('S') ? code_value_short() : 255,
+               p = code_seen('P') ? code_value_short() : 0;
+      NOMORE(s, 255);
+      if (p < FAN_COUNT) fanSpeeds[p] = s;
+    #endif
   }
 
   /**
    * M107: Fan Off
    */
   inline void gcode_M107() {
-    uint16_t p = code_seen('P') ? code_value_short() : 0;
-    if (p < FAN_COUNT) fanSpeeds[p] = 0;
+    #if DISABLED(IS_MONO_FAN)
+      uint16_t p = code_seen('P') ? code_value_short() : 0;
+      if (p < FAN_COUNT) fanSpeeds[p] = 0;
+    #endif
   }
 
 #endif // FAN_COUNT > 0
