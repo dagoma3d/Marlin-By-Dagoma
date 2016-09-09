@@ -468,6 +468,13 @@ static uint8_t target_extruder;
 #if ENABLED(FILAMENT_RUNOUT_SENSOR)
   static bool filament_ran_out = false;
 #endif
+#if ENABLED(SUMMON_PRINT_PAUSE)
+  static bool print_pause_summoned = false;
+  static millis_t print_pause_summon_schedule = 0;
+#endif
+#if ENABLED(U8GLIB_SSD1306) && ENABLED(INTELLIGENT_LCD_REFRESH_RATE)
+  static float last_intelligent_z_lcd_update = 0;
+#endif
 
 static bool send_ok[BUFSIZE];
 
@@ -901,6 +908,11 @@ void setup() {
 
   #if ENABLED(USE_SECOND_SERIAL)
     SECOND_SERIAL.begin( SECOND_SERIAL_BAUDRATE );
+  #endif
+
+  #if ENABLED(SUMMON_PRINT_PAUSE) && SUMMON_PRINT_PAUSE_PIN != X_MIN_PIN && SUMMON_PRINT_PAUSE_PIN != Y_MAX_PIN && SUMMON_PRINT_PAUSE_PIN != Z_MIN_PIN
+    SET_INPUT(SUMMON_PRINT_PAUSE_PIN);
+    WRITE(SUMMON_PRINT_PAUSE_PIN, HIGH);
   #endif
 }
 
@@ -6274,6 +6286,7 @@ inline void gcode_M503() {
    *  Y[position] - Move to this Y position, with X
    *  L[distance] - Retract distance for removal (manual reload)
    *  P[pin]      - Pin to wait for, if not specified use lcd button
+   *              - Pin can be A, B or C respectively for X, Y and Z endstops.
    *  S[0|1]      - If Pin, state to wait for, if not specified use LOW
    *
    *  Default values are used for omitted arguments.
@@ -6474,6 +6487,10 @@ inline void gcode_M503() {
 
     #if ENABLED(FILAMENT_RUNOUT_SENSOR)
       filament_ran_out = false;
+    #endif
+
+    #if ENABLED(SUMMON_PRINT_PAUSE)
+      print_pause_summoned = false;
     #endif
 
   }
@@ -8144,6 +8161,26 @@ void disable_all_steppers() {
   disable_e3();
 }
 
+
+#if ENABLED(SUMMON_PRINT_PAUSE)
+
+  void manage_pause_summoner() {
+      // PAUSE RELEASED
+      if (print_pause_summoned && (READ(SUMMON_PRINT_PAUSE_PIN) ^ SUMMON_PRINT_PAUSE_INVERTING)) {
+        print_pause_summoned = false;
+        enqueue_and_echo_commands_P(PSTR(SUMMON_PRINT_PAUSE_SCRIPT));
+        st_synchronize();
+      }
+      // PAUSE PUSHED
+      if (!print_pause_summoned && IS_SD_PRINTING && !(READ(SUMMON_PRINT_PAUSE_PIN) ^ SUMMON_PRINT_PAUSE_INVERTING)
+        && axis_homed[X_AXIS] && axis_homed[Y_AXIS] && axis_homed[Z_AXIS]) {
+        print_pause_summoned = true;
+        print_pause_summon_schedule = millis() + 2500UL;
+      }
+  }
+
+#endif // SUMMON_PRINT_PAUSE
+
 /**
  * Standard idle routine keeps the machine alive
  */
@@ -8153,13 +8190,28 @@ void idle(
   #endif
 ) {
   manage_heater();
+  #if ENABLED(SUMMON_PRINT_PAUSE)
+  manage_pause_summoner();
+  #endif
   manage_inactivity(
     #if ENABLED(FILAMENTCHANGEENABLE)
       no_stepper_sleep
     #endif
   );
   host_keepalive();
-  lcd_update();
+  #if ENABLED(U8GLIB_SSD1306) && ENABLED(INTELLIGENT_LCD_REFRESH_RATE)
+    if (IS_SD_PRINTING) {
+      if (last_intelligent_z_lcd_update != current_position[Z_AXIS]) {
+        last_intelligent_z_lcd_update = current_position[Z_AXIS];
+        lcd_update();
+      }
+    }
+    else {
+      lcd_update();
+    }
+  #else
+    lcd_update();
+  #endif
 
   #if ENABLED( WIFI_PRINT )
     manage_second_serial_status();
