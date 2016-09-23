@@ -360,7 +360,7 @@
   // Make delta curves from many straight lines (linear interpolation).
   // This is a trade-off between visible corners (not enough segments)
   // and processor overload (too many expensive sqrt calls).
-  #define DELTA_SEGMENTS_PER_SECOND 160
+  #define DELTA_SEGMENTS_PER_SECOND 60
 
   // NOTE NB all values for DELTA_* values MUST be floating point, so always have a decimal point in them
 
@@ -714,7 +714,7 @@ const bool Z_MIN_PROBE_ENDSTOP_INVERTING = true; // set to true to invert the lo
   #define MANUAL_X_HOME_POS 0
   #define MANUAL_Y_HOME_POS 0
   //#define MANUAL_Z_HOME_POS 0
-  #define MANUAL_Z_HOME_POS 200 // For delta: Distance between nozzle and print surface after homing.
+  #define MANUAL_Z_HOME_POS 195 // For delta: Distance between nozzle and print surface after homing.
 #endif
 
 // Use "Z Safe Homing" to avoid homing with a Z probe outside the bed area.
@@ -752,16 +752,21 @@ const bool Z_MIN_PROBE_ENDSTOP_INVERTING = true; // set to true to invert the lo
 #define DEFAULT_MAX_ACCELERATION      {3000,3000,3000,10000}    // X, Y, Z, E maximum start speed for accelerated moves. E default values are good for Skeinforge 40+, for older versions raise them a lot.
 //#define DEFAULT_MAX_ACCELERATION      {9000,9000,9000,10000}    // X, Y, Z, E maximum start speed for accelerated moves. E default values are good for Skeinforge 40+, for older versions raise them a lot.
 
-#define DEFAULT_ACCELERATION          3000    // X, Y, Z and E acceleration in mm/s^2 for printing moves
+//#define DEFAULT_ACCELERATION          3000    // X, Y, Z and E acceleration in mm/s^2 for printing moves
 //#define DEFAULT_ACCELERATION          20
 #define DEFAULT_RETRACT_ACCELERATION  3000    // E acceleration in mm/s^2 for retracts
 #define DEFAULT_TRAVEL_ACCELERATION   3000    // X, Y, Z acceleration in mm/s^2 for travel (non printing) moves
 
 // The speed change that does not require acceleration (i.e. the software might assume it can be done instantaneously)
-#define DEFAULT_XYJERK                20    // (mm/sec)
-#define DEFAULT_ZJERK                 20     // 0.4(mm/sec)
-#define DEFAULT_EJERK                 5.0    // (mm/sec)
+//#define DEFAULT_XYJERK                20    // (mm/sec)
+//#define DEFAULT_ZJERK                 20     // 0.4(mm/sec)
+//#define DEFAULT_EJERK                 5.0    // (mm/sec)
 
+// TRY SEPTEMBER 2016 !!!
+#define DEFAULT_ACCELERATION          10    // X, Y, Z and E acceleration in mm/s^2 for printing moves
+#define DEFAULT_XYJERK                0.5    // (mm/sec)
+#define DEFAULT_ZJERK                 0.5     // 0.4(mm/sec)
+#define DEFAULT_EJERK                 5.0    // (mm/sec)
 
 //=============================================================================
 //============================= Additional Features ===========================
