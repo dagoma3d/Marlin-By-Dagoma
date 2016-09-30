@@ -342,8 +342,8 @@ millis_t previous_cmd_ms = 0;
 static millis_t max_inactive_time = 0;
 static millis_t stepper_inactive_time = (DEFAULT_STEPPER_DEACTIVE_TIME) * 1000UL;
 
-#if ENABLED(IS_MONO_FAN)
-static millis_t mext_fan_auto_regulation_check = 0;
+#if ENABLED(IS_MONO_FAN) || ENABLED(PRINTER_HEAD_EASY)
+static millis_t next_fan_auto_regulation_check = 0;
 #endif
 
 // Print Job Timer
@@ -913,6 +913,11 @@ void setup() {
   #if ENABLED(SUMMON_PRINT_PAUSE) && SUMMON_PRINT_PAUSE_PIN != X_MIN_PIN && SUMMON_PRINT_PAUSE_PIN != Y_MAX_PIN && SUMMON_PRINT_PAUSE_PIN != Z_MIN_PIN
     SET_INPUT(SUMMON_PRINT_PAUSE_PIN);
     WRITE(SUMMON_PRINT_PAUSE_PIN, HIGH);
+  #endif
+
+  #if ENABLED(PRINTER_HEAD_EASY)
+    SET_OUTPUT(PRINTER_HEAD_EASY_CONSTANT_FAN_PIN);
+    WRITE(PRINTER_HEAD_EASY_CONSTANT_FAN_PIN, LOW);
   #endif
 }
 
@@ -8304,30 +8309,40 @@ void manage_inactivity(bool ignore_stepper_queue/*=false*/) {
     }
   #endif
 
-  #if ENABLED(IS_MONO_FAN)
-    if ( ELAPSED(ms, mext_fan_auto_regulation_check) ) {
+  #if ENABLED(IS_MONO_FAN) || ENABLED(PRINTER_HEAD_EASY)
+    if ( ELAPSED(ms, next_fan_auto_regulation_check) ) {
       float max_temp = 0.0;
       for (int8_t cur_extruder = 0; cur_extruder < EXTRUDERS; ++cur_extruder)
         max_temp = max(max_temp, degHotend(cur_extruder));
-      // Clamp/Map 50 < max_temp < 100 to 0 < fan_speed < 255
 
-      short fs = 0;
-      if ( max_temp < MONO_FAN_MIN_TEMP ) {
-        fs = 0;
-      }
-      else if ( max_temp > MONO_FAN_MAX_TEMP ) {
-        fs = 255;
-      }
-      else {
-        float map_factor = 255.0 / ( MONO_FAN_MAX_TEMP - MONO_FAN_MIN_TEMP );
-        fs = (short) ( (max_temp - MONO_FAN_MIN_TEMP) * map_factor );
-        NOLESS(fs, 100); // 40%
-        NOMORE(fs, 255);
-      }
+      #if ENABLED(IS_MONO_FAN)
+        short fs = 0;
+        if ( max_temp < MONO_FAN_MIN_TEMP ) {
+          fs = 0;
+        }
+        else if ( max_temp > MONO_FAN_MAX_TEMP ) {
+          fs = 255;
+        }
+        else {
+          float map_factor = 255.0 / ( MONO_FAN_MAX_TEMP - MONO_FAN_MIN_TEMP );
+          fs = (short) ( (max_temp - MONO_FAN_MIN_TEMP) * map_factor );
+          NOLESS(fs, 100); // 40%
+          NOMORE(fs, 255);
+        }
 
-      fanSpeeds[0] = fs;
+        fanSpeeds[0] = fs;
+      #endif
 
-      mext_fan_auto_regulation_check = ms + 2500UL;
+      #if ENABLED(PRINTER_HEAD_EASY)
+        if ( max_temp < PRINTER_HEAD_EASY_CONSTANT_FAN_MIN_TEMP ) {
+          analogWrite(PRINTER_HEAD_EASY_CONSTANT_FAN_PIN, 0);
+        }
+        else {
+          analogWrite(PRINTER_HEAD_EASY_CONSTANT_FAN_PIN, 255);
+        }
+      #endif
+
+      next_fan_auto_regulation_check = ms + 2500UL;
     }
   #endif
 
