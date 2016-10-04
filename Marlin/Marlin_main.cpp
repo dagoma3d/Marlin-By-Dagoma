@@ -474,6 +474,8 @@ static uint8_t target_extruder;
 #endif
 #if ENABLED(U8GLIB_SSD1306) && ENABLED(INTELLIGENT_LCD_REFRESH_RATE)
   static float last_intelligent_z_lcd_update = 0;
+  static float last_intelligent_F_lcd_update = 0;
+  static bool last_intelligent_F_authorized_lcd_update = false;
 #endif
 
 static bool send_ok[BUFSIZE];
@@ -8205,11 +8207,18 @@ void idle(
   );
   host_keepalive();
   #if ENABLED(U8GLIB_SSD1306) && ENABLED(INTELLIGENT_LCD_REFRESH_RATE)
-    if (IS_SD_PRINTING) {
-      if (last_intelligent_z_lcd_update != current_position[Z_AXIS]) {
+    if (IS_SD_PRINTING && axis_homed[X_AXIS] && axis_homed[Y_AXIS] && axis_homed[Z_AXIS]) {
+      
+      if ( last_intelligent_F_lcd_update != feedrate ) {
+        last_intelligent_F_authorized_lcd_update = feedrate > last_intelligent_F_lcd_update;
+        last_intelligent_F_lcd_update = feedrate;
+      }
+
+      if ( last_intelligent_z_lcd_update != current_position[Z_AXIS] || last_intelligent_F_authorized_lcd_update ) {
         last_intelligent_z_lcd_update = current_position[Z_AXIS];
         lcd_update();
       }
+
     }
     else {
       lcd_update();
