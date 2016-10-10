@@ -39,7 +39,7 @@
 #define MSG_SD_INSERTED                     "Carte inseree"
 #define MSG_SD_REMOVED                      "Carte retiree"
 #define MSG_MAIN                            "Menu principal"
-#define MSG_OK                              "OK"
+#define MSG_LCD_OK                          "OK"
 #define MSG_PINCH                           "Pincez la feuille"
 #define MSG_SET_OFFSET                      "en reglant l'offset"
 #define MSG_VALIDATE                        "puis validez"

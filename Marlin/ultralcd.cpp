@@ -1422,7 +1422,7 @@ static void _lcd_reinit_z_offsets_saved(){
   lcd_implementation_drawmenu_generic(0, 2, PSTR(MSG_SAVED), ' ', ' ');
 
   encoderLine = 4;
-  MENU_ITEM(submenu, MSG_OK, lcd_return_to_status);
+  MENU_ITEM(submenu, MSG_LCD_OK, lcd_return_to_status);
 
 
   END_MENU();
