@@ -470,7 +470,6 @@ static uint8_t target_extruder;
 #endif
 #if ENABLED(SUMMON_PRINT_PAUSE)
   static bool print_pause_summoned = false;
-  static millis_t print_pause_summon_schedule = 0;
 #endif
 #if ENABLED(U8GLIB_SSD1306) && ENABLED(INTELLIGENT_LCD_REFRESH_RATE)
   static float last_intelligent_z_lcd_update = 0;
@@ -6492,6 +6491,8 @@ inline void gcode_M503() {
       line_to_destination();
     #endif
 
+    st_synchronize();
+
     #if ENABLED(FILAMENT_RUNOUT_SENSOR)
       filament_ran_out = false;
     #endif
@@ -8172,18 +8173,23 @@ void disable_all_steppers() {
 #if ENABLED(SUMMON_PRINT_PAUSE)
 
   void manage_pause_summoner() {
-      // PAUSE RELEASED
-      if (print_pause_summoned && (READ(SUMMON_PRINT_PAUSE_PIN) ^ SUMMON_PRINT_PAUSE_INVERTING)) {
-        print_pause_summoned = false;
-        enqueue_and_echo_commands_P(PSTR(SUMMON_PRINT_PAUSE_SCRIPT));
-        st_synchronize();
+    // PAUSE PUSHED
+    if (!print_pause_summoned
+      #if HAS_FILRUNOUT
+      && !filament_ran_out
+      #endif
+      ) {
+      if (
+        IS_SD_PRINTING
+        && READ(SUMMON_PRINT_PAUSE_PIN)
+        && axis_homed[X_AXIS]
+        && axis_homed[Y_AXIS]
+        && axis_homed[Z_AXIS]
+        ) {
+          print_pause_summoned = true;
+          enqueue_and_echo_commands_P(PSTR(SUMMON_PRINT_PAUSE_SCRIPT));
       }
-      // PAUSE PUSHED
-      if (!print_pause_summoned && IS_SD_PRINTING && !(READ(SUMMON_PRINT_PAUSE_PIN) ^ SUMMON_PRINT_PAUSE_INVERTING)
-        && axis_homed[X_AXIS] && axis_homed[Y_AXIS] && axis_homed[Z_AXIS]) {
-        print_pause_summoned = true;
-        print_pause_summon_schedule = millis() + 2500UL;
-      }
+    }
   }
 
 #endif // SUMMON_PRINT_PAUSE
@@ -8247,8 +8253,9 @@ void idle(
 void manage_inactivity(bool ignore_stepper_queue/*=false*/) {
 
   #if HAS_FILRUNOUT
-    if (IS_SD_PRINTING && !(READ(FILRUNOUT_PIN) ^ FIL_RUNOUT_INVERTING))
+    if (IS_SD_PRINTING && !(READ(FILRUNOUT_PIN) ^ FIL_RUNOUT_INVERTING)) {
       handle_filament_runout();
+    }
   #endif
 
   if (commands_in_queue < BUFSIZE) get_available_commands();
