@@ -96,7 +96,9 @@ static void lcd_status_screen();
   static void lcd_control_temperature_preheat_abs_settings_menu();
   static void lcd_control_motion_menu();
   static void lcd_control_volumetric_menu();
-  static void lcd_set_z_offsets();
+  #if ENABLED(AUTO_BED_LEVELING_FEATURE)
+    static void lcd_set_z_offsets();
+  #endif
   static void lcd_prepare_advanced_menu();
 
   #if ENABLED(HAS_LCD_CONTRAST)
@@ -1410,6 +1412,8 @@ static void lcd_move_menu_01mm() {
   _lcd_move_menu_axis();
 }
 
+#if ENABLED( AUTO_BED_LEVELING_FEATURE )
+
 static void _lcd_reinit_z_offsets_saved(){
   START_MENU();
 
@@ -1520,6 +1524,8 @@ static void lcd_set_z_offsets() {
 
   END_MENU();
 }
+
+#endif
 
 /**
  *
