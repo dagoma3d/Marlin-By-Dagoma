@@ -4674,22 +4674,18 @@ inline void gcode_M105() {
    *  P<index> Fan index, if more than one fan
    */
   inline void gcode_M106() {
-    #if DISABLED(IS_MONO_FAN)
-      uint16_t s = code_seen('S') ? code_value_short() : 255,
-               p = code_seen('P') ? code_value_short() : 0;
-      NOMORE(s, 255);
-      if (p < FAN_COUNT) fanSpeeds[p] = s;
-    #endif
+    uint16_t s = code_seen('S') ? code_value_short() : 255,
+             p = code_seen('P') ? code_value_short() : 0;
+    NOMORE(s, 255);
+    if (p < FAN_COUNT) fanSpeeds[p] = s;
   }
 
   /**
    * M107: Fan Off
    */
   inline void gcode_M107() {
-    #if DISABLED(IS_MONO_FAN)
-      uint16_t p = code_seen('P') ? code_value_short() : 0;
-      if (p < FAN_COUNT) fanSpeeds[p] = 0;
-    #endif
+    uint16_t p = code_seen('P') ? code_value_short() : 0;
+    if (p < FAN_COUNT) fanSpeeds[p] = 0;
   }
 
 #endif // FAN_COUNT > 0
@@ -8336,14 +8332,9 @@ void manage_inactivity(bool ignore_stepper_queue/*=false*/) {
         if ( max_temp < MONO_FAN_MIN_TEMP ) {
           fs = 0;
         }
-        else if ( max_temp > MONO_FAN_MAX_TEMP ) {
-          fs = 255;
-        }
         else {
-          float map_factor = 255.0 / ( MONO_FAN_MAX_TEMP - MONO_FAN_MIN_TEMP );
-          fs = (short) ( (max_temp - MONO_FAN_MIN_TEMP) * map_factor );
-          NOLESS(fs, 100); // 40%
-          NOMORE(fs, 255);
+          fs = fanSpeeds[0];
+          NOLESS(fs, MONO_FAN_MIN_PWM);
         }
 
         fanSpeeds[0] = fs;
