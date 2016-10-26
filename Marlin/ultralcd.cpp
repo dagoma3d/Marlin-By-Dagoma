@@ -48,6 +48,10 @@
   #define ENCODER_DIRECTION_MENUS() ;
 #endif
 
+#if ENABLED( AUTO_BED_LEVELING_FEATURE )
+  #define Z_OFFSET_REINIT_START_VALUE (-4.0f)
+#endif
+
 int8_t encoderDiff; // updated from interrupt context and added to encoderPosition every LCD update
 
 bool encoderRateMultiplierEnabled;
@@ -881,8 +885,9 @@ void lcd_cooldown() {
 void lcd_parallel_x(){
   lcd_return_to_status();
 
-  enqueue_and_echo_commands_P( PSTR("M117 Origine Machine") );  //      ; Message sur afficheur
-  enqueue_and_echo_commands_P( PSTR("G28") );  //             	    ; Home X Y Z
+  enqueue_and_echo_commands_P( PSTR("M117 Origine Machine") );  // ; Message sur afficheur
+  enqueue_and_echo_commands_P( PSTR("M84") );  //                  ; Disable motors to encure Z_SAFE_HOMING
+  enqueue_and_echo_commands_P( PSTR("G28") );  //             	   ; Home X Y Z
   enqueue_and_echo_commands_P( PSTR("G90") );  //                	 ; Passage coordonnees absolues
   wait_all_commands_finished__CALLABLE_FROM_LCD_ONLY();
 
@@ -1298,6 +1303,22 @@ static void _lcd_move_callback(const char* name, AxisEnum axis, float min, float
   if (LCD_CLICKED) (*callback)();
 }
 
+#if ENABLED( AUTO_BED_LEVELING_FEATURE )
+  static void _lcd_move_callback_with_offset(const char* name, AxisEnum axis, float min, float max, menuFunc_t callback, float offset) {
+    ENCODER_DIRECTION_NORMAL();
+    if (encoderPosition && movesplanned() <= 3) {
+      refresh_cmd_timeout();
+      current_position[axis] += float((int32_t)encoderPosition) * move_menu_scale;
+      if (min_software_endstops) NOLESS(current_position[axis], min);
+      if (max_software_endstops) NOMORE(current_position[axis], max);
+      line_to_current(axis);
+      lcdDrawUpdate = LCDVIEW_REDRAW_NOW;
+    }
+    encoderPosition = 0;
+    if (lcdDrawUpdate) lcd_implementation_drawedit(name, ftostr32(current_position[axis] + offset));
+    if (LCD_CLICKED) (*callback)();
+  }
+#endif
 
 
 #if ENABLED(DELTA)
@@ -1443,11 +1464,12 @@ static void _lcd_reinit_z_offsets_wait(){
 static void _lcd_reinit_z_offsets_save_back(){
   lcd_goto_menu(_lcd_reinit_z_offsets_wait);
 
-  zprobe_zoffset = -4.0+current_position[Z_AXIS];
+  zprobe_zoffset = Z_OFFSET_REINIT_START_VALUE + current_position[Z_AXIS];
 
   Config_StoreSettings();
-  enqueue_and_echo_commands_P(PSTR("G28")); //origine auto : besoin pour que le z soit pris en compte
-  enqueue_and_echo_commands_P(PSTR("G0 Z0")); //origine auto : besoin pour que le z soit pris en compte
+  enqueue_and_echo_commands_P(PSTR("M84"));   // ; Disable motors to encure Z_SAFE_HOMING
+  enqueue_and_echo_commands_P(PSTR("G28"));   // origine auto : besoin pour que le z soit pris en compte
+  enqueue_and_echo_commands_P(PSTR("G0 Z0")); // 
 
   wait_all_commands_finished__CALLABLE_FROM_LCD_ONLY();
 
@@ -1461,8 +1483,8 @@ static void _lcd_reinit_z_offsets_zConfig(){
   lcd_implementation_drawmenu_generic(0, 1, PSTR(MSG_SET_OFFSET), ' ', ' ');
 
   //lcd_move_z();
-  move_menu_scale = 0.1;
-  _lcd_move_callback(PSTR(MSG_MOVE_Z), Z_AXIS, sw_endstop_min[Z_AXIS], sw_endstop_max[Z_AXIS], _lcd_reinit_z_offsets_save_back);
+  move_menu_scale = 0.05;
+  _lcd_move_callback_with_offset(PSTR(MSG_MOVE_Z), Z_AXIS, sw_endstop_min[Z_AXIS], sw_endstop_max[Z_AXIS], _lcd_reinit_z_offsets_save_back, Z_OFFSET_REINIT_START_VALUE);
 
   lcd_implementation_drawmenu_generic(0, 4, PSTR(MSG_VALIDATE), ' ', ' ');
 }
@@ -1496,9 +1518,10 @@ static void lcd_reinit_z_offsets(){
 
   defer_return_to_status = true;
 
-  zprobe_zoffset = -4.0;
+  zprobe_zoffset = Z_OFFSET_REINIT_START_VALUE;
   Config_StoreSettings();
-  enqueue_and_echo_commands_P(PSTR("G28")); //origine auto
+  enqueue_and_echo_commands_P(PSTR("M84"));  // ; Disable motors to encure Z_SAFE_HOMING
+  enqueue_and_echo_commands_P(PSTR("G28"));  // origine auto
   wait_all_commands_finished__CALLABLE_FROM_LCD_ONLY();
 
   lcd_goto_menu(_lcd_reinit_z_offsets_screenSheet);
@@ -1506,8 +1529,9 @@ static void lcd_reinit_z_offsets(){
 
 static void lcd_set_z_offsets_save_config() {
   Config_StoreSettings();
+  enqueue_and_echo_commands_P(PSTR("M84"));   // ; Disable motors to encure Z_SAFE_HOMING
   enqueue_and_echo_commands_P(PSTR("G28"));
-  enqueue_and_echo_commands_P(PSTR("G0 Z0")); //origine auto : besoin pour que le z soit pris en compte
+  enqueue_and_echo_commands_P(PSTR("G0 Z0")); // origine auto : besoin pour que le z soit pris en compte
 }
 
 static void lcd_set_z_offsets() {
