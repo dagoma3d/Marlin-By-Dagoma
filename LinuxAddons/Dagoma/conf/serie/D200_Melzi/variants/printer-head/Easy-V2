@@ -1,5 +1,7 @@
 Disable IS_MONO_FAN
 
+Enable FAN_KICKSTART_TIME
+
 Set X_MIN_POS -2
 Set Y_MIN_POS -1
 Set Z_MIN_POS 0
