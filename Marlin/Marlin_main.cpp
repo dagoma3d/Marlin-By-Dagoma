@@ -6317,7 +6317,49 @@ inline void gcode_M503() {
       #define RUNPLAN line_to_destination();
     #endif
 
+   
+
+    //retract by E
+    if (code_seen('E')) destination[E_AXIS] += code_value();
+    #ifdef FILAMENTCHANGE_FIRSTRETRACT
+      else destination[E_AXIS] += FILAMENTCHANGE_FIRSTRETRACT;
+    #endif
+
+    RUNPLAN;
+
+    //lift Z
+    if (code_seen('Z')) destination[Z_AXIS] += code_value();
+    #ifdef FILAMENTCHANGE_ZADD
+      else destination[Z_AXIS] += FILAMENTCHANGE_ZADD;
+    #endif
+
+    RUNPLAN;
+
+    //move xy
+    if (code_seen('X')) destination[X_AXIS] = code_value();
+    #ifdef FILAMENTCHANGE_XPOS
+      else destination[X_AXIS] = FILAMENTCHANGE_XPOS;
+    #endif
+
+    if (code_seen('Y')) destination[Y_AXIS] = code_value();
+    #ifdef FILAMENTCHANGE_YPOS
+      else destination[Y_AXIS] = FILAMENTCHANGE_YPOS;
+    #endif
+
+    RUNPLAN;
+
+    if (code_seen('L')) destination[E_AXIS] += code_value();
+    #ifdef FILAMENTCHANGE_FINALRETRACT
+      else destination[E_AXIS] += FILAMENTCHANGE_FINALRETRACT;
+    #endif
+
+    RUNPLAN;
+
+    //finish moves
+    st_synchronize();
+
     // DAGOMA added
+    // Determine exit/pin state after moving away
     int pin_number = -1;
     int target = -1;
     if (code_seen('P')) {
@@ -6371,44 +6413,8 @@ inline void gcode_M503() {
     } // code_seen('P')
     // END DAGOMA added
 
-    //retract by E
-    if (code_seen('E')) destination[E_AXIS] += code_value();
-    #ifdef FILAMENTCHANGE_FIRSTRETRACT
-      else destination[E_AXIS] += FILAMENTCHANGE_FIRSTRETRACT;
-    #endif
 
-    RUNPLAN;
 
-    //lift Z
-    if (code_seen('Z')) destination[Z_AXIS] += code_value();
-    #ifdef FILAMENTCHANGE_ZADD
-      else destination[Z_AXIS] += FILAMENTCHANGE_ZADD;
-    #endif
-
-    RUNPLAN;
-
-    //move xy
-    if (code_seen('X')) destination[X_AXIS] = code_value();
-    #ifdef FILAMENTCHANGE_XPOS
-      else destination[X_AXIS] = FILAMENTCHANGE_XPOS;
-    #endif
-
-    if (code_seen('Y')) destination[Y_AXIS] = code_value();
-    #ifdef FILAMENTCHANGE_YPOS
-      else destination[Y_AXIS] = FILAMENTCHANGE_YPOS;
-    #endif
-
-    RUNPLAN;
-
-    if (code_seen('L')) destination[E_AXIS] += code_value();
-    #ifdef FILAMENTCHANGE_FINALRETRACT
-      else destination[E_AXIS] += FILAMENTCHANGE_FINALRETRACT;
-    #endif
-
-    RUNPLAN;
-
-    //finish moves
-    st_synchronize();
     //disable extruder steppers so filament can be removed
     disable_e0();
     disable_e1();
