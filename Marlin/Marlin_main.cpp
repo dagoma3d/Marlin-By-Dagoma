@@ -467,6 +467,7 @@ static uint8_t target_extruder;
 
 #if ENABLED(FILAMENT_RUNOUT_SENSOR)
   static bool filament_ran_out = false;
+  static bool filrunout_bypassed = false;
 #endif
 #if ENABLED(SUMMON_PRINT_PAUSE)
   static bool print_pause_summoned = false;
@@ -914,6 +915,11 @@ void setup() {
   #if ENABLED(SUMMON_PRINT_PAUSE) && SUMMON_PRINT_PAUSE_PIN != X_MIN_PIN && SUMMON_PRINT_PAUSE_PIN != Y_MAX_PIN && SUMMON_PRINT_PAUSE_PIN != Z_MIN_PIN
     SET_INPUT(SUMMON_PRINT_PAUSE_PIN);
     WRITE(SUMMON_PRINT_PAUSE_PIN, HIGH);
+    delay( 100 );
+    if ( READ( SUMMON_PRINT_PAUSE_PIN ) ) {
+      filrunout_bypassed = true;
+      SERIAL_ECHOLN( "Filament sensor bypassed" );
+    }
   #endif
 
   #if ENABLED(PRINTER_HEAD_EASY)
@@ -6490,6 +6496,25 @@ inline void gcode_M503() {
         st_synchronize();
       #endif
     } // while(!lcd_clicked)
+
+    #if ENABLED( NO_LCD_FOR_FILAMENTCHANGEABLE )
+      // Wait a bit more to see if we want to disable filrunout sensor
+      millis_t now = millis();
+      millis_t long_push = now + 2000UL;
+      delay( 200 );
+      while (pin_number != -1 && digitalRead(pin_number) == target && PENDING(now, long_push)) {
+        enable_x();
+        enable_y();
+        enable_z();
+        idle(true);
+        now = millis();
+      }
+      if ( ELAPSED(now,long_push) ) {
+        filrunout_bypassed = true;
+        SERIAL_ECHOLN( "Filament sensor bypassed" );
+      }
+    #endif
+
     KEEPALIVE_STATE(IN_HANDLER);
     #if DISABLED(NO_LCD_FOR_FILAMENTCHANGEABLE)
     lcd_quick_feedback(); // click sound feedback
@@ -8712,7 +8737,14 @@ void idle(
 void manage_inactivity(bool ignore_stepper_queue/*=false*/) {
 
   #if HAS_FILRUNOUT
-    if (IS_SD_PRINTING && !(READ(FILRUNOUT_PIN) ^ FIL_RUNOUT_INVERTING)) {
+    if (
+      IS_SD_PRINTING
+      && !filrunout_bypassed
+      && !(READ(FILRUNOUT_PIN) ^ FIL_RUNOUT_INVERTING)
+      && axis_homed[X_AXIS]
+      && axis_homed[Y_AXIS]
+      && axis_homed[Z_AXIS]
+      ) {
       handle_filament_runout();
     }
   #endif
