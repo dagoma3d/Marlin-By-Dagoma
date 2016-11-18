@@ -248,9 +248,9 @@
 
   // If you are using a pre-configured hotend then you can use one of the value sets by uncommenting it
   // Ultimaker
-  #define  DEFAULT_Kp 22.2
-  #define  DEFAULT_Ki 1.08
-  #define  DEFAULT_Kd 114
+  //#define  DEFAULT_Kp 22.2
+  //#define  DEFAULT_Ki 1.08
+  //#define  DEFAULT_Kd 114
 
   // MakerGear
   //#define  DEFAULT_Kp 7.0
@@ -261,6 +261,11 @@
   //#define  DEFAULT_Kp 63.0
   //#define  DEFAULT_Ki 2.25
   //#define  DEFAULT_Kd 440
+
+  // hotend E3D-v6 1,75mm + sonde temperature AMTEC 104GT2 100K pour ramps1.4
+  #define  DEFAULT_Kp 32.48
+  #define  DEFAULT_Ki 6.4
+  #define  DEFAULT_Kd 41.25
 
 #endif // PIDTEMP
 
@@ -360,27 +365,31 @@
   // Make delta curves from many straight lines (linear interpolation).
   // This is a trade-off between visible corners (not enough segments)
   // and processor overload (too many expensive sqrt calls).
-  #define DELTA_SEGMENTS_PER_SECOND 60
+  #define DELTA_SEGMENTS_PER_SECOND 60 // Ju
 
   // NOTE NB all values for DELTA_* values MUST be floating point, so always have a decimal point in them
 
   // Center-to-center distance of the holes in the diagonal push rods.
   //#define DELTA_DIAGONAL_ROD 232.29 // 232.29 // mm
   //#define DELTA_DIAGONAL_ROD 212.57
-  #define DELTA_DIAGONAL_ROD 212.6
+  //#define DELTA_DIAGONAL_ROD 212.6
+  #define DELTA_DIAGONAL_ROD 209 // Ju
 
   // Horizontal offset from middle of printer to smooth rod center.
   //#define DELTA_SMOOTH_ROD_OFFSET 147.10 //147.10 // mm
-  #define DELTA_SMOOTH_ROD_OFFSET 147.10
+  //#define DELTA_SMOOTH_ROD_OFFSET 147.10
+  #define DELTA_SMOOTH_ROD_OFFSET 147.10 // Ju
 
   // Horizontal offset of the universal joints on the end effector.
   //#define DELTA_EFFECTOR_OFFSET 38.98 // 38.98 // mm
   //#define DELTA_EFFECTOR_OFFSET 32.12
-  #define DELTA_EFFECTOR_OFFSET 32.1
+  //#define DELTA_EFFECTOR_OFFSET 32.1
+  #define DELTA_EFFECTOR_OFFSET 31.83 // Ju
 
   // Horizontal offset of the universal joints on the carriages.
   //#define DELTA_CARRIAGE_OFFSET 21.18 // 21.18 // mm
-  #define DELTA_CARRIAGE_OFFSET 21.2 // 21.18 // mm
+  //#define DELTA_CARRIAGE_OFFSET 21.2 // 21.18 // mm
+  #define DELTA_CARRIAGE_OFFSET 19.16 // Ju
 
   // Horizontal distance bridged by diagonal push rods when effector is centered.
   #define DELTA_RADIUS (DELTA_SMOOTH_ROD_OFFSET-(DELTA_EFFECTOR_OFFSET)-(DELTA_CARRIAGE_OFFSET))
@@ -393,7 +402,7 @@
   // See http://minow.blogspot.com/index.html#4918805519571907051
   // If needed, adjust the X, Y, Z calibration coordinates
   // in ultralcd.cpp@lcd_delta_calibrate_menu()
-  #define DELTA_CALIBRATION_MENU
+  //#define DELTA_CALIBRATION_MENU
 
 #endif
 
@@ -473,11 +482,11 @@ const bool Z_MIN_PROBE_ENDSTOP_INVERTING = true; // set to true to invert the lo
 // Setting the wrong pin may have unexpected and potentially disastrous consequences.
 // Use with caution and do your homework.
 //
-#define Z_MIN_PROBE_ENDSTOP
+// #define Z_MIN_PROBE_ENDSTOP
 
 // Enable Z_MIN_PROBE_USES_Z_MIN_ENDSTOP_PIN to use the Z_MIN_PIN for your Z_MIN_PROBE.
 // The Z_MIN_PIN will then be used for both Z-homing and probing.
-//#define Z_MIN_PROBE_USES_Z_MIN_ENDSTOP_PIN
+#define Z_MIN_PROBE_USES_Z_MIN_ENDSTOP_PIN
 
 // To use a probe you must enable one of the two options above!
 
@@ -664,8 +673,10 @@ const bool Z_MIN_PROBE_ENDSTOP_INVERTING = true; // set to true to invert the lo
   //  (0,0)
   #define X_PROBE_OFFSET_FROM_EXTRUDER 0.0  // X offset: -left  +right  [of the nozzle]
   //#define Y_PROBE_OFFSET_FROM_EXTRUDER -38.0  // Y offset: -front +behind [the nozzle]
-  #define Y_PROBE_OFFSET_FROM_EXTRUDER -30.8
-  #define Z_PROBE_OFFSET_FROM_EXTRUDER 1.0   // Z offset: -below +above  [the nozzle]
+  //#define Y_PROBE_OFFSET_FROM_EXTRUDER -30.8
+  #define Y_PROBE_OFFSET_FROM_EXTRUDER 0.0 // SFR probing
+  //#define Z_PROBE_OFFSET_FROM_EXTRUDER 1.0   // Z offset: -below +above  [the nozzle]
+  #define Z_PROBE_OFFSET_FROM_EXTRUDER 0.0 // SFR probing
 
   #define XY_TRAVEL_SPEED 4000         // X and Y axis travel speed between probes, in mm/min.
 
@@ -714,7 +725,7 @@ const bool Z_MIN_PROBE_ENDSTOP_INVERTING = true; // set to true to invert the lo
   #define MANUAL_X_HOME_POS 0
   #define MANUAL_Y_HOME_POS 0
   //#define MANUAL_Z_HOME_POS 0
-  #define MANUAL_Z_HOME_POS 195 // For delta: Distance between nozzle and print surface after homing.
+  #define MANUAL_Z_HOME_POS 205 // For delta: Distance between nozzle and print surface after homing.
 #endif
 
 // Use "Z Safe Homing" to avoid homing with a Z probe outside the bed area.
@@ -746,14 +757,15 @@ const bool Z_MIN_PROBE_ENDSTOP_INVERTING = true; // set to true to invert the lo
 
 // default settings
 
-#define DEFAULT_AXIS_STEPS_PER_UNIT   {80,80,80, 98.0}  // default steps per unit for Ultimaker
+#define DEFAULT_AXIS_STEPS_PER_UNIT   {80.0, 80.0, 80.0, 98.0}  // default steps per unit for Ultimaker
 //#define DEFAULT_MAX_FEEDRATE          {300, 300, 300, 25}    // (mm/sec)
-#define DEFAULT_MAX_FEEDRATE          {200, 200, 200, 25}    // (mm/sec)
-#define DEFAULT_MAX_ACCELERATION      {3000,3000,3000,10000}    // X, Y, Z, E maximum start speed for accelerated moves. E default values are good for Skeinforge 40+, for older versions raise them a lot.
+//#define DEFAULT_MAX_FEEDRATE          {200, 200, 200, 25}    // (mm/sec)
+#define DEFAULT_MAX_FEEDRATE          {500, 500, 500, 70}    // (mm/sec) // Ju
+//#define DEFAULT_MAX_ACCELERATION      {3000,3000,3000,10000}    // X, Y, Z, E maximum start speed for accelerated moves. E default values are good for Skeinforge 40+, for older versions raise them a lot.
+#define DEFAULT_MAX_ACCELERATION      {9000,9000,9000,10000} // Ju
 //#define DEFAULT_MAX_ACCELERATION      {9000,9000,9000,10000}    // X, Y, Z, E maximum start speed for accelerated moves. E default values are good for Skeinforge 40+, for older versions raise them a lot.
 
-//#define DEFAULT_ACCELERATION          3000    // X, Y, Z and E acceleration in mm/s^2 for printing moves
-//#define DEFAULT_ACCELERATION          20
+#define DEFAULT_ACCELERATION          3000    // X, Y, Z and E acceleration in mm/s^2 for printing moves
 #define DEFAULT_RETRACT_ACCELERATION  3000    // E acceleration in mm/s^2 for retracts
 #define DEFAULT_TRAVEL_ACCELERATION   3000    // X, Y, Z acceleration in mm/s^2 for travel (non printing) moves
 
@@ -763,10 +775,13 @@ const bool Z_MIN_PROBE_ENDSTOP_INVERTING = true; // set to true to invert the lo
 //#define DEFAULT_EJERK                 5.0    // (mm/sec)
 
 // TRY SEPTEMBER 2016 !!!
-#define DEFAULT_ACCELERATION          10    // X, Y, Z and E acceleration in mm/s^2 for printing moves
-#define DEFAULT_XYJERK                0.5    // (mm/sec)
-#define DEFAULT_ZJERK                 0.5     // 0.4(mm/sec)
-#define DEFAULT_EJERK                 5.0    // (mm/sec)
+//#define DEFAULT_ACCELERATION          10    // X, Y, Z and E acceleration in mm/s^2 for printing moves
+//#define DEFAULT_XYJERK                0.5    // (mm/sec)
+//#define DEFAULT_ZJERK                 0.5     // 0.4(mm/sec)
+//#define DEFAULT_EJERK                 5.0    // (mm/sec)
+#define DEFAULT_XYJERK                20.0    // (mm/sec)
+#define DEFAULT_ZJERK                 20.0    // (mm/sec) Must be same as XY for delta
+#define DEFAULT_EJERK                 20.0     // (mm/sec)
 
 //=============================================================================
 //============================= Additional Features ===========================
