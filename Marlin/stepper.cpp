@@ -337,6 +337,12 @@ void checkHitEndstops() {
   }
 }
 
+#if ENABLED( Z_MIN_MAGIC )
+  volatile int measure_state = 0;
+  volatile unsigned long raw_z_min_value;
+  volatile int last_measure = -1;
+#endif
+
 // Check endstops - Called from ISR!
 inline void update_endstops() {
 
@@ -470,7 +476,6 @@ inline void update_endstops() {
                 step_events_completed = current_block->step_event_count;
             }
           #else // !Z_DUAL_ENDSTOPS
-
             #if ENABLED(Z_MIN_PROBE_USES_Z_MIN_ENDSTOP_PIN) && ENABLED(HAS_Z_MIN_PROBE)
               if (z_probe_is_active) UPDATE_ENDSTOP(Z, MIN);
             #else
@@ -480,10 +485,49 @@ inline void update_endstops() {
         #endif
 
         #if ENABLED(Z_MIN_PROBE_ENDSTOP) && DISABLED(Z_MIN_PROBE_USES_Z_MIN_ENDSTOP_PIN) && ENABLED(HAS_Z_MIN_PROBE)
-          if (z_probe_is_active) {
-            UPDATE_ENDSTOP(Z, MIN_PROBE);
-            if (TEST_ENDSTOP(Z_MIN_PROBE)) SBI(endstop_hit_bits, Z_MIN_PROBE);
-          }
+          #if ENABLED( Z_MIN_MAGIC )
+              if ( z_probe_is_active && can_measure_z_magic ) {
+                int z_sensor = analogRead( Z_MIN_PROBE_PIN );
+                
+                if ( last_measure < 0 ) {
+                  last_measure = z_sensor;
+                }
+
+                if ( last_measure - z_sensor < 3 ) {
+                  SET_BIT(current_endstop_bits, Z_MIN_PROBE, 0 );
+                }
+                else if ( abs( last_measure - z_sensor ) > 150 ) {
+                  // Weird value
+                  SERIAL_ECHO( "Weird value [" );
+                  SERIAL_ECHO( measure_state );
+                  SERIAL_ECHO( "]: " );
+                  SERIAL_ECHOLN( z_sensor );
+
+                  SET_BIT(current_endstop_bits, Z_MIN_PROBE, 0 );
+                }
+                else {
+                  SET_BIT(current_endstop_bits, Z_MIN_PROBE, 1 );
+
+                }
+                last_measure = z_sensor;
+
+                if (TEST_ENDSTOP(_ENDSTOP(Z, MIN_PROBE)) && current_block->steps[_AXIS(Z)] > 0) {
+                  _SET_TRIGSTEPS(Z);
+                  _ENDSTOP_HIT(Z);
+                  step_events_completed = current_block->step_event_count;
+                }
+                
+                if (TEST_ENDSTOP(Z_MIN_PROBE)) SBI(endstop_hit_bits, Z_MIN_PROBE);
+               
+              } // END z_probe_is_active
+
+              //measure_state++;
+          #else
+            if (z_probe_is_active) {
+              UPDATE_ENDSTOP(Z, MIN_PROBE);
+              if (TEST_ENDSTOP(Z_MIN_PROBE)) SBI(endstop_hit_bits, Z_MIN_PROBE);
+            }
+          #endif
         #endif
       }
       else { // z +direction

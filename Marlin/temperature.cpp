@@ -1387,6 +1387,10 @@ static void set_current_temp_raw() {
   temp_meas_ready = true;
 }
 
+#if ENABLED( Z_MIN_MAGIC )
+  bool can_measure_z_magic = false;
+#endif
+
 /**
  * Timer 0 is shared with millies
  *  - Manage PWM to all the heaters and fan
@@ -1643,12 +1647,18 @@ ISR(TIMER0_COMPB_vect) {
       #endif
       lcd_buttons_update();
       temp_state = MeasureTemp_0;
+      #if ENABLED( Z_MIN_MAGIC )
+        can_measure_z_magic = false;
+      #endif
       break;
     case MeasureTemp_0:
       #if HAS_TEMP_0
         raw_temp_value[0] += ADC;
       #endif
       temp_state = PrepareTemp_BED;
+      #if ENABLED( Z_MIN_MAGIC )
+        can_measure_z_magic = false;
+      #endif
       break;
 
     case PrepareTemp_BED:
@@ -1657,12 +1667,18 @@ ISR(TIMER0_COMPB_vect) {
       #endif
       lcd_buttons_update();
       temp_state = MeasureTemp_BED;
+      #if ENABLED( Z_MIN_MAGIC )
+        can_measure_z_magic = true;
+      #endif
       break;
     case MeasureTemp_BED:
       #if HAS_TEMP_BED
         raw_temp_bed_value += ADC;
       #endif
       temp_state = PrepareTemp_1;
+      #if ENABLED( Z_MIN_MAGIC )
+        can_measure_z_magic = true;
+      #endif
       break;
 
     case PrepareTemp_1:
@@ -1677,6 +1693,9 @@ ISR(TIMER0_COMPB_vect) {
         raw_temp_value[1] += ADC;
       #endif
       temp_state = PrepareTemp_2;
+      #if ENABLED( Z_MIN_MAGIC )
+        can_measure_z_magic = true;
+      #endif
       break;
 
     case PrepareTemp_2:
@@ -1685,12 +1704,18 @@ ISR(TIMER0_COMPB_vect) {
       #endif
       lcd_buttons_update();
       temp_state = MeasureTemp_2;
+      #if ENABLED( Z_MIN_MAGIC )
+        can_measure_z_magic = true;
+      #endif
       break;
     case MeasureTemp_2:
       #if HAS_TEMP_2
         raw_temp_value[2] += ADC;
       #endif
       temp_state = PrepareTemp_3;
+      #if ENABLED( Z_MIN_MAGIC )
+        can_measure_z_magic = true;
+      #endif
       break;
 
     case PrepareTemp_3:
@@ -1699,12 +1724,18 @@ ISR(TIMER0_COMPB_vect) {
       #endif
       lcd_buttons_update();
       temp_state = MeasureTemp_3;
+      #if ENABLED( Z_MIN_MAGIC )
+        can_measure_z_magic = true;
+      #endif
       break;
     case MeasureTemp_3:
       #if HAS_TEMP_3
         raw_temp_value[3] += ADC;
       #endif
       temp_state = Prepare_FILWIDTH;
+      #if ENABLED( Z_MIN_MAGIC )
+        can_measure_z_magic = true;
+      #endif
       break;
 
     case Prepare_FILWIDTH:
@@ -1713,6 +1744,9 @@ ISR(TIMER0_COMPB_vect) {
       #endif
       lcd_buttons_update();
       temp_state = Measure_FILWIDTH;
+      #if ENABLED( Z_MIN_MAGIC )
+        can_measure_z_magic = true;
+      #endif
       break;
     case Measure_FILWIDTH:
       #if ENABLED(FILAMENT_WIDTH_SENSOR)
@@ -1724,6 +1758,9 @@ ISR(TIMER0_COMPB_vect) {
       #endif
       temp_state = PrepareTemp_0;
       temp_count++;
+      #if ENABLED( Z_MIN_MAGIC )
+        can_measure_z_magic = true;
+      #endif
       break;
 
     case StartupDelay:

@@ -186,4 +186,8 @@ FORCE_INLINE void autotempShutdown() {
   #endif
 }
 
+#if ENABLED( Z_MIN_MAGIC )
+  extern bool can_measure_z_magic;
+#endif
+
 #endif // TEMPERATURE_H

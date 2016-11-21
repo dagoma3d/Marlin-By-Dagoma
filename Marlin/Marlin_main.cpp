@@ -444,6 +444,10 @@ static uint8_t target_extruder;
     int delta_grid_spacing[2] = { 0, 0 };
     float bed_level[AUTO_BED_LEVELING_GRID_POINTS][AUTO_BED_LEVELING_GRID_POINTS];
   #endif
+
+  #if ENABLED( DELTA_EXTRA )
+    bool postcompute_tri_ready = false;
+  #endif
 #else
   static bool home_all_axis = true;
 #endif
@@ -467,10 +471,12 @@ static uint8_t target_extruder;
 
 #if ENABLED(FILAMENT_RUNOUT_SENSOR)
   static bool filament_ran_out = false;
-  static bool filrunout_bypassed = false;
 #endif
 #if ENABLED(SUMMON_PRINT_PAUSE)
   static bool print_pause_summoned = false;
+  #if ENABLED(FILAMENT_RUNOUT_SENSOR)
+    static bool filrunout_bypassed = false;
+  #endif
 #endif
 #if ENABLED(U8GLIB_SSD1306) && ENABLED(INTELLIGENT_LCD_REFRESH_RATE)
   static float last_intelligent_z_lcd_update = 0;
@@ -787,6 +793,16 @@ void servo_init() {
   void enableStepperDrivers() { pinMode(STEPPER_RESET_PIN, INPUT); }  // set to input, which allows it to be pulled high by pullups
 #endif
 
+#if ENABLED( ONE_LED )
+  inline void one_led_on() {
+    digitalWrite( ONE_LED_PIN, true ^ ONE_LED_INVERTING );
+  }
+
+  inline void one_led_off() {
+    digitalWrite( ONE_LED_PIN, false ^ ONE_LED_INVERTING );
+  }
+#endif
+
 /**
  * Marlin entry-point: Set up before the program loop
  *  - Set up the kill pin, filament runout, power hold
@@ -915,11 +931,14 @@ void setup() {
   #if ENABLED(SUMMON_PRINT_PAUSE) && SUMMON_PRINT_PAUSE_PIN != X_MIN_PIN && SUMMON_PRINT_PAUSE_PIN != Y_MAX_PIN && SUMMON_PRINT_PAUSE_PIN != Z_MIN_PIN
     SET_INPUT(SUMMON_PRINT_PAUSE_PIN);
     WRITE(SUMMON_PRINT_PAUSE_PIN, HIGH);
-    delay( 100 );
-    if ( READ( SUMMON_PRINT_PAUSE_PIN ) ) {
-      filrunout_bypassed = true;
-      SERIAL_ECHOLN( "Filament sensor bypassed" );
-    }
+
+    #if ENABLED(FILAMENT_RUNOUT_SENSOR)
+      delay( 100 );
+      if ( READ( SUMMON_PRINT_PAUSE_PIN ) ) {
+          filrunout_bypassed = true;
+          SERIAL_ECHOLN( "Filament sensor bypassed" );
+      }
+    #endif
   #endif
 
   #if ENABLED(PRINTER_HEAD_EASY)
@@ -928,11 +947,14 @@ void setup() {
   #endif
 
   #if ENABLED(DELTA_EXTRA)
-    // Start special Z-Offset routine
-    if (READ(Z_MIN_PIN) != Z_MIN_ENDSTOP_INVERTING) {
-      enqueue_and_echo_commands_P( PSTR("D851") );
-    }
+    // Read the button state here
   #endif
+
+  #if ENABLED( ONE_LED )
+    pinMode( ONE_LED_PIN, OUTPUT );
+    one_led_off();
+  #endif
+
 }
 
 #if ENABLED(WIFI_PRINT)
@@ -6497,7 +6519,7 @@ inline void gcode_M503() {
       #endif
     } // while(!lcd_clicked)
 
-    #if ENABLED( NO_LCD_FOR_FILAMENTCHANGEABLE )
+    #if ENABLED( NO_LCD_FOR_FILAMENTCHANGEABLE ) && ENABLED( FILAMENT_RUNOUT_SENSOR )
       // Wait a bit more to see if we want to disable filrunout sensor
       millis_t now = millis();
       millis_t long_push = now + 2000UL;
@@ -6907,122 +6929,9 @@ inline void gcode_D999() {
   }
 }
 
-#define Z_DETECTION_PRECISION_STEP (0.0125)
-//#define MOVE_FEEDRATE      (1.732 * homing_feedrate[X_AXIS])
-#define MOVE_FEEDRATE      (4000.0)
-#define PRECISION_FEEDRATE (2000.0)
-//#define PRECISION_FEEDRATE      (1.732 * homing_feedrate[X_AXIS])
-
-inline float _delta_extra__probe_average_steps( int reprobe_count ) {
-  int i = reprobe_count;
-
-  long stop_steps, stop_steps_acc=0;
-  do {
-    feedrate = MOVE_FEEDRATE;
-    for (int i = X_AXIS; i <= Z_AXIS; i++) destination[i] += 5.0;
-    line_to_destination();
-    st_synchronize();
-    
-    feedrate = PRECISION_FEEDRATE;
-    while( READ(Z_MIN_PIN) == Z_MIN_ENDSTOP_INVERTING ) {
-      // Move all carriages up together until Z Probe do not see anything.
-      for (int i = X_AXIS; i <= Z_AXIS; i++) destination[i] -= Z_DETECTION_PRECISION_STEP;
-      line_to_destination();
-      st_synchronize();
-    }
-
-    stop_steps = st_get_position(Z_AXIS);
-    SERIAL_ECHO( "Stopped at: ");
-    SERIAL_ECHOLN( stop_steps );
-
-    stop_steps_acc += stop_steps;
-
-  } while( --i );
-  return float( stop_steps_acc ) / (reprobe_count * 1.0);
-}
-
-inline void _delta_extra__print_st_positions() {
-  SERIAL_ECHO( "X(" );
-  SERIAL_ECHO( st_get_position(X_AXIS) );
-  SERIAL_ECHO( ") Y(" );
-  SERIAL_ECHO( st_get_position(Y_AXIS) );
-  SERIAL_ECHO( ") Z(" );
-  SERIAL_ECHO( st_get_position(Z_AXIS) );
-  SERIAL_ECHOLN( ")" );
-}
-
 inline void gcode_D851() {
 
-  SERIAL_ECHOLN( "Starting Z-Offset Delta special" );
-
-  //
-  // Reset to factory settings
-  gcode_M502();
-  gcode_M500();
-
-  for (int i = X_AXIS; i <= Z_AXIS; i++) current_position[i] = 0;
-  set_current_to_destination();
-  sync_plan_position();
-
-  enable_x();
-  delay( 500 ); idle();
-  //disable_x();
-  //delay( 500 ); idle();
-  enable_y();
-  delay( 500 ); idle();
-  //disable_y();
-  //delay( 500 ); idle();
-  enable_z();
-  delay( 500 ); idle();
-  //disable_z();
-  //delay( 500 ); idle();
-
-  long steps_plateau = st_get_position(X_AXIS);
-
-  SERIAL_ECHO( "Step plateau: ");
-  SERIAL_ECHOLN( steps_plateau );
-
-  feedrate = PRECISION_FEEDRATE;
-
-  while( READ(Z_MIN_PIN) != Z_MIN_ENDSTOP_INVERTING ) {
-    // Move all carriages up together until Z Probe do not see anything.
-    for (int i = X_AXIS; i <= Z_AXIS; i++) destination[i] += Z_DETECTION_PRECISION_STEP;
-    line_to_destination();
-    st_synchronize();
-    gcode_M18_M84();
-  }
-
-  long steps_decrochage = st_get_position(X_AXIS) - steps_plateau;
-
-  SERIAL_ECHO( "                    Step decrochage: ");
-  SERIAL_ECHOLN( steps_decrochage );
-
-  /*
-  feedrate = 1.732 * homing_feedrate[X_AXIS];
-  line_to_destination();
-  st_synchronize();
-  endstops_hit_on_purpose(); // clear endstop hit flags
-  */
-
-  float steps_accrochage_avg = _delta_extra__probe_average_steps( 3 ) - float(steps_plateau);
-
-  float z_offset_average_mm = steps_accrochage_avg / axis_steps_per_unit[Z_AXIS];
-
-  zprobe_zoffset = - z_offset_average_mm;
-
-  SERIAL_ECHO( "                           Z Offset: ");
-  SERIAL_ECHOLN( zprobe_zoffset );
-
-  SERIAL_ECHO( "                    Step accrochage: ");
-  SERIAL_ECHOLN( steps_accrochage_avg );
-
-  gcode_M18_M84();
-
-  //
-  // Store Z-Offset
-  gcode_M500();
-
-  _delta_extra__print_st_positions();
+  SERIAL_ECHOLN( "Starting full Delta calibration" );
 
 }
 
@@ -7047,9 +6956,8 @@ float precalc_probed_tri_aref[4] = { 0.0, 0.0, 0.0, 0.0 };
 
 inline int triangle_index( const float x, const float y ) {
 
-  float aRef, aTested;
   // While all tri equations are just: y = a.x;
-  aTested = y / x;
+  float aTested = y / x;
   
   // Test to choice between 2 tri groups: 1,2,3 or 0,4,5
   if ( x >= 0.0 ) {
@@ -7096,7 +7004,6 @@ inline int triangle_index( const float x, const float y ) {
   return -1;
 }
 
-bool postcompute_tri_ready = false;
 float probed_tri_altitude[7] = { 42.0, 42.0, 42.0, 42.0, 42.0, 42.0, 42.0 };
 
 float probed_tri_postcompute_d[6] = { 0.0 };
@@ -8659,7 +8566,7 @@ void disable_all_steppers() {
   void manage_pause_summoner() {
     // PAUSE PUSHED
     if (!print_pause_summoned
-      #if HAS_FILRUNOUT
+      #if ENABLED( FILAMENT_RUNOUT_SENSOR )
       && !filament_ran_out
       #endif
       ) {
@@ -8739,7 +8646,10 @@ void manage_inactivity(bool ignore_stepper_queue/*=false*/) {
   #if HAS_FILRUNOUT
     if (
       IS_SD_PRINTING
+      #if ENABLED( SUMMON_PRINT_PAUSE )
       && !filrunout_bypassed
+      && !print_pause_summoned
+      #endif
       && !(READ(FILRUNOUT_PIN) ^ FIL_RUNOUT_INVERTING)
       && axis_homed[X_AXIS]
       && axis_homed[Y_AXIS]
@@ -8950,11 +8860,19 @@ void kill(const char* lcd_msg) {
   // FMC small patch to update the LCD before ending
   sei();   // enable interrupts
   for (int i = 5; i--; lcd_update()) delay(200); // Wait a short time
-  cli();   // disable interrupts
+  #if DISABLED( ONE_LED )
+    cli();   // disable interrupts
+  #endif
   suicide();
   while (1) {
     #if ENABLED(USE_WATCHDOG)
       watchdog_reset();
+    #endif
+    #if ENABLED( ONE_LED )
+      one_led_on();
+      delay(70);
+      one_led_off();
+      delay(140);
     #endif
   } // Wait for reset
 }
