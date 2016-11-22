@@ -934,11 +934,14 @@ void setup() {
 
     #if ENABLED(FILAMENT_RUNOUT_SENSOR)
       delay( 100 );
-      if ( READ( SUMMON_PRINT_PAUSE_PIN ) ) {
+      if ( READ( SUMMON_PRINT_PAUSE_PIN ) ^ SUMMON_PRINT_PAUSE_INVERTING ) {
           filrunout_bypassed = true;
           SERIAL_ECHOLN( "Filament sensor bypassed" );
       }
     #endif
+  #elif ENABLED(ONE_BUTTON)
+    SET_INPUT(ONE_BUTTON_PIN);
+    WRITE(ONE_BUTTON_PIN, HIGH);
   #endif
 
   #if ENABLED(PRINTER_HEAD_EASY)
@@ -1025,7 +1028,7 @@ void loop() {
 
   if (commands_in_queue < BUFSIZE) get_available_commands();
 
-  #if ENABLED(SDSUPPORT)
+  #if ENABLED(SDSUPPORT) && DISABLED(ONE_BUTTON)
     card.checkautostart(false);
   #endif
 
@@ -6361,7 +6364,7 @@ inline void gcode_M503() {
    *
    */
   inline void gcode_M600() {
-    
+
     if (degHotend(active_extruder) < extrude_min_temp) {
       SERIAL_ERROR_START;
       SERIAL_ERRORLNPGM(MSG_TOO_COLD_FOR_M600);
@@ -7188,7 +7191,7 @@ inline void gcode_D29() {
 
   probing_postcompute_tri_parameters();
 
-  gcode_G28();
+  //gcode_G28();
 
 }
 
@@ -8563,7 +8566,7 @@ void disable_all_steppers() {
 
 #if ENABLED(SUMMON_PRINT_PAUSE)
 
-  void manage_pause_summoner() {
+  inline void manage_pause_summoner() {
     // PAUSE PUSHED
     if (!print_pause_summoned
       #if ENABLED( FILAMENT_RUNOUT_SENSOR )
@@ -8572,7 +8575,7 @@ void disable_all_steppers() {
       ) {
       if (
         IS_SD_PRINTING
-        && READ(SUMMON_PRINT_PAUSE_PIN)
+        && ( READ(SUMMON_PRINT_PAUSE_PIN) ^ SUMMON_PRINT_PAUSE_INVERTING )
         && axis_homed[X_AXIS]
         && axis_homed[Y_AXIS]
         && axis_homed[Z_AXIS]
@@ -8585,6 +8588,65 @@ void disable_all_steppers() {
 
 #endif // SUMMON_PRINT_PAUSE
 
+#if ENABLED(ONE_BUTTON)
+  millis_t next_one_button_check = 0;
+  bool asked_to_print = false;
+  bool asked_to_pause = false;
+  inline void manage_one_button() {
+    // De-Bounce bouton press
+    millis_t now = millis();
+    if (PENDING(now, next_one_button_check)) return;
+    next_one_button_check = now + 250UL;
+
+    if ( !IS_SD_PRINTING && !asked_to_print && ( READ(ONE_BUTTON_PIN) ^ ONE_BUTTON_INVERTING ) ) {
+      asked_to_print = true;
+      card.autostart_index = 0;
+      card.checkautostart( true );
+    }
+
+    if ( IS_SD_PRINTING && asked_to_print ) {
+      asked_to_print = false;
+    }
+  }
+#endif
+#if ENABLED(ONE_LED)
+  int state_bliblink = 0;
+  millis_t next_one_led_tick = 0;
+  inline void manage_one_led() {
+    if (
+      false
+      #if ENABLED(SUMMON_PRINT_PAUSE)
+      || print_pause_summoned
+      #endif
+      #if ENABLED(FILAMENT_RUNOUT_SENSOR)
+      || filament_ran_out
+      #endif
+      ) {
+      millis_t now = millis();
+      if ( ELAPSED( now, next_one_led_tick ) ) {
+        switch( state_bliblink ) {
+          case 0:
+          case 2:
+            one_led_on();
+            break;
+          default:
+            one_led_off();
+        }
+        state_bliblink = ( state_bliblink + 1 ) % 10;
+        next_one_led_tick = now + 150UL;
+      }
+    }
+    else {
+      if ( IS_SD_PRINTING ) {
+        one_led_on();
+      }
+      else {
+        one_led_off();
+      }
+    }
+  }
+#endif
+
 /**
  * Standard idle routine keeps the machine alive
  */
@@ -8596,6 +8658,12 @@ void idle(
   manage_heater();
   #if ENABLED(SUMMON_PRINT_PAUSE)
   manage_pause_summoner();
+  #endif
+  #if ENABLED(ONE_BUTTON)
+  manage_one_button();
+  #endif
+  #if ENABLED(ONE_LED)
+  manage_one_led();
   #endif
   manage_inactivity(
     #if ENABLED(FILAMENTCHANGEENABLE)

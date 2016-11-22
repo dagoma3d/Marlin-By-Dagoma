@@ -548,6 +548,12 @@ void CardReader::checkautostart(bool force) {
     autostart_index++;
 }
 
+#if ENABLED(ONE_BUTTON)
+void CardReader::check_auto_consume() {
+  
+}
+#endif
+
 void CardReader::closefile(bool store_location) {
   file.sync();
   file.close();
