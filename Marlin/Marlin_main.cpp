@@ -8871,6 +8871,13 @@ void disable_all_steppers() {
   disable_e3();
 }
 
+#if ENABLED(ONE_BUTTON)
+
+  millis_t next_one_button_check = 0;
+  bool asked_to_print = false;
+  bool asked_to_pause = false;
+
+#endif
 
 #if ENABLED(SUMMON_PRINT_PAUSE)
 
@@ -8879,6 +8886,9 @@ void disable_all_steppers() {
     if (!print_pause_summoned
       #if ENABLED( FILAMENT_RUNOUT_SENSOR )
       && !filament_ran_out
+      #endif
+      #if ENABLED( ONE_BUTTON )
+      && !asked_to_print
       #endif
       ) {
       if (
@@ -8898,15 +8908,18 @@ void disable_all_steppers() {
 
 #if ENABLED(ONE_BUTTON)
 
-  millis_t next_one_button_check = 0;
-  bool asked_to_print = false;
-  bool asked_to_pause = false;
-
   inline void manage_one_button() {
     // De-Bounce bouton press
     millis_t now = millis();
     if (PENDING(now, next_one_button_check)) return;
     next_one_button_check = now + 250UL;
+
+    if ( IS_SD_PRINTING
+      && asked_to_print
+      && !( READ(ONE_BUTTON_PIN) ^ ONE_BUTTON_INVERTING )
+    ) {
+      asked_to_print = false;
+    }
 
     if ( !startup_auto_calibration
       && !IS_SD_PRINTING
@@ -8919,10 +8932,6 @@ void disable_all_steppers() {
       asked_to_print = true;
       card.autostart_index = 0;
       card.checkautostart( true );
-    }
-
-    if ( IS_SD_PRINTING && asked_to_print ) {
-      asked_to_print = false;
     }
   }
 #endif
