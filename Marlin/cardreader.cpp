@@ -507,6 +507,18 @@ void CardReader::write_command(char *buf) {
   }
 }
 
+#if ENABLED( DELTA_EXTRA )
+bool CardReader::writePGM(const char *bufPGM) {
+  char msg[64];
+  strncpy_P(msg, bufPGM, sizeof(msg) - 1);
+  file.writeError = false;
+  file.write( msg );
+  file.write( '\r' );
+  file.write( '\n' );
+  return !file.writeError;
+}
+#endif
+
 void CardReader::checkautostart(bool force) {
   if (!force && (!autostart_stilltocheck || ELAPSED(millis(), next_autostart_ms)))
     return;
