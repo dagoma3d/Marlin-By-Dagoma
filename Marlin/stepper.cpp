@@ -338,9 +338,10 @@ void checkHitEndstops() {
 }
 
 #if ENABLED( Z_MIN_MAGIC )
-  volatile int measure_state = 0;
-  volatile unsigned long raw_z_min_value;
-  volatile int last_measure = -1;
+  #define LAST_MEASURE_NUMBER 10
+  volatile float last_measures[LAST_MEASURE_NUMBER] = { 0.0 };
+  volatile float last_measures_avg = { 0.0 };
+  volatile int last_measures_idx = 0;
 #endif
 
 // Check endstops - Called from ISR!
@@ -487,29 +488,28 @@ inline void update_endstops() {
         #if ENABLED(Z_MIN_PROBE_ENDSTOP) && DISABLED(Z_MIN_PROBE_USES_Z_MIN_ENDSTOP_PIN) && ENABLED(HAS_Z_MIN_PROBE)
           #if ENABLED( Z_MIN_MAGIC )
               if ( z_probe_is_active && can_measure_z_magic ) {
-                int z_sensor = analogRead( Z_MIN_PROBE_PIN );
-                
-                if ( last_measure < 0 ) {
-                  last_measure = z_sensor;
-                }
+                int z_sensor_i = analogRead( Z_MIN_PROBE_PIN );
+                float z_sensor_f = float( z_sensor_i );
+                float derivative_bias = ( z_sensor_f - last_measures_avg ) / 2.0;
 
-                if ( last_measure - z_sensor < 3 ) {
-                  SET_BIT(current_endstop_bits, Z_MIN_PROBE, 0 );
-                }
-                else if ( abs( last_measure - z_sensor ) > 150 ) {
-                  // Weird value
-                  SERIAL_ECHO( "Weird value [" );
-                  SERIAL_ECHO( measure_state );
-                  SERIAL_ECHO( "]: " );
-                  SERIAL_ECHOLN( z_sensor );
-
+                if ( derivative_bias > -3.0 ) {
+                  // We do not hit anything
                   SET_BIT(current_endstop_bits, Z_MIN_PROBE, 0 );
                 }
                 else {
+                  // We eat something
                   SET_BIT(current_endstop_bits, Z_MIN_PROBE, 1 );
-
                 }
-                last_measure = z_sensor;
+
+                // Update last_measures avg
+                last_measures[ last_measures_idx ] = z_sensor_f;
+                last_measures_idx = ( last_measures_idx + 1 ) % LAST_MEASURE_NUMBER;
+
+                last_measures_avg = last_measures[0];
+                for( int i=1; i<LAST_MEASURE_NUMBER; i++ ) {
+                  last_measures_avg += last_measures[ i ];
+                }
+                last_measures_avg /= float( LAST_MEASURE_NUMBER );
 
                 if (TEST_ENDSTOP(_ENDSTOP(Z, MIN_PROBE)) && current_block->steps[_AXIS(Z)] > 0) {
                   _SET_TRIGSTEPS(Z);
@@ -520,8 +520,6 @@ inline void update_endstops() {
                 if (TEST_ENDSTOP(Z_MIN_PROBE)) SBI(endstop_hit_bits, Z_MIN_PROBE);
                
               } // END z_probe_is_active
-
-              //measure_state++;
           #else
             if (z_probe_is_active) {
               UPDATE_ENDSTOP(Z, MIN_PROBE);
