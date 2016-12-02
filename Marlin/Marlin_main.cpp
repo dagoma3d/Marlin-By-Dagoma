@@ -448,6 +448,9 @@ static uint8_t target_extruder;
   #if ENABLED( DELTA_EXTRA )
     bool postcompute_tri_ready = false;
     bool startup_auto_calibration = false;
+    #if ENABLED( SDSUPPORT )
+      inline void abort_sd_printing();
+    #endif
   #endif
 #else
   static bool home_all_axis = true;
@@ -3339,7 +3342,7 @@ inline void gcode_G28() {
       do {
         gcode_G30();
         z_read = current_position[Z_AXIS];
-        if ( abs( z_read - z_last ) > 0.05 ) {
+        if ( z_read > 42.0 || abs( z_read - z_last ) > 0.05 ) {
           SERIAL_ECHOLN( "Weird value");
           i++;
         }
@@ -3348,9 +3351,15 @@ inline void gcode_G28() {
         }
         z_last = z_read;
         set_destination_to_current();
-        destination[ Z_AXIS ] = min( 50.0, destination[ Z_AXIS ] + 5.0 );
+        destination[ Z_AXIS ] = min( 50.0, destination[ Z_AXIS ] + 5.0 );    
         prepare_move();
         st_synchronize();
+
+        if ( destination[ Z_AXIS ] > 49.90 ) {
+          idle(true);
+          delay(500);
+        }
+
       } while( --i );
 
 
@@ -6703,6 +6712,17 @@ inline void gcode_M503() {
           enable_x();
           enable_y();
           enable_z();
+
+
+          #if ENABLED( DELTA_EXTRA )
+            // Detected if sd is out
+            if ( !card.stillPluggedIn() ) {
+              // Abort current print
+              abort_sd_printing();
+              gcode_G28();
+              return;
+            }
+          #endif
         }
         idle(true);
       #else
@@ -7148,6 +7168,178 @@ inline void gcode_D851() {
 
   gcode_G28();
 
+  #define THAT
+
+#ifdef THAT
+
+  feedrate = homing_feedrate[ Z_AXIS ];
+
+  float tower1_altitude, tower2_altitude, tower3_altitude, center_altitude;
+
+  // TOWER 1
+  destination[X_AXIS] = delta_tower1_x;
+  destination[Y_AXIS] = delta_tower1_y;
+  destination[Z_AXIS] = 10.0f;
+  prepare_move();
+  st_synchronize();
+  tower1_altitude = get_probed_Z_avg();
+
+  // TOWER 2
+  destination[X_AXIS] = delta_tower2_x;
+  destination[Y_AXIS] = delta_tower2_y;
+  destination[Z_AXIS] = 10.0f;
+  prepare_move();
+  st_synchronize();
+  tower2_altitude = get_probed_Z_avg();
+
+  // TOWER 3
+  destination[X_AXIS] = delta_tower3_x;
+  destination[Y_AXIS] = delta_tower3_y;
+  destination[Z_AXIS] = 10.0f;
+  prepare_move();
+  st_synchronize();
+  tower3_altitude = get_probed_Z_avg();
+
+  // CENTER
+  destination[X_AXIS] = 0.0f;
+  destination[Y_AXIS] = 0.0f;
+  destination[Z_AXIS] = 10.0f;
+  prepare_move();
+  st_synchronize();
+  center_altitude = get_probed_Z_avg();
+
+  SERIAL_ECHOLN( "R probed points:" );
+  SERIAL_ECHO  ( "  T1: " );
+  SERIAL_ECHOLN( tower1_altitude );
+  SERIAL_ECHO  ( "  T2: " );
+  SERIAL_ECHOLN( tower2_altitude );
+  SERIAL_ECHO  ( "  T3: " );
+  SERIAL_ECHOLN( tower3_altitude );
+  SERIAL_ECHO  ( "   C: " );
+  SERIAL_ECHOLN( center_altitude );
+
+  float mean_ref_plan_altitude = ( tower1_altitude + tower2_altitude + tower3_altitude ) / 3.0;
+  float diff_center_altitude = center_altitude - mean_ref_plan_altitude;
+
+  SERIAL_ECHO( "Mean based difference: " );
+  SERIAL_ECHOLN( diff_center_altitude );
+
+  do {
+
+    delta_radius -= 2.0 * diff_center_altitude;
+
+    gcode_M665();
+
+    destination[X_AXIS] = delta_tower1_x;
+    destination[Y_AXIS] = delta_tower1_y;
+    destination[Z_AXIS] = 10.0f;
+    prepare_move();
+    st_synchronize();
+    tower1_altitude = get_probed_Z_avg();
+
+    // TOWER 2
+    destination[X_AXIS] = delta_tower2_x;
+    destination[Y_AXIS] = delta_tower2_y;
+    destination[Z_AXIS] = 10.0f;
+    prepare_move();
+    st_synchronize();
+    tower2_altitude = get_probed_Z_avg();
+
+    // TOWER 3
+    destination[X_AXIS] = delta_tower3_x;
+    destination[Y_AXIS] = delta_tower3_y;
+    destination[Z_AXIS] = 10.0f;
+    prepare_move();
+    st_synchronize();
+    tower3_altitude = get_probed_Z_avg();
+
+    // CENTER
+    destination[X_AXIS] = 0.0f;
+    destination[Y_AXIS] = 0.0f;
+    destination[Z_AXIS] = 10.0f;
+    prepare_move();
+    st_synchronize();
+    center_altitude = get_probed_Z_avg();
+
+    SERIAL_ECHOLN( "R probed points:" );
+    SERIAL_ECHO  ( "  T1: " );
+    SERIAL_ECHOLN( tower1_altitude );
+    SERIAL_ECHO  ( "  T2: " );
+    SERIAL_ECHOLN( tower2_altitude );
+    SERIAL_ECHO  ( "  T3: " );
+    SERIAL_ECHOLN( tower3_altitude );
+    SERIAL_ECHO  ( "   C: " );
+    SERIAL_ECHOLN( center_altitude );
+
+    mean_ref_plan_altitude = ( tower1_altitude + tower2_altitude + tower3_altitude ) / 3.0;
+    diff_center_altitude = center_altitude - mean_ref_plan_altitude;
+
+    SERIAL_ECHO( "NEW Mean based difference: " );
+    SERIAL_ECHOLN( diff_center_altitude );
+  } while( abs( diff_center_altitude ) > 0.05 );
+
+  // Use last result as endstops adujst
+  endstop_adj[0] = tower1_altitude + zprobe_zoffset;
+  endstop_adj[1] = tower2_altitude + zprobe_zoffset;
+  endstop_adj[2] = tower3_altitude + zprobe_zoffset;
+
+  // Store endstop adjust
+  gcode_M500();
+
+  // JUST FOR REPORTING BACK
+  // Take in account now
+  gcode_G28();
+
+  // TOWER 1
+  destination[X_AXIS] = delta_tower1_x;
+  destination[Y_AXIS] = delta_tower1_y;
+  destination[Z_AXIS] = 10.0f;
+  prepare_move();
+  st_synchronize();
+  tower1_altitude = get_probed_Z_avg();
+
+  // TOWER 2
+  destination[X_AXIS] = delta_tower2_x;
+  destination[Y_AXIS] = delta_tower2_y;
+  destination[Z_AXIS] = 10.0f;
+  prepare_move();
+  st_synchronize();
+  tower2_altitude = get_probed_Z_avg();
+
+  // TOWER 3
+  destination[X_AXIS] = delta_tower3_x;
+  destination[Y_AXIS] = delta_tower3_y;
+  destination[Z_AXIS] = 10.0f;
+  prepare_move();
+  st_synchronize();
+  tower3_altitude = get_probed_Z_avg();
+
+  // CENTER
+  destination[X_AXIS] = 0.0f;
+  destination[Y_AXIS] = 0.0f;
+  destination[Z_AXIS] = 10.0f;
+  prepare_move();
+  st_synchronize();
+  center_altitude = get_probed_Z_avg();
+
+  SERIAL_ECHOLN( "R probed points:" );
+  SERIAL_ECHO  ( "  T1: " );
+  SERIAL_ECHOLN( tower1_altitude );
+  SERIAL_ECHO  ( "  T2: " );
+  SERIAL_ECHOLN( tower2_altitude );
+  SERIAL_ECHO  ( "  T3: " );
+  SERIAL_ECHOLN( tower3_altitude );
+  SERIAL_ECHO  ( "   C: " );
+  SERIAL_ECHOLN( center_altitude );
+
+  mean_ref_plan_altitude = ( tower1_altitude + tower2_altitude + tower3_altitude ) / 3.0;
+  diff_center_altitude = center_altitude - mean_ref_plan_altitude;
+
+  SERIAL_ECHO( "FOR VERIF ONLY Mean based difference: " );
+  SERIAL_ECHOLN( diff_center_altitude );
+
+#else
+
   feedrate = 8000;
 
   float tower1_altitude, tower2_altitude, tower3_altitude, center_altitude;
@@ -7352,140 +7544,7 @@ inline void gcode_D851() {
   SERIAL_ECHO( "NEW Mean based difference: " );
   SERIAL_ECHOLN( diff_center_altitude );
 
-
-
-
-  /*
-
-
-  // NOW : Re-Adjust tower height
-
-  endstop_adj[0] = 0.0;
-  endstop_adj[1] = 0.0;
-  endstop_adj[2] = 0.0;
-
-  gcode_G28();
-
-  // TOWER 1
-  destination[X_AXIS] = delta_tower1_x;
-  destination[Y_AXIS] = delta_tower1_y;
-  destination[Z_AXIS] = 10.0f;
-  prepare_move();
-  st_synchronize();
-  
-  da_pause = 10; do { idle(); delay(100); } while(--da_pause);
-
-  tower1_altitude = get_probed_Z_avg();
-
-  // TOWER 2
-  destination[X_AXIS] = delta_tower2_x;
-  destination[Y_AXIS] = delta_tower2_y;
-  destination[Z_AXIS] = 10.0f;
-  prepare_move();
-  st_synchronize();
-
-  da_pause = 10; do { idle(); delay(100); } while(--da_pause);
-
-  tower2_altitude = get_probed_Z_avg();
-
-  // TOWER 3
-  destination[X_AXIS] = delta_tower3_x;
-  destination[Y_AXIS] = delta_tower3_y;
-  destination[Z_AXIS] = 10.0f;
-  prepare_move();
-  st_synchronize();
-
-  da_pause = 10; do { idle(); delay(100); } while(--da_pause);
-
-  tower3_altitude = get_probed_Z_avg();;
-
-  SERIAL_ECHOLN( "endstop_adj probed points:" );
-  SERIAL_ECHO  ( "  T1: " );
-  SERIAL_ECHOLN( tower1_altitude );
-  SERIAL_ECHO  ( "  T2: " );
-  SERIAL_ECHOLN( tower2_altitude );
-  SERIAL_ECHO  ( "  T3: " );
-  SERIAL_ECHOLN( tower3_altitude );
-
-  endstop_adj[0] = tower1_altitude + zprobe_zoffset;
-  endstop_adj[1] = tower2_altitude + zprobe_zoffset;
-  endstop_adj[2] = tower3_altitude + zprobe_zoffset;
-
-  // Store endstop adjust
-  gcode_M500();
-
-  // Take in account now
-  gcode_G28();
-
-  //
-  // NOW
-  // Reprobe each tower PLUS middle point
-  feedrate = homing_feedrate[ X_AXIS ];
-
-  // TOWER 1
-  destination[X_AXIS] = delta_tower1_x;
-  destination[Y_AXIS] = delta_tower1_y;
-  destination[Z_AXIS] = 10.0f;
-  prepare_move();
-  st_synchronize();
-
-  da_pause = 5; do { idle(); delay(100); } while(--da_pause);
-
-  tower1_altitude = get_probed_Z_avg();
-
-  
-  // TOWER 2
-  destination[X_AXIS] = delta_tower2_x;
-  destination[Y_AXIS] = delta_tower2_y;
-  destination[Z_AXIS] = 10.0f;
-  prepare_move();
-  st_synchronize();
-
-  da_pause = 5; do { idle(); delay(100); } while(--da_pause);
-
-  tower2_altitude = get_probed_Z_avg();
-
-
-  // TOWER 3
-  destination[X_AXIS] = delta_tower3_x;
-  destination[Y_AXIS] = delta_tower3_y;
-  destination[Z_AXIS] = 10.0f;
-  prepare_move();
-  st_synchronize();
-
-  da_pause = 5; do { idle(); delay(100); } while(--da_pause);
-
-  tower3_altitude = get_probed_Z_avg();
-
-
-  // CENTER
-  destination[X_AXIS] = 0.0f;
-  destination[Y_AXIS] = 0.0f;
-  destination[Z_AXIS] = 10.0f;
-  prepare_move();
-  st_synchronize();
-
-  da_pause = 5; do { idle(); delay(100); } while(--da_pause);
-
-  center_altitude = get_probed_Z_avg();
-
-  SERIAL_ECHOLN( "R probed points:" );
-  SERIAL_ECHO  ( "  T1: " );
-  SERIAL_ECHOLN( tower1_altitude );
-  SERIAL_ECHO  ( "  T2: " );
-  SERIAL_ECHOLN( tower2_altitude );
-  SERIAL_ECHO  ( "  T3: " );
-  SERIAL_ECHOLN( tower3_altitude );
-  SERIAL_ECHO  ( "   C: " );
-  SERIAL_ECHOLN( center_altitude );
-
-  mean_ref_plan_altitude = ( tower1_altitude + tower2_altitude + tower3_altitude ) / 3.0;
-  diff_center_altitude = center_altitude - mean_ref_plan_altitude;
-
-  SERIAL_ECHO( "FINAL Mean based difference: " );
-  SERIAL_ECHOLN( diff_center_altitude );
-
-  */
+#endif
 
   gcode_G28();
 
@@ -8876,7 +8935,69 @@ void disable_all_steppers() {
   millis_t next_one_button_check = 0;
   bool asked_to_print = false;
   bool asked_to_pause = false;
+  millis_t has_to_print_timeout = 0;
+#endif
 
+#if ENABLED(ONE_LED)
+  int state_blink = 0;
+  millis_t next_one_led_tick = 0;
+  bool notify_warning = false;
+  millis_t notify_warning_timeout = 0;
+
+  inline void set_notify_warning() {
+    notify_warning = true;
+    notify_warning_timeout = millis() + 2000UL;
+  }
+
+  inline void manage_one_led() {
+    millis_t now = millis();
+    if ( PENDING( now, next_one_led_tick ) ) return;
+
+    state_blink = ( state_blink + 1 ) % 10;
+    next_one_led_tick = now + 150UL;
+
+    if ( startup_auto_calibration ) {
+      switch( state_blink ) {
+        case 0:
+          one_led_on();
+          break;
+        default:
+          one_led_off();
+      }
+    }
+    else if ( notify_warning ) {
+      state_blink % 2 ? one_led_on() : one_led_off();
+      if ( ELAPSED(now, notify_warning_timeout) ) {
+        notify_warning = false;
+      }
+    }
+    else if (
+      false
+      #if ENABLED(SUMMON_PRINT_PAUSE)
+      || print_pause_summoned
+      #endif
+      #if ENABLED(FILAMENT_RUNOUT_SENSOR)
+      || filament_ran_out
+      #endif
+    ) {
+      switch( state_blink ) {
+        case 0:
+        case 2:
+          one_led_on();
+          break;
+        default:
+          one_led_off();
+      }
+    }
+    else {
+      if ( IS_SD_PRINTING ) {
+        one_led_on();
+      }
+      else {
+        one_led_off();
+      }
+    }
+  }
 #endif
 
 #if ENABLED(SUMMON_PRINT_PAUSE)
@@ -8921,6 +9042,17 @@ void disable_all_steppers() {
       asked_to_print = false;
     }
 
+    if ( !IS_SD_PRINTING
+      && asked_to_print
+      && !( READ(ONE_BUTTON_PIN) ^ ONE_BUTTON_INVERTING )
+      && ELAPSED(now, has_to_print_timeout)
+    ) {
+      asked_to_print = false;
+      #if ENABLED(ONE_LED)
+        set_notify_warning();
+      #endif
+    }
+
     if ( !startup_auto_calibration
       && !IS_SD_PRINTING
       && !asked_to_print
@@ -8930,57 +9062,18 @@ void disable_all_steppers() {
         filrunout_bypassed = false;
       #endif
       asked_to_print = true;
+      has_to_print_timeout = now + 2500UL;
+      
+      #if ENABLED(ONE_LED)
+        one_led_on();
+      #endif
+
       card.autostart_index = 0;
       card.checkautostart( true );
-    }
-  }
-#endif
-
-#if ENABLED(ONE_LED)
-
-  int state_bliblink = 0;
-  millis_t next_one_led_tick = 0;
-
-  inline void manage_one_led() {
-    millis_t now = millis();
-    if ( PENDING( now, next_one_led_tick ) ) return;
-
-    state_bliblink = ( state_bliblink + 1 ) % 10;
-    next_one_led_tick = now + 150UL;
-    if ( startup_auto_calibration ) {
-      switch( state_bliblink ) {
-        case 0:
-          one_led_on();
-          break;
-        default:
-          one_led_off();
-      }
-    }
-    else if (
-      false
-      #if ENABLED(SUMMON_PRINT_PAUSE)
-      || print_pause_summoned
+      
+      #if ENABLED(ONE_LED)
+        if ( !card.cardOK ) set_notify_warning();
       #endif
-      #if ENABLED(FILAMENT_RUNOUT_SENSOR)
-      || filament_ran_out
-      #endif
-    ) {
-      switch( state_bliblink ) {
-        case 0:
-        case 2:
-          one_led_on();
-          break;
-        default:
-          one_led_off();
-      }
-    }
-    else {
-      if ( IS_SD_PRINTING ) {
-        one_led_on();
-      }
-      else {
-        one_led_off();
-      }
     }
   }
 #endif

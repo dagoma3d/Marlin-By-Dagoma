@@ -517,6 +517,28 @@ bool CardReader::writePGM(const char *bufPGM) {
   file.write( '\n' );
   return !file.writeError;
 }
+
+bool CardReader::stillPluggedIn() {
+  SERIAL_ECHOLN( "Check still plugged in" );
+  // Jump to begining of file, to avoid SdFile cache
+  if ( ! file.seekSet(0) ) {
+    SERIAL_ECHOLN( "Can't seek" );
+    return false;
+  }
+
+  if ( file.peek() < 0 ) {
+    SERIAL_ECHOLN( "Can't peek" );
+    return false;
+  }
+
+  // Jump back to where we were
+  if ( ! file.seekSet(sdpos) ) {
+    SERIAL_ECHOLN( "Can't seek back" );
+    return false;
+  }
+
+  return true;
+}
 #endif
 
 void CardReader::checkautostart(bool force) {
