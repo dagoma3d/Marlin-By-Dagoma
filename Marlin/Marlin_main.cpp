@@ -6718,8 +6718,14 @@ inline void gcode_M503() {
             // Detected if sd is out
             if ( !card.stillPluggedIn() ) {
               // Abort current print
-              abort_sd_printing();
-              gcode_G28();
+              while( true ) {
+                one_led_on();
+                delay(150);
+                one_led_off();
+                delay(150);
+              }
+              //abort_sd_printing();
+              //enqueue_and_echo_commands_P( PSTR("G28") );
               return;
             }
           #endif
@@ -7138,10 +7144,12 @@ inline void gcode_T(uint8_t tmp_extruder) {
 #if ENABLED( DELTA_EXTRA )
 
 inline void abort_sd_printing() {
+  commands_in_queue = 0;
   quickStop();
   card.sdprinting = false;
   card.closefile();
   autotempShutdown();
+  setTargetHotend(0, 0);
   cancel_heatup = true;
 }
 
@@ -8936,9 +8944,11 @@ void disable_all_steppers() {
   bool asked_to_print = false;
   bool asked_to_pause = false;
   millis_t has_to_print_timeout = 0;
+
 #endif
 
 #if ENABLED(ONE_LED)
+
   int state_blink = 0;
   millis_t next_one_led_tick = 0;
   bool notify_warning = false;
@@ -8965,6 +8975,11 @@ void disable_all_steppers() {
           one_led_off();
       }
     }
+    #if ENABLED( ONE_BUTTON )
+    else if ( asked_to_print ) {
+      one_led_on();
+    }
+    #endif
     else if ( notify_warning ) {
       state_blink % 2 ? one_led_on() : one_led_off();
       if ( ELAPSED(now, notify_warning_timeout) ) {
@@ -9033,7 +9048,7 @@ void disable_all_steppers() {
     // De-Bounce bouton press
     millis_t now = millis();
     if (PENDING(now, next_one_button_check)) return;
-    next_one_button_check = now + 250UL;
+    next_one_button_check = now + 100UL;
 
     if ( IS_SD_PRINTING
       && asked_to_print
@@ -9069,6 +9084,7 @@ void disable_all_steppers() {
       #endif
 
       card.autostart_index = 0;
+      card.cardOK = false;
       card.checkautostart( true );
       
       #if ENABLED(ONE_LED)

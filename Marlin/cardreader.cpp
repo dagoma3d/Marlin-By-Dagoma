@@ -520,8 +520,11 @@ bool CardReader::writePGM(const char *bufPGM) {
 
 bool CardReader::stillPluggedIn() {
   SERIAL_ECHOLN( "Check still plugged in" );
-  // Jump to begining of file, to avoid SdFile cache
-  if ( ! file.seekSet(0) ) {
+  // Jump to end of file, to avoid SdFile 'cluster' block cache
+  // TODO: do it better
+  //       (e.g: when we will be in the last 'cluster' block as sd_curpos)
+  //       (     peek will not fail baecause already in cache)
+  if ( ! file.seekEnd( -1 ) ) {
     SERIAL_ECHOLN( "Can't seek" );
     return false;
   }
