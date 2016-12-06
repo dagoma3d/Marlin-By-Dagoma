@@ -8378,6 +8378,7 @@ void clamp_to_software_endstops(float target[3]) {
       #else // if DELTA_EXTRA
         if ( ! postcompute_tri_ready ) return;
 
+        if ( cartesian[Z_AXIS] > 0.6 ) return;
 
         // Find the index tri for z correction
         int idx = triangle_index( cartesian[X_AXIS], cartesian[Y_AXIS] );
@@ -8389,9 +8390,15 @@ void clamp_to_software_endstops(float target[3]) {
           + probed_tri_postcompute_d [ idx ]
         ) / probed_tri_postcompute_nz[ idx ] ;
 
+        // Adjust final-offset againt Z altitude
+        // to reduce it after 0.6mm
+        offset *= ( 0.6 - cartesian[Z_AXIS] ) / 0.6;
+
         delta[X_AXIS] += offset;
         delta[Y_AXIS] += offset;
         delta[Z_AXIS] += offset;
+
+
 
       #endif // End DELTA_EXTRA
     }
