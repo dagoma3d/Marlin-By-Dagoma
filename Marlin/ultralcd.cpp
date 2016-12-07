@@ -275,6 +275,10 @@ static void lcd_status_screen();
     uint8_t lcd_sd_status;
   #endif
 
+  #if ENABLED(HAS_SERVO_ENDSTOPS) && ENABLED(Z_DUAL_ENDSTOPS)
+    float z_probed_value_before_z_raise;
+  #endif
+
 #endif // ULTIPANEL
 
 typedef struct {
@@ -891,24 +895,59 @@ void lcd_parallel_x(){
 
   enqueue_and_echo_commands_P( PSTR("M117 Origine Machine") );  // ; Message sur afficheur
   enqueue_and_echo_commands_P( PSTR("M84") );  //                  ; Disable motors to encure Z_SAFE_HOMING
+  #if ENABLED(Z_DUAL_ENDSTOPS)
+    enqueue_and_echo_commands_P( PSTR("M666 Z0") );
+  #endif
   enqueue_and_echo_commands_P( PSTR("G28") );  //             	   ; Home X Y Z
   enqueue_and_echo_commands_P( PSTR("G90") );  //                	 ; Passage coordonnees absolues
   wait_all_commands_finished__CALLABLE_FROM_LCD_ONLY();
 
   //;Parallelisme Axe X
   enqueue_and_echo_commands_P( PSTR("M117 Parallelisme X") );  //      ; Message sur afficheur
-  enqueue_and_echo_commands_P( PSTR("G1 Z5 F9000") );  //           ; lift nozzle
-  wait_all_commands_finished__CALLABLE_FROM_LCD_ONLY();
+  #if DISABLED(Z_DUAL_ENDSTOPS)
+    enqueue_and_echo_commands_P( PSTR("G1 Z5 F9000") );  //           ; lift nozzle
+    wait_all_commands_finished__CALLABLE_FROM_LCD_ONLY();
 
-  enqueue_and_echo_commands_P( PSTR("G1 X-24 Y-14 F9000") );  //
-  enqueue_and_echo_commands_P( PSTR("G92 Z20") );  //
-  enqueue_and_echo_commands_P( PSTR("G91") );  //                   ; Passage coordonnees relatives
-  wait_all_commands_finished__CALLABLE_FROM_LCD_ONLY();
+    enqueue_and_echo_commands_P( PSTR("G1 X-24 Y-14 F9000") );  //
+    enqueue_and_echo_commands_P( PSTR("G92 Z20") );  //
+    enqueue_and_echo_commands_P( PSTR("G91") );  //                   ; Passage coordonnees relatives
+    wait_all_commands_finished__CALLABLE_FROM_LCD_ONLY();
 
-  enqueue_and_echo_commands_P( PSTR("G1 Z-15 F200") );  //		     ; Descente en dessous du plateau
-  enqueue_and_echo_commands_P( PSTR("G1 Z15 F9000") );  //
-  enqueue_and_echo_commands_P( PSTR("G28") );  //		            ; Home
-  wait_all_commands_finished__CALLABLE_FROM_LCD_ONLY();
+    enqueue_and_echo_commands_P( PSTR("G1 Z-15 F200") );  //		     ; Descente en dessous du plateau
+    enqueue_and_echo_commands_P( PSTR("G1 Z15 F9000") );  //
+    enqueue_and_echo_commands_P( PSTR("G28") );  //		            ; Home
+    wait_all_commands_finished__CALLABLE_FROM_LCD_ONLY();
+  #else
+    enqueue_and_echo_commands_P( PSTR("G1 X0 F9000") );
+    enqueue_and_echo_commands_P( PSTR("G30") );
+    wait_all_commands_finished__CALLABLE_FROM_LCD_ONLY();
+
+    float z_left, z_right, z_diff;
+    #if ENABLED(HAS_SERVO_ENDSTOPS)
+      z_left = z_probed_value_before_z_raise;
+    #else
+      z_left = current_position[ Z_AXIS ];
+    #endif
+
+    enqueue_and_echo_commands_P( PSTR("G1 X350 F9000") );
+    enqueue_and_echo_commands_P( PSTR("G30") );
+    wait_all_commands_finished__CALLABLE_FROM_LCD_ONLY();
+
+
+    #if ENABLED(HAS_SERVO_ENDSTOPS)
+      z_right = z_probed_value_before_z_raise;
+    #else
+      z_right = current_position[ Z_AXIS ];
+    #endif
+
+    z_diff = z_right - z_left;
+    z_endstop_adj = z_diff;
+
+    enqueue_and_echo_commands_P( PSTR("G28") );
+    enqueue_and_echo_commands_P( PSTR("M666 Z0") );
+    wait_all_commands_finished__CALLABLE_FROM_LCD_ONLY();
+
+  #endif // Z_DUAL_ENDSTOPS
 
   enqueue_and_echo_commands_P( PSTR("G90") );  //                   ; Passage coordonnees absolues
 }

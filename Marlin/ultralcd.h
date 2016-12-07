@@ -85,6 +85,10 @@
   bool lcd_clicked();
   void lcd_ignore_click(bool b=true);
   bool lcd_blink();
+  
+  #if ENABLED(HAS_SERVO_ENDSTOPS) && ENABLED(Z_DUAL_ENDSTOPS)
+    extern float z_probed_value_before_z_raise;
+  #endif
 
   #if ENABLED(ULTIPANEL) && ENABLED(REPRAPWORLD_KEYPAD)
 

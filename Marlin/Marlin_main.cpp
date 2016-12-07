@@ -4179,9 +4179,13 @@ inline void gcode_G28() {
       SERIAL_PROTOCOL(current_position[Z_AXIS] + 0.0001);
       SERIAL_EOL;
 
+
       clean_up_after_endstop_move(); // Too early. must be done after the stowing.
 
       #if HAS_SERVO_ENDSTOPS
+        #if ENABLED(Z_DUAL_ENDSTOPS)
+          z_probed_value_before_z_raise = current_position[Z_AXIS];
+        #endif
         raise_z_for_servo();
       #endif
       stow_z_probe(false); // Retract Z Servo endstop if available. Z_PROBE_SLED is missed here.
