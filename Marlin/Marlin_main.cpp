@@ -448,6 +448,7 @@ static uint8_t target_extruder;
   #if ENABLED( DELTA_EXTRA )
     bool postcompute_tri_ready = false;
     bool startup_auto_calibration = false;
+    float z_smooth_tri_leveling_height = 0.0;
     #if ENABLED( SDSUPPORT )
       inline void abort_sd_printing();
     #endif
@@ -3319,14 +3320,25 @@ inline void gcode_G28() {
 
   #if ENABLED( DELTA_EXTRA )
 
-    float probe_point_XY_x = (delta_tower1_x + delta_tower2_x ) / 2.0;
-    float probe_point_XY_y = (delta_tower1_y + delta_tower2_y ) / 2.0;
+    #if ENABLED( TRI_SHAPE_PROBING )
+      float probe_point_XY_x = (delta_tower1_x + delta_tower2_x ) / 2.0;
+      float probe_point_XY_y = (delta_tower1_y + delta_tower2_y ) / 2.0;
 
-    float probe_point_YZ_x = (delta_tower2_x + delta_tower3_x ) / 2.0;
-    float probe_point_YZ_y = (delta_tower2_y + delta_tower3_y ) / 2.0;
+      float probe_point_YZ_x = (delta_tower2_x + delta_tower3_x ) / 2.0;
+      float probe_point_YZ_y = (delta_tower2_y + delta_tower3_y ) / 2.0;
 
-    float probe_point_ZX_x = (delta_tower3_x + delta_tower1_x ) / 2.0;
-    float probe_point_ZX_y = (delta_tower3_y + delta_tower1_y ) / 2.0;
+      float probe_point_ZX_x = (delta_tower3_x + delta_tower1_x ) / 2.0;
+      float probe_point_ZX_y = (delta_tower3_y + delta_tower1_y ) / 2.0;
+    #else
+      float probe_point_XY_x =  0.0;
+      float probe_point_XY_y =  -1.0 * delta_radius;
+
+      float probe_point_YZ_x =  SIN_60 * delta_radius;
+      float probe_point_YZ_y =  COS_60 * delta_radius;
+
+      float probe_point_ZX_x = -SIN_60 * delta_radius;
+      float probe_point_ZX_y =  COS_60 * delta_radius;
+    #endif
 
     // Predefine used functions
     inline void gcode_M500();
@@ -3334,36 +3346,41 @@ inline void gcode_G28() {
     inline void gcode_G30();
 
     inline float get_probed_Z_avg() {
-      int reprobe_count = 2;
-      int i = max(1, reprobe_count);
 
+      bool all_points_are_good = false;
+      float z_read[3] = { 50.0 };
       float z_avg = 0.0;
-      float z_read, z_last = 42.0;
+
       do {
         gcode_G30();
-        z_read = current_position[Z_AXIS];
-        if ( z_read > 42.0 || abs( z_read - z_last ) > 0.05 ) {
-          SERIAL_ECHOLN( "Weird value");
-          i++;
-        }
-        else {
-          z_avg += z_read;
-        }
-        z_last = z_read;
+
+        z_read[2] = z_read[1];
+        z_read[1] = z_read[0];
+        z_read[0] = current_position[Z_AXIS];
+
+        z_avg = ( z_read[0] + z_read[1] + z_read[2] ) / 3.0;
+        
         set_destination_to_current();
         destination[ Z_AXIS ] = min( 50.0, destination[ Z_AXIS ] + 5.0 );    
         prepare_move();
         st_synchronize();
 
         if ( destination[ Z_AXIS ] > 49.90 ) {
-          idle(true);
-          delay(500);
+          int i=10; do { idle(true); delay(100); } while(--i);
+          all_points_are_good = false;
+        }
+        else {
+          // Check for all points
+          all_points_are_good =
+            abs(z_read[0] - z_avg) < 0.05 &&
+            abs(z_read[1] - z_avg) < 0.05 &&
+            abs(z_read[2] - z_avg) < 0.05;
         }
 
-      } while( --i );
+      } while( !all_points_are_good );
 
 
-      return z_avg / float(reprobe_count);
+      return z_avg;
     }
 
     /**
@@ -3595,6 +3612,30 @@ inline void gcode_G28() {
         SERIAL_ECHOLN( probed_tri_altitude[i] );
       }
 
+      z_smooth_tri_leveling_height = 
+        max(probed_tri_altitude[0], 
+        max(probed_tri_altitude[1],
+        max(probed_tri_altitude[2],
+        max(probed_tri_altitude[3],
+        max(probed_tri_altitude[4],
+        max(probed_tri_altitude[5],
+            probed_tri_altitude[7])))))) -
+        min(probed_tri_altitude[0], 
+        min(probed_tri_altitude[1],
+        min(probed_tri_altitude[2],
+        min(probed_tri_altitude[3],
+        min(probed_tri_altitude[4],
+        min(probed_tri_altitude[5],
+            probed_tri_altitude[7]))))));
+
+      SERIAL_ECHO( "       smooth range: " );
+      SERIAL_ECHOLN( z_smooth_tri_leveling_height );
+
+      z_smooth_tri_leveling_height = 20.0;
+
+      SERIAL_ECHO( "     overrided with: " );
+      SERIAL_ECHOLN( z_smooth_tri_leveling_height );
+
       precalc_probed_tri_aref[ 0 ] = delta_tower2_y / delta_tower2_x;
       precalc_probed_tri_aref[ 1 ] = probe_point_YZ_y / probe_point_YZ_x;
       precalc_probed_tri_aref[ 2 ] = delta_tower1_y / delta_tower1_x;
@@ -3616,6 +3657,7 @@ inline void gcode_G28() {
         }
 
       #endif
+
 
       probing_postcompute_tri_parameters();
 
@@ -6746,7 +6788,7 @@ inline void gcode_M503() {
     #if ENABLED( NO_LCD_FOR_FILAMENTCHANGEABLE ) && ENABLED( FILAMENT_RUNOUT_SENSOR )
       // Wait a bit more to see if we want to disable filrunout sensor
       millis_t now = millis();
-      millis_t long_push = now + 2000UL;
+      millis_t long_push = now + 1000UL;
       delay( 200 );
       while (pin_number != -1 && digitalRead(pin_number) == target && PENDING(now, long_push)) {
         enable_x();
@@ -7161,6 +7203,42 @@ inline void gcode_D410() {
   abort_sd_printing();
 }
 
+inline void gcode_D888() {
+  SERIAL_ECHOLN( "Bizarre procedure" );
+  float z_bizarre = 0.5;
+  if (code_seen('Z')) {
+    z_bizarre = code_value();
+  }
+  float f_bizarre = 3000;
+  if (code_seen('F')) {
+    f_bizarre = code_value();
+  }
+
+  float x_bizarre = 70;
+  if (code_seen('X')) {
+    x_bizarre = code_value();
+  }
+
+  int N = 100;
+  if (code_seen('N')) {
+    N = code_value();
+  }
+
+  for(int i=0; i<N; i++) {
+    feedrate = f_bizarre;
+    destination[X_AXIS] = x_bizarre;
+    destination[Y_AXIS] = 0;
+    destination[Z_AXIS] = z_bizarre;
+    prepare_move();
+    st_synchronize();
+
+    destination[X_AXIS] = x_bizarre + 10.0;
+
+    prepare_move();
+    st_synchronize();
+  }
+}
+
 inline void gcode_D999() {
   SERIAL_ECHOLN( "Reseting board" );
   while( true ) {
@@ -7180,9 +7258,9 @@ inline void gcode_D851() {
 
   gcode_G28();
 
-  #define THAT
+  #define THAT_FULL_AND_R
 
-#ifdef THAT
+#ifdef THAT_FULL_AND_R
 
   feedrate = homing_feedrate[ Z_AXIS ];
 
@@ -7349,6 +7427,52 @@ inline void gcode_D851() {
 
   SERIAL_ECHO( "FOR VERIF ONLY Mean based difference: " );
   SERIAL_ECHOLN( diff_center_altitude );
+
+#elif defined THAT_SIMPLE
+  
+  feedrate = homing_feedrate[ Z_AXIS ];
+
+  float tower1_altitude, tower2_altitude, tower3_altitude, center_altitude;
+
+  // TOWER 1
+  destination[X_AXIS] = delta_tower1_x;
+  destination[Y_AXIS] = delta_tower1_y;
+  destination[Z_AXIS] = 10.0f;
+  prepare_move();
+  st_synchronize();
+  tower1_altitude = get_probed_Z_avg();
+
+  // TOWER 2
+  destination[X_AXIS] = delta_tower2_x;
+  destination[Y_AXIS] = delta_tower2_y;
+  destination[Z_AXIS] = 10.0f;
+  prepare_move();
+  st_synchronize();
+  tower2_altitude = get_probed_Z_avg();
+
+  // TOWER 3
+  destination[X_AXIS] = delta_tower3_x;
+  destination[Y_AXIS] = delta_tower3_y;
+  destination[Z_AXIS] = 10.0f;
+  prepare_move();
+  st_synchronize();
+  tower3_altitude = get_probed_Z_avg();
+
+  SERIAL_ECHOLN( "R probed points:" );
+  SERIAL_ECHO  ( "  T1: " );
+  SERIAL_ECHOLN( tower1_altitude );
+  SERIAL_ECHO  ( "  T2: " );
+  SERIAL_ECHOLN( tower2_altitude );
+  SERIAL_ECHO  ( "  T3: " );
+  SERIAL_ECHOLN( tower3_altitude );
+
+  // Use last result as endstops adujst
+  endstop_adj[0] = tower1_altitude + zprobe_zoffset;
+  endstop_adj[1] = tower2_altitude + zprobe_zoffset;
+  endstop_adj[2] = tower3_altitude + zprobe_zoffset;
+
+  // Store endstop adjust
+  gcode_M500();
 
 #else
 
@@ -8215,6 +8339,9 @@ void process_next_command() {
         case 851:
           gcode_D851();
           break;
+        case 888:
+          gcode_D888();
+          break;
         case 999:
           gcode_D999();
           break;
@@ -8303,14 +8430,26 @@ void clamp_to_software_endstops(float target[3]) {
     delta_diagonal_rod_2_tower_3 = sq(diagonal_rod + delta_diagonal_rod_trim_tower_3);
 
     #if ENABLED( DELTA_EXTRA )
-      probe_point_XY_x = (delta_tower1_x + delta_tower2_x ) / 2.0;
-      probe_point_XY_y = (delta_tower1_y + delta_tower2_y ) / 2.0;
+      #if ENABLED(TRI_SHAPE_PROBING)
+    #error
+        probe_point_XY_x = (delta_tower1_x + delta_tower2_x ) / 2.0;
+        probe_point_XY_y = (delta_tower1_y + delta_tower2_y ) / 2.0;
 
-      probe_point_YZ_x = (delta_tower2_x + delta_tower3_x ) / 2.0;
-      probe_point_YZ_y = (delta_tower2_y + delta_tower3_y ) / 2.0;
+        probe_point_YZ_x = (delta_tower2_x + delta_tower3_x ) / 2.0;
+        probe_point_YZ_y = (delta_tower2_y + delta_tower3_y ) / 2.0;
 
-      probe_point_ZX_x = (delta_tower3_x + delta_tower1_x ) / 2.0;
-      probe_point_ZX_y = (delta_tower3_y + delta_tower1_y ) / 2.0;
+        probe_point_ZX_x = (delta_tower3_x + delta_tower1_x ) / 2.0;
+        probe_point_ZX_y = (delta_tower3_y + delta_tower1_y ) / 2.0;
+      #else
+        probe_point_XY_x =  0.0;
+        probe_point_XY_y =  -1.0 * radius;
+
+        probe_point_YZ_x =  SIN_60 * radius;
+        probe_point_YZ_y =  COS_60 * radius;
+
+        probe_point_ZX_x = -SIN_60 * radius;
+        probe_point_ZX_y =  COS_60 * radius;
+      #endif
     #endif
   }
 
@@ -8382,7 +8521,7 @@ void clamp_to_software_endstops(float target[3]) {
       #else // if DELTA_EXTRA
         if ( ! postcompute_tri_ready ) return;
 
-        if ( cartesian[Z_AXIS] > 0.6 ) return;
+        if ( cartesian[Z_AXIS] > z_smooth_tri_leveling_height ) return;
 
         // Find the index tri for z correction
         int idx = triangle_index( cartesian[X_AXIS], cartesian[Y_AXIS] );
@@ -8396,7 +8535,7 @@ void clamp_to_software_endstops(float target[3]) {
 
         // Adjust final-offset againt Z altitude
         // to reduce it after 0.6mm
-        offset *= ( 0.6 - cartesian[Z_AXIS] ) / 0.6;
+        offset *= ( z_smooth_tri_leveling_height - cartesian[Z_AXIS] ) / z_smooth_tri_leveling_height;
 
         delta[X_AXIS] += offset;
         delta[Y_AXIS] += offset;
