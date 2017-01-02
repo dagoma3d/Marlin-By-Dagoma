@@ -1337,7 +1337,9 @@ inline void get_serial_commands() {
           SERIAL_ECHOLN(time);
           lcd_setstatus(time, true);
           card.printingHasFinished();
+          #if DISABLED(ONE_BUTTON)
           card.checkautostart(true);
+          #endif
         }
 
         if (!sd_count) continue; //skip empty lines

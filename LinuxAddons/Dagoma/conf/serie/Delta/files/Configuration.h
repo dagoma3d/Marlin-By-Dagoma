@@ -373,7 +373,8 @@
   //#define DELTA_DIAGONAL_ROD 232.29 // 232.29 // mm
   //#define DELTA_DIAGONAL_ROD 212.57
   //#define DELTA_DIAGONAL_ROD 212.6
-  #define DELTA_DIAGONAL_ROD 209 // Ju
+  //#define DELTA_DIAGONAL_ROD 209 // Ju
+  #define DELTA_DIAGONAL_ROD 210 // Ju - 07-12-2016
 
   // Horizontal offset from middle of printer to smooth rod center.
   //#define DELTA_SMOOTH_ROD_OFFSET 147.10 //147.10 // mm
@@ -384,12 +385,14 @@
   //#define DELTA_EFFECTOR_OFFSET 38.98 // 38.98 // mm
   //#define DELTA_EFFECTOR_OFFSET 32.12
   //#define DELTA_EFFECTOR_OFFSET 32.1
-  #define DELTA_EFFECTOR_OFFSET 31.83 // Ju
+  //#define DELTA_EFFECTOR_OFFSET 31.83 // Ju
+  #define DELTA_EFFECTOR_OFFSET 31.98 // Ju - Measured FreeCad 07-12-2016
 
   // Horizontal offset of the universal joints on the carriages.
   //#define DELTA_CARRIAGE_OFFSET 21.18 // 21.18 // mm
   //#define DELTA_CARRIAGE_OFFSET 21.2 // 21.18 // mm
-  #define DELTA_CARRIAGE_OFFSET 19.16 // Ju
+  //#define DELTA_CARRIAGE_OFFSET 19.16 // Ju
+  #define DELTA_CARRIAGE_OFFSET 20.32 // Ju - 07-12-2016
 
   // Horizontal distance bridged by diagonal push rods when effector is centered.
   #define DELTA_RADIUS (DELTA_SMOOTH_ROD_OFFSET-(DELTA_EFFECTOR_OFFSET)-(DELTA_CARRIAGE_OFFSET))

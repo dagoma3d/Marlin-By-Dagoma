@@ -45,7 +45,8 @@ public:
 
   void checkautostart(bool x);
   #if ENABLED(ONE_BUTTON)
-  void check_auto_consume();
+  int last_autoconsume_idx;
+  bool check_auto_consume();
   #endif
   void openFile(char* name, bool read, bool push_current=false);
   void openLogFile(char* name);
