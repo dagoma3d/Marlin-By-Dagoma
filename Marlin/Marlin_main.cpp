@@ -6746,7 +6746,7 @@ inline void gcode_M503() {
     #endif
     KEEPALIVE_STATE(PAUSED_FOR_USER);
     #if DISABLED(NO_LCD_FOR_FILAMENTCHANGEABLE)
-    while ( (pin_number != -1 && digitalRead(pin_number) != target) || !lcd_clicked() ) {
+    while ( ! ( lcd_clicked() || (pin_number != -1 && digitalRead(pin_number) == target) ) ) {
     #else
     while (pin_number != -1 && digitalRead(pin_number) != target) {
     #endif
