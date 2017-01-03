@@ -7371,9 +7371,9 @@ inline void gcode_D851() {
   } while( abs( diff_center_altitude ) > 0.05 );
 
   // Use last result as endstops adujst
-  endstop_adj[0] = tower1_altitude + zprobe_zoffset;
-  endstop_adj[1] = tower2_altitude + zprobe_zoffset;
-  endstop_adj[2] = tower3_altitude + zprobe_zoffset;
+  endstop_adj[0] = tower1_altitude /*+ zprobe_zoffset*/;
+  endstop_adj[1] = tower2_altitude /*+ zprobe_zoffset*/;
+  endstop_adj[2] = tower3_altitude /*+ zprobe_zoffset*/;
 
   // Store endstop adjust
   gcode_M500();
@@ -8543,7 +8543,9 @@ void clamp_to_software_endstops(float target[3]) {
         delta[Y_AXIS] += offset;
         delta[Z_AXIS] += offset;
 
-
+        delta[X_AXIS] += zprobe_zoffset;
+        delta[Y_AXIS] += zprobe_zoffset;
+        delta[Z_AXIS] += zprobe_zoffset;
 
       #endif // End DELTA_EXTRA
     }
