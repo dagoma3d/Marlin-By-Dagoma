@@ -1,5 +1,7 @@
 Disable IS_MONO_FAN
 
+Enable FAN_SOFT_PWM
+
 Enable FAN_KICKSTART_TIME
 
 Set X_MIN_POS -2
