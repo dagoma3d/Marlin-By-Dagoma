@@ -497,7 +497,7 @@ inline void update_endstops() {
                   SET_BIT(current_endstop_bits, Z_MIN_PROBE, 0 );
                 }
                 else {
-                  // We eat something
+                  // We hit something
                   SET_BIT(current_endstop_bits, Z_MIN_PROBE, 1 );
                 }
 
