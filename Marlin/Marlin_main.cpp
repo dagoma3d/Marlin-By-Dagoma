@@ -3361,9 +3361,9 @@ inline void gcode_G28() {
         z_read[0] = current_position[Z_AXIS];
 
         z_avg = ( z_read[0] + z_read[1] + z_read[2] ) / 3.0;
-        
+
         set_destination_to_current();
-        destination[ Z_AXIS ] = min( 50.0, destination[ Z_AXIS ] + 5.0 );    
+        destination[ Z_AXIS ] = min( 50.0, destination[ Z_AXIS ] + 5.0 );
         prepare_move();
         st_synchronize();
 
@@ -3386,13 +3386,13 @@ inline void gcode_G28() {
     }
 
     /**
-     *           T3 
+     *           T3
      *           |
      *           |
      *          4| 3
-     *           |  
+     *           |
      *      ZX   O    YZ
-     *        5      2 
+     *        5      2
      *
      *         0    1
      *
@@ -3408,7 +3408,7 @@ inline void gcode_G28() {
 
       // While all tri equations are just: y = a.x;
       float aTested = y / x;
-      
+
       // Test to choice between 2 tri groups: 1,2,3 or 0,4,5
       if ( x >= 0.0 ) {
         // Index is one of 1, 2 or 3
@@ -3512,7 +3512,7 @@ inline void gcode_G28() {
         ,probed_tri_altitude[5]
         ,probed_tri_altitude[0]
       };
-      
+
       float cz = probed_tri_altitude[6];
 
       for( int i=0; i<6; i++ ) {
@@ -3543,18 +3543,18 @@ inline void gcode_G28() {
     inline void gcode_G29() {
 
       postcompute_tri_ready = false;
-      
+
       gcode_G28();
 
       feedrate = homing_feedrate[ X_AXIS ];
 
       // Reset
-      probed_tri_altitude[0] = 
-      probed_tri_altitude[1] = 
-      probed_tri_altitude[2] = 
-      probed_tri_altitude[3] = 
-      probed_tri_altitude[4] = 
-      probed_tri_altitude[5] = 
+      probed_tri_altitude[0] =
+      probed_tri_altitude[1] =
+      probed_tri_altitude[2] =
+      probed_tri_altitude[3] =
+      probed_tri_altitude[4] =
+      probed_tri_altitude[5] =
       probed_tri_altitude[6] = 42.0;
 
       destination[ X_AXIS ] = delta_tower1_x;
@@ -3614,15 +3614,15 @@ inline void gcode_G28() {
         SERIAL_ECHOLN( probed_tri_altitude[i] );
       }
 
-      z_smooth_tri_leveling_height = 
-        max(probed_tri_altitude[0], 
+      z_smooth_tri_leveling_height =
+        max(probed_tri_altitude[0],
         max(probed_tri_altitude[1],
         max(probed_tri_altitude[2],
         max(probed_tri_altitude[3],
         max(probed_tri_altitude[4],
         max(probed_tri_altitude[5],
             probed_tri_altitude[7])))))) -
-        min(probed_tri_altitude[0], 
+        min(probed_tri_altitude[0],
         min(probed_tri_altitude[1],
         min(probed_tri_altitude[2],
         min(probed_tri_altitude[3],
@@ -6616,12 +6616,23 @@ inline void gcode_M503() {
     if (degHotend(active_extruder) < extrude_min_temp) {
       SERIAL_ERROR_START;
       SERIAL_ERRORLNPGM(MSG_TOO_COLD_FOR_M600);
+      
+      #if ENABLED(FILAMENT_RUNOUT_SENSOR)
+        filament_ran_out = false;
+      #endif
+
+      #if ENABLED(SUMMON_PRINT_PAUSE)
+        print_pause_summoned = false;
+      #endif
+
       return;
     }
-    
+
     float lastpos[NUM_AXIS];
     #if ENABLED(DELTA)
       float fr60 = feedrate / 60;
+    #else
+      float fr = feedrate;
     #endif
 
     for (int i = 0; i < NUM_AXIS; i++)
@@ -6631,10 +6642,11 @@ inline void gcode_M503() {
       #define RUNPLAN calculate_delta(destination); \
                       plan_buffer_line(delta[X_AXIS], delta[Y_AXIS], delta[Z_AXIS], destination[E_AXIS], fr60, active_extruder);
     #else
-      #define RUNPLAN line_to_destination();
+      #define RUNPLAN line_to_destination(fr);
     #endif
 
-   
+    //finish moves
+    // st_synchronize();
 
     //retract by E
     if (code_seen('E')) destination[E_AXIS] += code_value();
@@ -6642,7 +6654,21 @@ inline void gcode_M503() {
       else destination[E_AXIS] += FILAMENTCHANGE_FIRSTRETRACT;
     #endif
 
+    // First retract step must be done quickly to avoid melted material in the ptfe/nozzle...
+    #if ENABLED(DELTA)
+      fr60 *= FILAMENTCHANGE_FEEDRATE_MULTIPLICATOR;
+    #elif ENABLED(FILAMENT_RUNOUT_SENSOR)
+      fr *= FILAMENTCHANGE_FEEDRATE_MULTIPLICATOR;
+    #endif
+
     RUNPLAN;
+
+    // After first retract step, we set back fr60 to its initial value...
+    #if ENABLED(DELTA)
+      fr60 /= FILAMENTCHANGE_FEEDRATE_MULTIPLICATOR;
+    #elif ENABLED(FILAMENT_RUNOUT_SENSOR)
+      fr /= FILAMENTCHANGE_FEEDRATE_MULTIPLICATOR;
+    #endif
 
     //lift Z
     if (code_seen('Z')) destination[Z_AXIS] += code_value();
@@ -6651,6 +6677,10 @@ inline void gcode_M503() {
     #endif
 
     RUNPLAN;
+
+    // #if ENABLED(DELTA)
+    //   fr60 = homing_feedrate[ Z_AXIS ];
+    // #endif
 
     //move xy
     if (code_seen('X')) destination[X_AXIS] = code_value();
@@ -6816,6 +6846,11 @@ inline void gcode_M503() {
     #endif
 
     //return to normal
+    if (code_seen('E')) destination[E_AXIS] -= code_value();
+    #ifdef FILAMENTCHANGE_FIRSTRETRACT
+      else destination[E_AXIS] -= FILAMENTCHANGE_FIRSTRETRACT;
+    #endif
+
     if (code_seen('L')) destination[E_AXIS] -= code_value();
     #ifdef FILAMENTCHANGE_FINALRETRACT
       else destination[E_AXIS] -= FILAMENTCHANGE_FINALRETRACT;
@@ -7431,7 +7466,7 @@ inline void gcode_D851() {
   SERIAL_ECHOLN( diff_center_altitude );
 
 #elif defined THAT_SIMPLE
-  
+
   feedrate = homing_feedrate[ Z_AXIS ];
 
   float tower1_altitude, tower2_altitude, tower3_altitude, center_altitude;
@@ -7550,7 +7585,7 @@ inline void gcode_D851() {
 
   tower1_altitude = get_probed_Z_avg();
 
-  
+
   // TOWER 2
   destination[X_AXIS] = delta_tower2_x;
   destination[Y_AXIS] = delta_tower2_y;
@@ -7630,7 +7665,7 @@ inline void gcode_D851() {
 
   tower1_altitude = get_probed_Z_avg();
 
-  
+
   // TOWER 2
   destination[X_AXIS] = delta_tower2_x;
   destination[Y_AXIS] = delta_tower2_y;
@@ -9232,7 +9267,7 @@ void disable_all_steppers() {
       #endif
       asked_to_print = true;
       has_to_print_timeout = now + 2500UL;
-      
+
       #if ENABLED(ONE_LED)
         one_led_on();
       #endif
@@ -9240,7 +9275,7 @@ void disable_all_steppers() {
       card.autostart_index = 0;
       card.cardOK = false;
       card.checkautostart( true );
-      
+
       #if ENABLED(ONE_LED)
         if ( !card.cardOK ) set_notify_warning();
       #endif
@@ -9274,7 +9309,7 @@ void idle(
   host_keepalive();
   #if ENABLED(U8GLIB_SSD1306) && ENABLED(INTELLIGENT_LCD_REFRESH_RATE)
     if (IS_SD_PRINTING && axis_homed[X_AXIS] && axis_homed[Y_AXIS] && axis_homed[Z_AXIS]) {
-      
+
       if ( last_intelligent_F_lcd_update != feedrate ) {
         last_intelligent_F_authorized_lcd_update = feedrate > last_intelligent_F_lcd_update;
         last_intelligent_F_lcd_update = feedrate;
