@@ -18,6 +18,6 @@ Vérifier que le user courant appartient bien aux groupe dialout et plugdev.
 
 
 TODO:
-- 1ère phase de retract trop lente? Jouer sur la température lors de la première phase de retract?
+- 1ère phase de retract trop lente? Jouer sur la température lors de la première phase de retract? Faire autrement?
 - Si pas de fil au début, ne détecte rien par la suite (fil ajouté, plus de fil,...)
 - Désactiver la détection de filament avant que l'impression démarre (donc pendant le palpage et la chauffe)

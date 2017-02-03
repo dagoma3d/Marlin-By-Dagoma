@@ -6616,7 +6616,7 @@ inline void gcode_M503() {
     if (degHotend(active_extruder) < extrude_min_temp) {
       SERIAL_ERROR_START;
       SERIAL_ERRORLNPGM(MSG_TOO_COLD_FOR_M600);
-      
+
       #if ENABLED(FILAMENT_RUNOUT_SENSOR)
         filament_ran_out = false;
       #endif

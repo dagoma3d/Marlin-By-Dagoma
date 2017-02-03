@@ -1,10 +1,10 @@
-Enable FILAMENT_RUNOUT_SENSOR
-
 # D65 is A11
 # D19 is Z+
 # Sensor PIN : D19
 
+Enable FILAMENT_RUNOUT_SENSOR
 Pin FILRUNOUT_PIN 19
+
 Set FIL_RUNOUT_INVERTING true
 Set FILAMENTCHANGE_FIRSTRETRACT -4.5
 Set FILAMENTCHANGE_FINALRETRACT -950
@@ -14,6 +14,7 @@ Set FILAMENTCHANGE_FEEDRATE_MULTIPLICATOR 5
 # D18 is Z-
 # Button PIN : D18
 
+# For testing purposes, L0 can be temporarily added to avoid using final retract value (we need to find a way to remove melted filament before final retract)
 Set FILAMENT_RUNOUT_SCRIPT '"M600 P18"'
 
 Enable SUMMON_PRINT_PAUSE
