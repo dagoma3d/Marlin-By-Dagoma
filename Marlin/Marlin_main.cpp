@@ -9262,6 +9262,14 @@ void disable_all_steppers() {
       && !asked_to_print
       && ( READ(ONE_BUTTON_PIN) ^ ONE_BUTTON_INVERTING )
     ) {
+      // Warns user if no filament at start/resume.
+      #if HAS_FILRUNOUT
+        if( !(READ(FILRUNOUT_PIN) ^ FIL_RUNOUT_INVERTING) ) {
+          set_notify_warning();
+          return;
+        }
+      #endif
+
       #if ENABLED( FILAMENT_RUNOUT_SENSOR )
         filrunout_bypassed = false;
       #endif
