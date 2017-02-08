@@ -6654,20 +6654,24 @@ inline void gcode_M503() {
       else destination[E_AXIS] += FILAMENTCHANGE_FIRSTRETRACT;
     #endif
 
-    // First retract step must be done quickly to avoid melted material in the ptfe/nozzle...
-    #if ENABLED(DELTA)
-      fr60 *= FILAMENTCHANGE_FEEDRATE_MULTIPLICATOR;
-    #elif ENABLED(FILAMENT_RUNOUT_SENSOR)
-      fr *= FILAMENTCHANGE_FEEDRATE_MULTIPLICATOR;
+    #ifdef FILAMENTCHANGE_FEEDRATE_MULTIPLICATOR
+      // First retract step must be done quickly to avoid melted material in the ptfe/nozzle...
+      #if ENABLED(DELTA)
+        fr60 *= FILAMENTCHANGE_FEEDRATE_MULTIPLICATOR;
+      #elif ENABLED(FILAMENT_RUNOUT_SENSOR)
+        fr *= FILAMENTCHANGE_FEEDRATE_MULTIPLICATOR;
+      #endif
     #endif
 
     RUNPLAN;
 
-    // After first retract step, we set back fr60 to its initial value...
-    #if ENABLED(DELTA)
-      fr60 /= FILAMENTCHANGE_FEEDRATE_MULTIPLICATOR;
-    #elif ENABLED(FILAMENT_RUNOUT_SENSOR)
-      fr /= FILAMENTCHANGE_FEEDRATE_MULTIPLICATOR;
+    #ifdef FILAMENTCHANGE_FEEDRATE_MULTIPLICATOR
+      // After first retract step, we set back fr60 to its initial value...
+      #if ENABLED(DELTA)
+        fr60 /= FILAMENTCHANGE_FEEDRATE_MULTIPLICATOR;
+      #elif ENABLED(FILAMENT_RUNOUT_SENSOR)
+        fr /= FILAMENTCHANGE_FEEDRATE_MULTIPLICATOR;
+      #endif
     #endif
 
     //lift Z
