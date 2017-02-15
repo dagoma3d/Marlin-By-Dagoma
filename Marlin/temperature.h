@@ -188,6 +188,9 @@ FORCE_INLINE void autotempShutdown() {
 
 #if ENABLED( Z_MIN_MAGIC )
   extern bool can_measure_z_magic;
+  extern int z_magic_value;
+  extern float z_magic_derivative_bias;
+  extern int z_magic_hit_count;
 #endif
 
 #endif // TEMPERATURE_H

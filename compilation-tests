@@ -1,0 +1,36 @@
+#!/bin/sh
+
+echo "Running some compilation tests"
+
+CONFIGURATIONS_TO_TEST=$(cat <<HereList
+Delta endstops:NO screen:None
+E200 filamentRunout:Disabled screen:Disabled
+E200 filamentRunout:Disabled screen:Enabled
+D200_Melzi endstops:NC z-probe:White printer-head:Original-V1 box-filamentRunout:Disabled
+D200_Melzi endstops:NC z-probe:White printer-head:Easy-V2 box-filamentRunout:Disabled
+D200_Melzi endstops:NC z-probe:White printer-head:Original-V1 box-filamentRunout:Enabled
+D200_Melzi endstops:NC z-probe:White printer-head:Easy-V2 box-filamentRunout:Enabled
+D200_MKS screen:Enabled wifi:None
+HereList
+)
+
+echo "$CONFIGURATIONS_TO_TEST" > /tmp/configurations_to_test.list 
+
+while read config_to_test
+do
+	echo "Testing compilation of: ${config_to_test}"
+	LinuxAddons/Dagoma/bin/apply_configuration -gcof ${config_to_test}
+	
+	# Compilation test
+	pio run -d Marlin/ > /dev/null
+
+	# Testing result ouput
+	if test "$?" -ne "0"
+	then
+		echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
+		echo "Compilation error for configuration: ${config_to_test}"
+		exit 1
+	fi 
+done < /tmp/configurations_to_test.list
+
+echo "All comilations test : SUCCESS"

@@ -968,7 +968,7 @@ void setup() {
         enqueue_and_echo_commands_P( PSTR("D851") );
       }
       else {
-        enqueue_and_echo_commands_P( PSTR("G28") );
+        enqueue_and_echo_commands_P( PSTR("G28\nM106 S255") );
       }
     #endif
   #endif
@@ -6678,20 +6678,24 @@ inline void gcode_M503() {
     }
 
     float lastpos[NUM_AXIS];
-    #if ENABLED(DELTA)
-      float fr60 = feedrate / 60;
-    #else
-      float fr = feedrate;
-    #endif
+    float previous_feedrate;
 
     for (int i = 0; i < NUM_AXIS; i++)
       lastpos[i] = destination[i] = current_position[i];
 
+    previous_feedrate = feedrate;
+
     #if ENABLED(DELTA)
+      #define SET_FEEDRATE_FOR_MOVE          feedrate = homing_feedrate[X_AXIS];
+      #define SET_FEEDRATE_FOR_EXTRUDER_MOVE feedrate = max_feedrate[E_AXIS];
+      // The following plan method use feedrate expressed in mm/s
       #define RUNPLAN calculate_delta(destination); \
-                      plan_buffer_line(delta[X_AXIS], delta[Y_AXIS], delta[Z_AXIS], destination[E_AXIS], fr60, active_extruder);
+                      plan_buffer_line(delta[X_AXIS], delta[Y_AXIS], delta[Z_AXIS], destination[E_AXIS], feedrate, active_extruder);
     #else
-      #define RUNPLAN line_to_destination(fr);
+      #define SET_FEEDRATE_FOR_MOVE          feedrate = homing_feedrate[X_AXIS] * 60;
+      #define SET_FEEDRATE_FOR_EXTRUDER_MOVE feedrate = max_feedrate[E_AXIS] * 60;
+      // The following plan method use feedrate expressed in mm/min
+      #define RUNPLAN line_to_destination(feedrate);
     #endif
 
     //finish moves
@@ -6703,25 +6707,8 @@ inline void gcode_M503() {
       else destination[E_AXIS] += FILAMENTCHANGE_FIRSTRETRACT;
     #endif
 
-    #ifdef FILAMENTCHANGE_FEEDRATE_MULTIPLICATOR
-      // First retract step must be done quickly to avoid melted material in the ptfe/nozzle...
-      #if ENABLED(DELTA)
-        fr60 *= FILAMENTCHANGE_FEEDRATE_MULTIPLICATOR;
-      #elif ENABLED(FILAMENT_RUNOUT_SENSOR)
-        fr *= FILAMENTCHANGE_FEEDRATE_MULTIPLICATOR;
-      #endif
-    #endif
-
+    SET_FEEDRATE_FOR_EXTRUDER_MOVE;
     RUNPLAN;
-
-    #ifdef FILAMENTCHANGE_FEEDRATE_MULTIPLICATOR
-      // After first retract step, we set back fr60 to its initial value...
-      #if ENABLED(DELTA)
-        fr60 /= FILAMENTCHANGE_FEEDRATE_MULTIPLICATOR;
-      #elif ENABLED(FILAMENT_RUNOUT_SENSOR)
-        fr /= FILAMENTCHANGE_FEEDRATE_MULTIPLICATOR;
-      #endif
-    #endif
 
     //lift Z
     if (code_seen('Z')) destination[Z_AXIS] += code_value();
@@ -6729,11 +6716,8 @@ inline void gcode_M503() {
       else destination[Z_AXIS] += FILAMENTCHANGE_ZADD;
     #endif
 
+    SET_FEEDRATE_FOR_MOVE;
     RUNPLAN;
-
-    // #if ENABLED(DELTA)
-    //   fr60 = homing_feedrate[ Z_AXIS ];
-    // #endif
 
     //move xy
     if (code_seen('X')) destination[X_AXIS] = code_value();
@@ -6746,6 +6730,7 @@ inline void gcode_M503() {
       else destination[Y_AXIS] = FILAMENTCHANGE_YPOS;
     #endif
 
+    SET_FEEDRATE_FOR_MOVE;
     RUNPLAN;
 
     if (code_seen('L')) destination[E_AXIS] += code_value();
@@ -6753,9 +6738,10 @@ inline void gcode_M503() {
       else destination[E_AXIS] += FILAMENTCHANGE_FINALRETRACT;
     #endif
 
+    SET_FEEDRATE_FOR_EXTRUDER_MOVE;
     RUNPLAN;
 
-    //finish moves
+    // validate planned all moves
     st_synchronize();
 
     // DAGOMA added
@@ -6840,12 +6826,15 @@ inline void gcode_M503() {
           lcd_quick_feedback();
           #endif
           next_tick = ms + 2500UL; // feedback every 2.5s while waiting
+
+          // Ensure steppers stay enabled
           enable_x();
           enable_y();
           enable_z();
 
 
           #if ENABLED( DELTA_EXTRA )
+            // Only checked every 2.5s
             // Detected if sd is out
             if ( !card.stillPluggedIn() ) {
               // Abort current print
@@ -6861,6 +6850,22 @@ inline void gcode_M503() {
             }
           #endif
         }
+
+        #if ENABLED(DELTA_EXTRA) && ENABLED(Z_MIN_MAGIC)
+          // Must be check quicker than 2.5s
+          if ( z_magic_hit_count > 1 ) {
+            float previous_dest = destination[E_AXIS];
+            destination[E_AXIS] += FILAMENTCHANGE_FINALRETRACT;
+
+            SET_FEEDRATE_FOR_EXTRUDER_MOVE;
+            RUNPLAN;
+            st_synchronize();
+            destination[E_AXIS] = previous_dest;
+            current_position[E_AXIS] = destination[E_AXIS];
+            sync_plan_position_e();
+          }
+        #endif
+
         idle(true);
       #else
         current_position[E_AXIS] += AUTO_FILAMENT_CHANGE_LENGTH;
@@ -6898,12 +6903,7 @@ inline void gcode_M503() {
       st_synchronize();
     #endif
 
-    //return to normal
-    if (code_seen('E')) destination[E_AXIS] -= code_value();
-    #ifdef FILAMENTCHANGE_FIRSTRETRACT
-      else destination[E_AXIS] -= FILAMENTCHANGE_FIRSTRETRACT;
-    #endif
-
+    // Return to normal
     if (code_seen('L')) destination[E_AXIS] -= code_value();
     #ifdef FILAMENTCHANGE_FINALRETRACT
       else destination[E_AXIS] -= FILAMENTCHANGE_FINALRETRACT;
@@ -6912,28 +6912,39 @@ inline void gcode_M503() {
     current_position[E_AXIS] = destination[E_AXIS]; //the long retract of L is compensated by manual filament feeding
     sync_plan_position_e();
 
+    SET_FEEDRATE_FOR_EXTRUDER_MOVE;
     RUNPLAN; //should do nothing
 
     #if DISABLED(NO_LCD_FOR_FILAMENTCHANGEABLE)
     lcd_reset_alert_level();
     #endif
-
+    
     #if ENABLED(DELTA)
       // Move XYZ to starting position, then E
       calculate_delta(lastpos);
-      plan_buffer_line(delta[X_AXIS], delta[Y_AXIS], delta[Z_AXIS], destination[E_AXIS], fr60, active_extruder);
-      plan_buffer_line(delta[X_AXIS], delta[Y_AXIS], delta[Z_AXIS], lastpos[E_AXIS], fr60, active_extruder);
+
+      SET_FEEDRATE_FOR_MOVE;
+      plan_buffer_line(delta[X_AXIS], delta[Y_AXIS], delta[Z_AXIS], destination[E_AXIS], feedrate, active_extruder);
+
+      SET_FEEDRATE_FOR_EXTRUDER_MOVE;
+      plan_buffer_line(delta[X_AXIS], delta[Y_AXIS], delta[Z_AXIS], lastpos[E_AXIS], feedrate, active_extruder);
     #else
       // Move XY to starting position, then Z, then E
       destination[X_AXIS] = lastpos[X_AXIS];
       destination[Y_AXIS] = lastpos[Y_AXIS];
+
+      SET_FEEDRATE_FOR_MOVE;
       line_to_destination();
       destination[Z_AXIS] = lastpos[Z_AXIS];
       line_to_destination();
+
       destination[E_AXIS] = lastpos[E_AXIS];
+
+      SET_FEEDRATE_FOR_EXTRUDER_MOVE;
       line_to_destination();
     #endif
 
+    // Validates all planned moves
     st_synchronize();
 
     #if ENABLED(FILAMENT_RUNOUT_SENSOR)
@@ -6943,6 +6954,9 @@ inline void gcode_M503() {
     #if ENABLED(SUMMON_PRINT_PAUSE)
       print_pause_summoned = false;
     #endif
+
+    // Restore previous feedrate
+    feedrate = previous_feedrate;
 
   }
 
@@ -7348,9 +7362,180 @@ inline void gcode_D851() {
 
   gcode_G28();
 
-  #define THAT_FULL_AND_R
+  #define THAT_FULL_AND_ROD_LENGTH
+#ifdef THAT_FULL_AND_ROD_LENGTH
 
-#ifdef THAT_FULL_AND_R
+  feedrate = homing_feedrate[ Z_AXIS ];
+
+  float tower1_altitude, tower2_altitude, tower3_altitude, center_altitude;
+
+  // TOWER 1
+  destination[X_AXIS] = delta_tower1_x;
+  destination[Y_AXIS] = delta_tower1_y;
+  destination[Z_AXIS] = 10.0f;
+  prepare_move();
+  st_synchronize();
+  tower1_altitude = get_probed_Z_avg();
+
+  // TOWER 2
+  destination[X_AXIS] = delta_tower2_x;
+  destination[Y_AXIS] = delta_tower2_y;
+  destination[Z_AXIS] = 10.0f;
+  prepare_move();
+  st_synchronize();
+  tower2_altitude = get_probed_Z_avg();
+
+  // TOWER 3
+  destination[X_AXIS] = delta_tower3_x;
+  destination[Y_AXIS] = delta_tower3_y;
+  destination[Z_AXIS] = 10.0f;
+  prepare_move();
+  st_synchronize();
+  tower3_altitude = get_probed_Z_avg();
+
+  // CENTER
+  destination[X_AXIS] = 0.0f;
+  destination[Y_AXIS] = 0.0f;
+  destination[Z_AXIS] = 10.0f;
+  prepare_move();
+  st_synchronize();
+  center_altitude = get_probed_Z_avg();
+
+  SERIAL_ECHOLN( "R probed points:" );
+  SERIAL_ECHO  ( "  T1: " );
+  SERIAL_ECHOLN( tower1_altitude );
+  SERIAL_ECHO  ( "  T2: " );
+  SERIAL_ECHOLN( tower2_altitude );
+  SERIAL_ECHO  ( "  T3: " );
+  SERIAL_ECHOLN( tower3_altitude );
+  SERIAL_ECHO  ( "   C: " );
+  SERIAL_ECHOLN( center_altitude );
+
+  float mean_ref_plan_altitude = ( tower1_altitude + tower2_altitude + tower3_altitude ) / 3.0;
+  float diff_center_altitude = center_altitude - mean_ref_plan_altitude;
+
+  SERIAL_ECHO( "Mean based difference: " );
+  SERIAL_ECHOLN( diff_center_altitude );
+
+  /*
+
+  do {
+
+    delta_radius -= 2.0 * diff_center_altitude;
+
+    gcode_M665();
+
+    destination[X_AXIS] = delta_tower1_x;
+    destination[Y_AXIS] = delta_tower1_y;
+    destination[Z_AXIS] = 10.0f;
+    prepare_move();
+    st_synchronize();
+    tower1_altitude = get_probed_Z_avg();
+
+    // TOWER 2
+    destination[X_AXIS] = delta_tower2_x;
+    destination[Y_AXIS] = delta_tower2_y;
+    destination[Z_AXIS] = 10.0f;
+    prepare_move();
+    st_synchronize();
+    tower2_altitude = get_probed_Z_avg();
+
+    // TOWER 3
+    destination[X_AXIS] = delta_tower3_x;
+    destination[Y_AXIS] = delta_tower3_y;
+    destination[Z_AXIS] = 10.0f;
+    prepare_move();
+    st_synchronize();
+    tower3_altitude = get_probed_Z_avg();
+
+    // CENTER
+    destination[X_AXIS] = 0.0f;
+    destination[Y_AXIS] = 0.0f;
+    destination[Z_AXIS] = 10.0f;
+    prepare_move();
+    st_synchronize();
+    center_altitude = get_probed_Z_avg();
+
+    SERIAL_ECHOLN( "R probed points:" );
+    SERIAL_ECHO  ( "  T1: " );
+    SERIAL_ECHOLN( tower1_altitude );
+    SERIAL_ECHO  ( "  T2: " );
+    SERIAL_ECHOLN( tower2_altitude );
+    SERIAL_ECHO  ( "  T3: " );
+    SERIAL_ECHOLN( tower3_altitude );
+    SERIAL_ECHO  ( "   C: " );
+    SERIAL_ECHOLN( center_altitude );
+
+    mean_ref_plan_altitude = ( tower1_altitude + tower2_altitude + tower3_altitude ) / 3.0;
+    diff_center_altitude = center_altitude - mean_ref_plan_altitude;
+
+    SERIAL_ECHO( "NEW Mean based difference: " );
+    SERIAL_ECHOLN( diff_center_altitude );
+  } while( abs( diff_center_altitude ) > 0.05 );
+
+  */
+
+  // Use last result as endstops adujst
+  endstop_adj[0] = tower1_altitude /*+ zprobe_zoffset*/;
+  endstop_adj[1] = tower2_altitude /*+ zprobe_zoffset*/;
+  endstop_adj[2] = tower3_altitude /*+ zprobe_zoffset*/;
+
+  // Store endstop adjust
+  gcode_M500();
+
+  // JUST FOR REPORTING BACK
+  // Take in account now
+  gcode_G28();
+
+  // TOWER 1
+  destination[X_AXIS] = delta_tower1_x;
+  destination[Y_AXIS] = delta_tower1_y;
+  destination[Z_AXIS] = 10.0f;
+  prepare_move();
+  st_synchronize();
+  tower1_altitude = get_probed_Z_avg();
+
+  // TOWER 2
+  destination[X_AXIS] = delta_tower2_x;
+  destination[Y_AXIS] = delta_tower2_y;
+  destination[Z_AXIS] = 10.0f;
+  prepare_move();
+  st_synchronize();
+  tower2_altitude = get_probed_Z_avg();
+
+  // TOWER 3
+  destination[X_AXIS] = delta_tower3_x;
+  destination[Y_AXIS] = delta_tower3_y;
+  destination[Z_AXIS] = 10.0f;
+  prepare_move();
+  st_synchronize();
+  tower3_altitude = get_probed_Z_avg();
+
+  // CENTER
+  destination[X_AXIS] = 0.0f;
+  destination[Y_AXIS] = 0.0f;
+  destination[Z_AXIS] = 10.0f;
+  prepare_move();
+  st_synchronize();
+  center_altitude = get_probed_Z_avg();
+
+  SERIAL_ECHOLN( "R probed points:" );
+  SERIAL_ECHO  ( "  T1: " );
+  SERIAL_ECHOLN( tower1_altitude );
+  SERIAL_ECHO  ( "  T2: " );
+  SERIAL_ECHOLN( tower2_altitude );
+  SERIAL_ECHO  ( "  T3: " );
+  SERIAL_ECHOLN( tower3_altitude );
+  SERIAL_ECHO  ( "   C: " );
+  SERIAL_ECHOLN( center_altitude );
+
+  mean_ref_plan_altitude = ( tower1_altitude + tower2_altitude + tower3_altitude ) / 3.0;
+  diff_center_altitude = center_altitude - mean_ref_plan_altitude;
+
+  SERIAL_ECHO( "FOR VERIF ONLY Mean based difference: " );
+  SERIAL_ECHOLN( diff_center_altitude );
+
+#elif defined THAT_FULL_AND_R
 
   feedrate = homing_feedrate[ Z_AXIS ];
 
@@ -7776,6 +7961,11 @@ inline void gcode_D851() {
 
   startup_auto_calibration = false;
 }
+
+#if ENABLED(Z_MIN_MAGIC)
+// Pre-declaration
+inline void gcode_D600();
+#endif
 
 #endif // DELTA_EXTRA End
 
@@ -8426,6 +8616,11 @@ void process_next_command() {
         case 410:
           gcode_D410();
           break;
+        #if ENABLED(Z_MIN_MAGIC)
+          case 600:
+            gcode_D600();
+            break;
+        #endif
         case 851:
           gcode_D851();
           break;
@@ -9344,6 +9539,47 @@ void disable_all_steppers() {
   }
 #endif
 
+#if ENABLED(DELTA_EXTRA) && ENABLED(Z_MIN_MAGIC)
+
+  bool change_filament_by_tap_tap = false;
+
+  inline void manage_tap_tap() {
+    if ( !startup_auto_calibration
+      && !IS_SD_PRINTING
+      && !change_filament_by_tap_tap
+      && z_magic_hit_count > 1
+    ) {
+      change_filament_by_tap_tap = true;
+      enqueue_and_echo_commands_P(PSTR("G28\nM104 S180\nG0 F200 X0 Y0 Z100\nM109 S180\nD600\nM106 S255\nM104 S0\nG28"));
+    }
+  }
+
+  inline void gcode_D600() {
+    SERIAL_ECHOLN( "Filament expulsion" );
+
+     if (degHotend(active_extruder) < extrude_min_temp) {
+      SERIAL_ERROR_START;
+      SERIAL_ERRORLNPGM(MSG_TOO_COLD_FOR_M600);
+
+      #if ENABLED(FILAMENT_RUNOUT_SENSOR)
+        filament_ran_out = false;
+      #endif
+
+      #if ENABLED(SUMMON_PRINT_PAUSE)
+        print_pause_summoned = false;
+      #endif
+
+      change_filament_by_tap_tap = false;
+      
+      return;
+    }
+
+
+
+    change_filament_by_tap_tap = false;
+  }
+#endif
+
 /**
  * Standard idle routine keeps the machine alive
  */
@@ -9352,6 +9588,14 @@ void idle(
     bool no_stepper_sleep/*=false*/
   #endif
 ) {
+
+/*
+  if (z_magic_derivative_bias < -5.0) {
+    SERIAL_ECHO("z_magic_d: ");
+    SERIAL_ECHOLN(z_magic_derivative_bias);
+  }
+*/
+
   manage_heater();
   #if ENABLED(SUMMON_PRINT_PAUSE)
   manage_pause_summoner();
@@ -9361,6 +9605,9 @@ void idle(
   #endif
   #if ENABLED(ONE_LED)
   manage_one_led();
+  #endif
+  #if ENABLED(DELTA_EXTRA) && ENABLED(Z_MIN_MAGIC)
+  manage_tap_tap();
   #endif
   manage_inactivity(
     #if ENABLED(FILAMENTCHANGEENABLE)
