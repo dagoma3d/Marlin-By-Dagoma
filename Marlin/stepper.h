@@ -50,6 +50,10 @@
   extern bool abort_on_endstop_hit;
 #endif
 
+#if ENABLED(EMERGENCY_STOP)
+  extern bool trigger_emergency_stop;
+#endif
+
 // Initialize and start the stepper motor subsystem
 void st_init();
 

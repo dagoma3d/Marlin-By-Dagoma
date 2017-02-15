@@ -138,7 +138,10 @@
 #define MSG_NO_CARD                         "Pas de carte"
 #define MSG_DWELL                           "Repos..."
 #define MSG_USERWAIT                        "Atten. de l'util."
-#define MSG_WAIT                            "   Patientez..."
+#ifdef MSG_WAIT
+  #undef MSG_WAIT
+  #define MSG_WAIT                          "   Patientez..."
+#endif
 #define MSG_PARAMETERS                      "   Parametres"
 #define MSG_SAVED                           "   Sauvegardes"
 #define MSG_RESUMING                        "Repri. de l'impr."

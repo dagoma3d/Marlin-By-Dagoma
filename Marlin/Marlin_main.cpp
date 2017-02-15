@@ -1781,6 +1781,37 @@ static void setup_for_endstop_move() {
 
   #endif // !AUTO_BED_LEVELING_GRID
 
+  // Check if pause is triggered during G29 (manuel bed leveling) and D851 (custom calibration)
+  #if ENABLED(EMERGENCY_STOP)
+    void handle_emergency_stop(){
+      if ( trigger_emergency_stop ) {
+        // Abort current operations:
+        // - Move the nozzle up
+        #if ENABLED(EMERGENCY_STOP_Z_MOVE)
+          // Setting the current_position seems useless as the move is stopped by resetting...?
+          //current_position[Z_AXIS] += 5;
+          feedrate = homing_feedrate[Z_AXIS];
+          if (DEBUGGING(ECHO)) DEBUG_POS("handle_emergency_stop", current_position);
+          #if ENABLED(DELTA)
+            calculate_delta(current_position);
+            plan_buffer_line(delta[X_AXIS], delta[Y_AXIS], delta[Z_AXIS], current_position[E_AXIS], feedrate / 60, active_extruder);
+          #else
+            line_to_current_position();
+          #endif
+        #endif
+        // - Reset the board
+        while( true ) {
+          #if ENABLED(DELTA)
+            one_led_on();
+            delay(150);
+            one_led_off();
+            delay(150);
+          #endif
+        }
+      }
+    }
+  #endif
+
   static void run_z_probe() {
 
     /**
@@ -1803,6 +1834,9 @@ static void setup_for_endstop_move() {
       destination[Z_AXIS] = -20;
       prepare_move_raw(); // this will also set_current_to_destination
       st_synchronize();
+      #if ENABLED(EMERGENCY_STOP)
+        handle_emergency_stop();
+      #endif
       endstops_hit_on_purpose(); // clear endstop hit flags
 
       /**
@@ -1820,6 +1854,9 @@ static void setup_for_endstop_move() {
       sync_plan_position_delta();
 
     #else // !DELTA
+      #if ENABLED(DEBUG_LEVELING_FEATURE)
+        SERIAL_ECHOLN("run_z_probe (DISCO)");
+      #endif
 
       plan_bed_level_matrix.set_to_identity();
       feedrate = homing_feedrate[Z_AXIS];
@@ -1828,6 +1865,9 @@ static void setup_for_endstop_move() {
       float zPosition = -(Z_MAX_LENGTH + 10);
       line_to_z(zPosition);
       st_synchronize();
+      #if ENABLED(EMERGENCY_STOP)
+        handle_emergency_stop();
+      #endif
 
       // Tell the planner where we ended up - Get this from the stepper handler
       zPosition = st_get_axis_position_mm(Z_AXIS);
@@ -1840,6 +1880,9 @@ static void setup_for_endstop_move() {
       zPosition += home_bump_mm(Z_AXIS);
       line_to_z(zPosition);
       st_synchronize();
+      #if ENABLED(EMERGENCY_STOP)
+        handle_emergency_stop();
+      #endif
       endstops_hit_on_purpose(); // clear endstop hit flags
 
       // move back down slowly to find bed
@@ -1848,6 +1891,9 @@ static void setup_for_endstop_move() {
       zPosition -= home_bump_mm(Z_AXIS) * 2;
       line_to_z(zPosition);
       st_synchronize();
+      #if ENABLED(EMERGENCY_STOP)
+        handle_emergency_stop();
+      #endif
       endstops_hit_on_purpose(); // clear endstop hit flags
 
       // Get the current stepper position after bumping an endstop
@@ -3831,6 +3877,9 @@ inline void gcode_G28() {
     #endif
 
     st_synchronize();
+    #if ENABLED(EMERGENCY_STOP)
+      handle_emergency_stop();
+    #endif
 
     setup_for_endstop_move();
 

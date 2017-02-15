@@ -25,3 +25,10 @@ Set SUMMON_PRINT_PAUSE_INVERTING false
 
 # To support a FINAL_RETRACT longer than 400 (200+200)
 Disable PREVENT_LENGTHY_EXTRUDE
+
+# Flag to activate for emergency stop
+Enable EMERGENCY_STOP
+Enable EMERGENCY_STOP_Z_MOVE
+
+# FLag to enable leveling debugging
+#Enable DEBUG_LEVELING_FEATURE

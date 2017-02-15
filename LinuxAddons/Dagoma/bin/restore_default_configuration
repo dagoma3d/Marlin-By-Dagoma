@@ -1,0 +1,8 @@
+#!/bin/bash
+
+MARLIN_DIR=$(realpath $(dirname $0)/../../../Marlin)
+
+git checkout ${MARLIN_DIR}/Configuration.h
+git checkout ${MARLIN_DIR}/Configuration_adv.h
+git checkout ${MARLIN_DIR}/platformio.ini
+git checkout ${MARLIN_DIR}/pins.h
