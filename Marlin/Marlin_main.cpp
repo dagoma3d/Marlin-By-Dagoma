@@ -1791,7 +1791,6 @@ static void setup_for_endstop_move() {
           // Setting the current_position seems useless as the move is stopped by resetting...?
           //current_position[Z_AXIS] += 5;
           feedrate = homing_feedrate[Z_AXIS];
-          if (DEBUGGING(ECHO)) DEBUG_POS("handle_emergency_stop", current_position);
           #if ENABLED(DELTA)
             calculate_delta(current_position);
             plan_buffer_line(delta[X_AXIS], delta[Y_AXIS], delta[Z_AXIS], current_position[E_AXIS], feedrate / 60, active_extruder);
@@ -6918,7 +6917,7 @@ inline void gcode_M503() {
     #if DISABLED(NO_LCD_FOR_FILAMENTCHANGEABLE)
     lcd_reset_alert_level();
     #endif
-    
+
     #if ENABLED(DELTA)
       // Move XYZ to starting position, then E
       calculate_delta(lastpos);
@@ -9570,7 +9569,7 @@ void disable_all_steppers() {
       #endif
 
       change_filament_by_tap_tap = false;
-      
+
       return;
     }
 
