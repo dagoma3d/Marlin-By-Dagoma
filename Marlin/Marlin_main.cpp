@@ -6642,7 +6642,84 @@ inline void gcode_M503() {
 
 #endif // CUSTOM_M_CODE_SET_Z_PROBE_OFFSET
 
+
+
 #if ENABLED(FILAMENTCHANGEENABLE)
+
+  #if ENABLED(DELTA)
+    #define SET_FEEDRATE_FOR_MOVE          feedrate = homing_feedrate[X_AXIS];
+    #define SET_FEEDRATE_FOR_EXTRUDER_MOVE feedrate = max_feedrate[E_AXIS];
+    // The following plan method use feedrate expressed in mm/s
+    #define RUNPLAN calculate_delta(destination); \
+                    plan_buffer_line(delta[X_AXIS], delta[Y_AXIS], delta[Z_AXIS], destination[E_AXIS], feedrate, active_extruder);
+  #else
+    #define SET_FEEDRATE_FOR_MOVE          feedrate = homing_feedrate[X_AXIS] * 60;
+    #define SET_FEEDRATE_FOR_EXTRUDER_MOVE feedrate = max_feedrate[E_AXIS] * 60;
+    // The following plan method use feedrate expressed in mm/min
+    #define RUNPLAN line_to_destination(feedrate);
+  #endif
+
+  #if ENABLED(DELTA_EXTRA) && ENABLED(Z_MIN_MAGIC)
+
+    bool change_filament_by_tap_tap = false;
+
+    inline void manage_tap_tap() {
+      if ( !startup_auto_calibration
+        && !IS_SD_PRINTING
+        && !change_filament_by_tap_tap
+        && z_magic_hit_count > 1
+      ) {
+        change_filament_by_tap_tap = true;
+        enqueue_and_echo_commands_P(PSTR("G28\nM104 S180\nG0 F200 X0 Y0 Z100\nM109 S180\nD600\nM106 S255\nM104 S0\nG28"));
+      }
+    }
+
+    inline bool cant_enter_M600_or_D600();
+
+    inline void gcode_D600() {
+      SERIAL_ECHOLNPGM( "Filament expulsion" );
+
+      if (cant_enter_M600_or_D600()) return;
+
+      // Synchronize all moves
+      st_synchronize();
+
+      float previous_dest = destination[E_AXIS];
+      destination[E_AXIS] += FILAMENTCHANGE_FINALRETRACT;
+
+      SET_FEEDRATE_FOR_EXTRUDER_MOVE;
+      RUNPLAN;
+      st_synchronize();
+      destination[E_AXIS] = previous_dest;
+      current_position[E_AXIS] = destination[E_AXIS];
+      sync_plan_position_e();
+    }
+  #endif
+
+
+  inline bool cant_enter_M600_or_D600() {
+
+    if (degHotend(active_extruder) < extrude_min_temp) {
+      SERIAL_ERROR_START;
+      SERIAL_ERRORLNPGM(MSG_TOO_COLD_FOR_M600);
+
+      #if ENABLED(FILAMENT_RUNOUT_SENSOR)
+        filament_ran_out = false;
+      #endif
+
+      #if ENABLED(SUMMON_PRINT_PAUSE)
+        print_pause_summoned = false;
+      #endif
+
+      #if ENABLED(DELTA_EXTRA) && ENABLED(Z_MIN_MAGIC)
+        change_filament_by_tap_tap = false;
+      #endif
+
+      return true;
+    }
+
+    return false;
+  }
 
   /**
    * M600: Pause for filament change
@@ -6661,20 +6738,9 @@ inline void gcode_M503() {
    */
   inline void gcode_M600() {
 
-    if (degHotend(active_extruder) < extrude_min_temp) {
-      SERIAL_ERROR_START;
-      SERIAL_ERRORLNPGM(MSG_TOO_COLD_FOR_M600);
+    SERIAL_ECHOLNPGM( "Pause for filament change" );
 
-      #if ENABLED(FILAMENT_RUNOUT_SENSOR)
-        filament_ran_out = false;
-      #endif
-
-      #if ENABLED(SUMMON_PRINT_PAUSE)
-        print_pause_summoned = false;
-      #endif
-
-      return;
-    }
+    if (cant_enter_M600_or_D600()) return;
 
     float lastpos[NUM_AXIS];
     float previous_feedrate;
@@ -6683,19 +6749,6 @@ inline void gcode_M503() {
       lastpos[i] = destination[i] = current_position[i];
 
     previous_feedrate = feedrate;
-
-    #if ENABLED(DELTA)
-      #define SET_FEEDRATE_FOR_MOVE          feedrate = homing_feedrate[X_AXIS];
-      #define SET_FEEDRATE_FOR_EXTRUDER_MOVE feedrate = max_feedrate[E_AXIS];
-      // The following plan method use feedrate expressed in mm/s
-      #define RUNPLAN calculate_delta(destination); \
-                      plan_buffer_line(delta[X_AXIS], delta[Y_AXIS], delta[Z_AXIS], destination[E_AXIS], feedrate, active_extruder);
-    #else
-      #define SET_FEEDRATE_FOR_MOVE          feedrate = homing_feedrate[X_AXIS] * 60;
-      #define SET_FEEDRATE_FOR_EXTRUDER_MOVE feedrate = max_feedrate[E_AXIS] * 60;
-      // The following plan method use feedrate expressed in mm/min
-      #define RUNPLAN line_to_destination(feedrate);
-    #endif
 
     //finish moves
     // st_synchronize();
@@ -6853,15 +6906,7 @@ inline void gcode_M503() {
         #if ENABLED(DELTA_EXTRA) && ENABLED(Z_MIN_MAGIC)
           // Must be check quicker than 2.5s
           if ( z_magic_hit_count > 1 ) {
-            float previous_dest = destination[E_AXIS];
-            destination[E_AXIS] += FILAMENTCHANGE_FINALRETRACT;
-
-            SET_FEEDRATE_FOR_EXTRUDER_MOVE;
-            RUNPLAN;
-            st_synchronize();
-            destination[E_AXIS] = previous_dest;
-            current_position[E_AXIS] = destination[E_AXIS];
-            sync_plan_position_e();
+            gcode_D600();
           }
         #endif
 
@@ -9535,47 +9580,6 @@ void disable_all_steppers() {
         if ( !card.cardOK ) set_notify_warning();
       #endif
     }
-  }
-#endif
-
-#if ENABLED(DELTA_EXTRA) && ENABLED(Z_MIN_MAGIC)
-
-  bool change_filament_by_tap_tap = false;
-
-  inline void manage_tap_tap() {
-    if ( !startup_auto_calibration
-      && !IS_SD_PRINTING
-      && !change_filament_by_tap_tap
-      && z_magic_hit_count > 1
-    ) {
-      change_filament_by_tap_tap = true;
-      enqueue_and_echo_commands_P(PSTR("G28\nM104 S180\nG0 F200 X0 Y0 Z100\nM109 S180\nD600\nM106 S255\nM104 S0\nG28"));
-    }
-  }
-
-  inline void gcode_D600() {
-    SERIAL_ECHOLN( "Filament expulsion" );
-
-     if (degHotend(active_extruder) < extrude_min_temp) {
-      SERIAL_ERROR_START;
-      SERIAL_ERRORLNPGM(MSG_TOO_COLD_FOR_M600);
-
-      #if ENABLED(FILAMENT_RUNOUT_SENSOR)
-        filament_ran_out = false;
-      #endif
-
-      #if ENABLED(SUMMON_PRINT_PAUSE)
-        print_pause_summoned = false;
-      #endif
-
-      change_filament_by_tap_tap = false;
-
-      return;
-    }
-
-
-
-    change_filament_by_tap_tap = false;
   }
 #endif
 
