@@ -6721,6 +6721,11 @@ inline void gcode_M503() {
     return false;
   }
 
+  #if ENABLED(ONE_LED)
+    // Pre-declaration
+    inline void set_notify_warning();
+  #endif
+
   /**
    * M600: Pause for filament change
    *
@@ -6866,75 +6871,98 @@ inline void gcode_M503() {
       millis_t next_tick = 0;
     #endif
     KEEPALIVE_STATE(PAUSED_FOR_USER);
-    #if DISABLED(NO_LCD_FOR_FILAMENTCHANGEABLE)
-    while ( ! ( lcd_clicked() || (pin_number != -1 && digitalRead(pin_number) == target) ) ) {
-    #else
-    while (pin_number != -1 && digitalRead(pin_number) != target) {
-    #endif
-      #if DISABLED(AUTO_FILAMENT_CHANGE)
-        millis_t ms = millis();
-        if (ELAPSED(ms, next_tick)) {
-          #if DISABLED(NO_LCD_FOR_FILAMENTCHANGEABLE)
-          lcd_quick_feedback();
-          #endif
-          next_tick = ms + 2500UL; // feedback every 2.5s while waiting
 
-          // Ensure steppers stay enabled
+    #if HAS_FILRUNOUT
+    bool can_exit_pause;
+    do { // Loop while no filament
+      can_exit_pause = true;
+    #endif
+
+      #if DISABLED(NO_LCD_FOR_FILAMENTCHANGEABLE)
+      while ( ! ( lcd_clicked() || (pin_number != -1 && digitalRead(pin_number) == target) ) ) {
+      #else
+      while (pin_number != -1 && digitalRead(pin_number) != target) {
+      #endif
+        #if DISABLED(AUTO_FILAMENT_CHANGE)
+          millis_t ms = millis();
+          if (ELAPSED(ms, next_tick)) {
+            #if DISABLED(NO_LCD_FOR_FILAMENTCHANGEABLE)
+            lcd_quick_feedback();
+            #endif
+            next_tick = ms + 2500UL; // feedback every 2.5s while waiting
+
+            // Ensure steppers stay enabled
+            enable_x();
+            enable_y();
+            enable_z();
+
+
+            #if ENABLED( DELTA_EXTRA )
+              // Only checked every 2.5s
+              // Detected if sd is out
+              if ( !card.stillPluggedIn() ) {
+                // Abort current print
+                while( true ) {
+                  one_led_on();
+                  delay(150);
+                  one_led_off();
+                  delay(150);
+                }
+                //abort_sd_printing();
+                //enqueue_and_echo_commands_P( PSTR("G28") );
+                return;
+              }
+            #endif
+          }
+
+          #if ENABLED(DELTA_EXTRA) && ENABLED(Z_MIN_MAGIC)
+            // Must be check quicker than 2.5s
+            if ( z_magic_hit_count > 1 ) {
+              gcode_D600();
+            }
+          #endif
+
+          idle(true);
+        #else
+          current_position[E_AXIS] += AUTO_FILAMENT_CHANGE_LENGTH;
+          destination[E_AXIS] = current_position[E_AXIS];
+          line_to_destination(AUTO_FILAMENT_CHANGE_FEEDRATE);
+          st_synchronize();
+        #endif
+      } // while(!lcd_clicked)
+
+      #if ENABLED( NO_LCD_FOR_FILAMENTCHANGEABLE ) && ENABLED( FILAMENT_RUNOUT_SENSOR )
+        // Wait a bit more to see if we want to disable filrunout sensor
+        millis_t now = millis();
+        millis_t long_push = now + 1000UL;
+        delay( 200 );
+        while (pin_number != -1 && digitalRead(pin_number) == target && PENDING(now, long_push)) {
           enable_x();
           enable_y();
           enable_z();
+          idle(true);
+          now = millis();
+        }
+        if ( ELAPSED(now,long_push) ) {
+          filrunout_bypassed = true;
+          SERIAL_ECHOLN( "Filament sensor bypassed" );
+        }
+      #endif
 
-
-          #if ENABLED( DELTA_EXTRA )
-            // Only checked every 2.5s
-            // Detected if sd is out
-            if ( !card.stillPluggedIn() ) {
-              // Abort current print
-              while( true ) {
-                one_led_on();
-                delay(150);
-                one_led_off();
-                delay(150);
-              }
-              //abort_sd_printing();
-              //enqueue_and_echo_commands_P( PSTR("G28") );
-              return;
-            }
+    #if HAS_FILRUNOUT
+        if( !(READ(FILRUNOUT_PIN) ^ FIL_RUNOUT_INVERTING) ) {
+          #if ENABLED(SUMMON_PRINT_PAUSE) && ENABLED( NO_LCD_FOR_FILAMENTCHANGEABLE ) && ENABLED( FILAMENT_RUNOUT_SENSOR )
+          if ( !filrunout_bypassed ) {
+          #endif
+            #if ENABLED(ONE_LED)
+              set_notify_warning();
+            #endif
+            can_exit_pause = false;
+          #if ENABLED(SUMMON_PRINT_PAUSE) && ENABLED( NO_LCD_FOR_FILAMENTCHANGEABLE ) && ENABLED( FILAMENT_RUNOUT_SENSOR )
+          }
           #endif
         }
-
-        #if ENABLED(DELTA_EXTRA) && ENABLED(Z_MIN_MAGIC)
-          // Must be check quicker than 2.5s
-          if ( z_magic_hit_count > 1 ) {
-            gcode_D600();
-          }
-        #endif
-
-        idle(true);
-      #else
-        current_position[E_AXIS] += AUTO_FILAMENT_CHANGE_LENGTH;
-        destination[E_AXIS] = current_position[E_AXIS];
-        line_to_destination(AUTO_FILAMENT_CHANGE_FEEDRATE);
-        st_synchronize();
-      #endif
-    } // while(!lcd_clicked)
-
-    #if ENABLED( NO_LCD_FOR_FILAMENTCHANGEABLE ) && ENABLED( FILAMENT_RUNOUT_SENSOR )
-      // Wait a bit more to see if we want to disable filrunout sensor
-      millis_t now = millis();
-      millis_t long_push = now + 1000UL;
-      delay( 200 );
-      while (pin_number != -1 && digitalRead(pin_number) == target && PENDING(now, long_push)) {
-        enable_x();
-        enable_y();
-        enable_z();
-        idle(true);
-        now = millis();
-      }
-      if ( ELAPSED(now,long_push) ) {
-        filrunout_bypassed = true;
-        SERIAL_ECHOLN( "Filament sensor bypassed" );
-      }
+      } while( !can_exit_pause );
     #endif
 
     KEEPALIVE_STATE(IN_HANDLER);
