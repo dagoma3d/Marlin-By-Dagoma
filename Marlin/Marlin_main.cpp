@@ -6646,15 +6646,18 @@ inline void gcode_M503() {
 
 #if ENABLED(FILAMENTCHANGEENABLE)
 
+  // Generaly : 
+  //   homing_feedrate is epxressed in mm/min
+  //   max_feedrate is expressed in mm/s
   #if ENABLED(DELTA)
-    #define SET_FEEDRATE_FOR_MOVE          feedrate = homing_feedrate[X_AXIS];
+    #define SET_FEEDRATE_FOR_MOVE          feedrate = homing_feedrate[X_AXIS] / 60.0;
     #define SET_FEEDRATE_FOR_EXTRUDER_MOVE feedrate = max_feedrate[E_AXIS];
     // The following plan method use feedrate expressed in mm/s
     #define RUNPLAN calculate_delta(destination); \
                     plan_buffer_line(delta[X_AXIS], delta[Y_AXIS], delta[Z_AXIS], destination[E_AXIS], feedrate, active_extruder);
   #else
-    #define SET_FEEDRATE_FOR_MOVE          feedrate = homing_feedrate[X_AXIS] * 60;
-    #define SET_FEEDRATE_FOR_EXTRUDER_MOVE feedrate = max_feedrate[E_AXIS] * 60;
+    #define SET_FEEDRATE_FOR_MOVE          feedrate = homing_feedrate[X_AXIS];
+    #define SET_FEEDRATE_FOR_EXTRUDER_MOVE feedrate = max_feedrate[E_AXIS] * 60.0;
     // The following plan method use feedrate expressed in mm/min
     #define RUNPLAN line_to_destination(feedrate);
   #endif
