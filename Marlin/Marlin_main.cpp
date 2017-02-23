@@ -9614,6 +9614,10 @@ void disable_all_steppers() {
   }
 #endif
 
+#if ENABLED( Z_MIN_MAGIC )
+  millis_t last_debug_z_magic_timing = 0UL;
+#endif
+
 /**
  * Standard idle routine keeps the machine alive
  */
@@ -9672,6 +9676,22 @@ void idle(
 
   #if ENABLED( WIFI_PRINT )
     manage_second_serial_status();
+  #endif
+
+  #if ENABLED( Z_MIN_MAGIC )
+    if (DEBUGGING(LEVELING)) {
+      millis_t now = millis();
+      if (ELAPSED(now, last_debug_z_magic_timing)) {
+        SERIAL_ECHOPGM("Z Magic (pressure / bias / tap): ");
+        SERIAL_ECHO( z_magic_value );
+        SERIAL_ECHOPGM(" / ");
+        SERIAL_ECHO( z_magic_derivative_bias );
+        SERIAL_ECHOPGM(" / ");
+        SERIAL_ECHO( z_magic_hit_count );
+        SERIAL_ECHOLNPGM("");
+        last_debug_z_magic_timing = now + 250UL; // 2times a second
+      }
+    }
   #endif
 }
 
