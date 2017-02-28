@@ -1397,9 +1397,13 @@ static void set_current_temp_raw() {
   volatile int z_magic_last_measures_idx = 0;
   float z_magic_derivative_bias = 0.0;
 
+  #define Z_MAGIC_DERIVATIVE_BIAS_THRESHOLD (7.0)
+  #define Z_MAGIC_MIN_ELASTICITY_RESPONSE_MILLIS 50UL
+  #define Z_MAGIC_MAX_ELASTICITY_RESPONSE_MILLIS 80UL
   #define Z_MAGIC_EDGE_DELAY_MILLIS 150UL
   #define Z_MAGIC_HIT_DELAY_MILLIS 500UL
-  millis_t z_magic_down_timeout = 0UL;
+  millis_t z_magic_elasticity_min_timeout = 0UL;
+  millis_t z_magic_elasticity_max_timeout = 0UL;
   millis_t z_magic_hit_timeout = 0UL;
   millis_t z_magic_tap_timeout = 0UL;
   
@@ -1416,23 +1420,28 @@ inline void update_z_magic( ) {
   millis_t now = millis();
 
   z_magic_derivative_bias = ( z_magic_f - z_magic_last_measures_avg ) / 2.0;
-  if ( z_magic_derivative_bias < -5.0 ) {
-    z_magic_down_timeout = now + Z_MAGIC_EDGE_DELAY_MILLIS;
+
+  if ( ELAPSED(now, z_magic_hit_timeout) ) {
+    if ( z_magic_derivative_bias < -Z_MAGIC_DERIVATIVE_BIAS_THRESHOLD ) {
+      z_magic_hit_timeout = now + Z_MAGIC_EDGE_DELAY_MILLIS;
+      z_magic_elasticity_max_timeout = now + Z_MAGIC_MAX_ELASTICITY_RESPONSE_MILLIS;
+    }
   }
-  else if ( z_magic_derivative_bias > 5.0 ) {
-    if ( PENDING(now, z_magic_down_timeout) ) {
-      if (ELAPSED(now, z_magic_hit_timeout)) {
-        z_magic_hit_timeout = now + Z_MAGIC_EDGE_DELAY_MILLIS;
+
+  if ( PENDING(now, z_magic_elasticity_max_timeout) ) {
+    if ( ELAPSED(now, z_magic_elasticity_min_timeout) ) {
+      if ( z_magic_derivative_bias > Z_MAGIC_DERIVATIVE_BIAS_THRESHOLD ) {
+        z_magic_elasticity_min_timeout = now + Z_MAGIC_EDGE_DELAY_MILLIS;
         z_magic_tap_timeout = now + Z_MAGIC_HIT_DELAY_MILLIS;
         z_magic_hit_count += 1;
       }
     }
   }
-  else {
-    if (ELAPSED(now, z_magic_tap_timeout)) {
-      z_magic_hit_count = 0;
-    }
+
+  if (ELAPSED(now, z_magic_tap_timeout)) {
+    z_magic_hit_count = 0;
   }
+  
 
   // Update last_measures avg
   z_magic_last_measures[ z_magic_last_measures_idx ] = z_magic_f;
