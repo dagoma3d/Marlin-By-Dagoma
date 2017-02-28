@@ -512,6 +512,15 @@ inline void update_endstops() {
             }
 
             if (TEST_ENDSTOP(Z_MIN_PROBE)) SBI(endstop_hit_bits, Z_MIN_PROBE);
+
+            // FIXME: Quick fix to exit earlier
+            //        If emergency stop is triggered
+            // TODO:  See if this code can be avoided with below Z_MIN_MAGIC possible override
+            //        of emergency occurrences
+            if (trigger_emergency_stop) {
+              old_endstop_bits = current_endstop_bits;
+              return;
+            }
           #endif
         #endif
 

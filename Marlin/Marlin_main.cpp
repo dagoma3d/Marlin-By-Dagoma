@@ -6696,6 +6696,8 @@ inline void gcode_M503() {
       destination[E_AXIS] = previous_dest;
       current_position[E_AXIS] = destination[E_AXIS];
       sync_plan_position_e();
+
+      change_filament_by_tap_tap = false;
     }
   #endif
 
@@ -9682,7 +9684,9 @@ void idle(
     if (DEBUGGING(LEVELING)) {
       millis_t now = millis();
       if (ELAPSED(now, last_debug_z_magic_timing)) {
-        SERIAL_ECHOPGM("Z Magic (pressure / bias / tap): ");
+        SERIAL_ECHOPGM("Z Magic (tstp / pressure / bias / tap): ");
+        SERIAL_ECHO( millis() );
+        SERIAL_ECHOPGM(" / ");
         SERIAL_ECHO( z_magic_value );
         SERIAL_ECHOPGM(" / ");
         SERIAL_ECHO( z_magic_derivative_bias );
