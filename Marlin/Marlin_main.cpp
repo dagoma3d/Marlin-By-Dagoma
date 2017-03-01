@@ -1800,12 +1800,12 @@ static void setup_for_endstop_move() {
         #endif
         // - Reset the board
         while( true ) {
-          #if ENABLED(DELTA)
+          #if ENABLED(ONE_LED)
             one_led_on();
             delay(150);
             one_led_off();
-            delay(150);
           #endif
+          delay(150);
         }
       }
     }
@@ -6908,9 +6908,11 @@ inline void gcode_M503() {
               if ( !card.stillPluggedIn() ) {
                 // Abort current print
                 while( true ) {
-                  one_led_on();
-                  delay(150);
-                  one_led_off();
+                  #if ENABLED(ONE_LED)
+                    one_led_on();
+                    delay(150);
+                    one_led_off();
+                  #endif
                   delay(150);
                 }
                 //abort_sd_printing();
@@ -8793,7 +8795,7 @@ void clamp_to_software_endstops(float target[3]) {
 
     #if ENABLED( DELTA_EXTRA )
       #if ENABLED(TRI_SHAPE_PROBING)
-    #error
+        #error TRI_SHAPE_PROBING deprecated
         probe_point_XY_x = (delta_tower1_x + delta_tower2_x ) / 2.0;
         probe_point_XY_y = (delta_tower1_y + delta_tower2_y ) / 2.0;
 

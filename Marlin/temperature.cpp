@@ -1397,7 +1397,7 @@ static void set_current_temp_raw() {
   volatile int z_magic_last_measures_idx = 0;
   float z_magic_derivative_bias = 0.0;
 
-  #define Z_MAGIC_DERIVATIVE_BIAS_THRESHOLD (7.0)
+  #define Z_MAGIC_DERIVATIVE_BIAS_THRESHOLD (8.0)
   #define Z_MAGIC_MIN_ELASTICITY_RESPONSE_MILLIS 50UL
   #define Z_MAGIC_MAX_ELASTICITY_RESPONSE_MILLIS 80UL
   #define Z_MAGIC_EDGE_DELAY_MILLIS 150UL
