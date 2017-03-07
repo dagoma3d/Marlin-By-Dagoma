@@ -374,7 +374,8 @@
   //#define DELTA_DIAGONAL_ROD 212.57
   //#define DELTA_DIAGONAL_ROD 212.6
   //#define DELTA_DIAGONAL_ROD 209 // Ju
-  #define DELTA_DIAGONAL_ROD 207.9 // Ju - 28-02-2017 - POM Rod
+  //#define DELTA_DIAGONAL_ROD 207.9 // Ju - 28-02-2017 - POM Rod
+  #define DELTA_DIAGONAL_ROD 206.75 // Ju - 07-03-2017 - POM Rod received on 03/03/2017
 
   // Horizontal offset from middle of printer to smooth rod center.
   //#define DELTA_SMOOTH_ROD_OFFSET 147.10 //147.10 // mm

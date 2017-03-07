@@ -6672,8 +6672,9 @@ inline void gcode_M503() {
         && !change_filament_by_tap_tap
         && z_magic_hit_count > 1
       ) {
+        SERIAL_ECHOLNPGM("Tap tap : Heating and changing filament from IDLE state");
         change_filament_by_tap_tap = true;
-        enqueue_and_echo_commands_P(PSTR("G28\nM104 S180\nG0 F200 X0 Y0 Z100\nM109 S180\nD600\nM106 S255\nM104 S0\nG28"));
+        enqueue_and_echo_commands_P(PSTR("G28\nM104 S180\nG0 F150 X0 Y0 Z100\nM109 S180\nD600\nM106 S255\nM104 S0\nG28"));
       }
     }
 
@@ -7796,8 +7797,8 @@ inline void gcode_D851() {
 
 #elif defined THAT_FULL_AND_R2
 
-  //feedrate = homing_feedrate[ Z_AXIS ];
-  feedrate = max_feedrate[ Z_AXIS ] * 60;
+  feedrate = homing_feedrate[ Z_AXIS ];
+  //feedrate = max_feedrate[ Z_AXIS ] * 60;
 
   float tower1_altitude, tower2_altitude, tower3_altitude, center_altitude;
 
@@ -7824,6 +7825,45 @@ inline void gcode_D851() {
   prepare_move();
   st_synchronize();
   tower3_altitude = get_probed_Z_avg();
+
+  // Use last result as endstops adujst
+  endstop_adj[0] = tower1_altitude /*+ zprobe_zoffset*/;
+  endstop_adj[1] = tower2_altitude /*+ zprobe_zoffset*/;
+  endstop_adj[2] = tower3_altitude /*+ zprobe_zoffset*/;
+
+  // Store endstop adjust
+  gcode_M500();
+
+  // JUST FOR REPORTING BACK
+  // Take in account now
+  gcode_G28();
+
+  feedrate = homing_feedrate[ Z_AXIS ];
+
+  // TOWER 1
+  destination[X_AXIS] = delta_tower1_x;
+  destination[Y_AXIS] = delta_tower1_y;
+  destination[Z_AXIS] = 10.0f;
+  prepare_move();
+  st_synchronize();
+  tower1_altitude = get_probed_Z_avg();
+
+  // TOWER 2
+  destination[X_AXIS] = delta_tower2_x;
+  destination[Y_AXIS] = delta_tower2_y;
+  destination[Z_AXIS] = 10.0f;
+  prepare_move();
+  st_synchronize();
+  tower2_altitude = get_probed_Z_avg();
+
+  // TOWER 3
+  destination[X_AXIS] = delta_tower3_x;
+  destination[Y_AXIS] = delta_tower3_y;
+  destination[Z_AXIS] = 10.0f;
+  prepare_move();
+  st_synchronize();
+  tower3_altitude = get_probed_Z_avg();
+
 
   // CENTER
   destination[X_AXIS] = 0.0f;
@@ -7903,12 +7943,7 @@ inline void gcode_D851() {
     SERIAL_ECHOLN( diff_center_altitude );
   } while( abs( diff_center_altitude ) > 0.05 );
 
-  // Use last result as endstops adujst
-  endstop_adj[0] = tower1_altitude /*+ zprobe_zoffset*/;
-  endstop_adj[1] = tower2_altitude /*+ zprobe_zoffset*/;
-  endstop_adj[2] = tower3_altitude /*+ zprobe_zoffset*/;
-
-  // Store endstop adjust
+  // Store delta_radius
   gcode_M500();
 
   // JUST FOR REPORTING BACK
@@ -7960,7 +7995,73 @@ inline void gcode_D851() {
   mean_ref_plan_altitude = ( tower1_altitude + tower2_altitude + tower3_altitude ) / 3.0;
   diff_center_altitude = center_altitude - mean_ref_plan_altitude;
 
-  SERIAL_ECHO( "FOR VERIF ONLY Mean based difference: " );
+  SERIAL_ECHOPGM( "FOR VERIF ONLY Mean based difference: " );
+  SERIAL_ECHOLN( diff_center_altitude );
+
+
+
+  // Use last result as endstops adujst
+  endstop_adj[0] += tower1_altitude /*+ zprobe_zoffset*/;
+  endstop_adj[1] += tower2_altitude /*+ zprobe_zoffset*/;
+  endstop_adj[2] += tower3_altitude /*+ zprobe_zoffset*/;
+
+  // Store endstop adjust
+  gcode_M500();
+
+  // JUST FOR REPORTING BACK
+  // Take in account now
+  gcode_G28();
+
+
+
+
+
+  // TOWER 1
+  destination[X_AXIS] = delta_tower1_x;
+  destination[Y_AXIS] = delta_tower1_y;
+  destination[Z_AXIS] = 10.0f;
+  prepare_move();
+  st_synchronize();
+  tower1_altitude = get_probed_Z_avg();
+
+  // TOWER 2
+  destination[X_AXIS] = delta_tower2_x;
+  destination[Y_AXIS] = delta_tower2_y;
+  destination[Z_AXIS] = 10.0f;
+  prepare_move();
+  st_synchronize();
+  tower2_altitude = get_probed_Z_avg();
+
+  // TOWER 3
+  destination[X_AXIS] = delta_tower3_x;
+  destination[Y_AXIS] = delta_tower3_y;
+  destination[Z_AXIS] = 10.0f;
+  prepare_move();
+  st_synchronize();
+  tower3_altitude = get_probed_Z_avg();
+
+  // CENTER
+  destination[X_AXIS] = 0.0f;
+  destination[Y_AXIS] = 0.0f;
+  destination[Z_AXIS] = 10.0f;
+  prepare_move();
+  st_synchronize();
+  center_altitude = get_probed_Z_avg();
+
+  SERIAL_ECHOLN( "R probed points:" );
+  SERIAL_ECHO  ( "  T1: " );
+  SERIAL_ECHOLN( tower1_altitude );
+  SERIAL_ECHO  ( "  T2: " );
+  SERIAL_ECHOLN( tower2_altitude );
+  SERIAL_ECHO  ( "  T3: " );
+  SERIAL_ECHOLN( tower3_altitude );
+  SERIAL_ECHO  ( "   C: " );
+  SERIAL_ECHOLN( center_altitude );
+
+  mean_ref_plan_altitude = ( tower1_altitude + tower2_altitude + tower3_altitude ) / 3.0;
+  diff_center_altitude = center_altitude - mean_ref_plan_altitude;
+
+  SERIAL_ECHOPGM( "FOR VERIF ONLY (last) Mean based difference: " );
   SERIAL_ECHOLN( diff_center_altitude );
 
 #elif defined THAT_FULL_AND_R
