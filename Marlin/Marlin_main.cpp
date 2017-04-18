@@ -476,6 +476,8 @@ static uint8_t target_extruder;
 
 #if ENABLED(FILAMENT_RUNOUT_SENSOR)
   static bool filament_ran_out = false;
+  const millis_t FRS_DEBOUNCE_DELAY = 250UL; // filament runout sensor delay
+  static millis_t frs_debounce_time = 0UL; // filament runout sensor debouncing count
 #endif
 #if ENABLED(SUMMON_PRINT_PAUSE)
   static bool print_pause_summoned = false;
@@ -6646,8 +6648,8 @@ inline void gcode_M503() {
 
 #if ENABLED(FILAMENTCHANGEENABLE)
 
-  // Generaly : 
-  //   homing_feedrate is epxressed in mm/min
+  // Generally :
+  //   homing_feedrate is expressed in mm/min
   //   max_feedrate is expressed in mm/s
   #if ENABLED(DELTA)
     #define SET_FEEDRATE_FOR_MOVE          feedrate = homing_feedrate[X_AXIS] / 60.0;
@@ -8067,7 +8069,7 @@ inline void gcode_D851() {
 #elif defined THAT_FULL_AND_R
 
   feedrate = homing_feedrate[ Z_AXIS ];
-  
+
   float tower1_altitude, tower2_altitude, tower3_altitude, center_altitude;
 
   // TOWER 1
@@ -10165,6 +10167,7 @@ void idle(
  *  - Check if an idle but hot extruder needs filament extruded (EXTRUDER_RUNOUT_PREVENT)
  */
 void manage_inactivity(bool ignore_stepper_queue/*=false*/) {
+  millis_t ms = millis();
 
   #if HAS_FILRUNOUT
     if (
@@ -10178,14 +10181,20 @@ void manage_inactivity(bool ignore_stepper_queue/*=false*/) {
       && axis_homed[Y_AXIS]
       && axis_homed[Z_AXIS]
       ) {
-      SERIAL_ECHOLNPGM("Pause : No more filament detected");
-      handle_filament_runout();
+      if(ELAPSED(ms, frs_debounce_time)) {
+        if (frs_debounce_time == 0UL) {
+          frs_debounce_time = ms + FRS_DEBOUNCE_DELAY;
+        } else {
+          SERIAL_ECHOLNPGM("Pause : No more filament detected");
+          handle_filament_runout();
+        }
+      }
+    } else {
+      frs_debounce_time = 0UL;
     }
   #endif
 
   if (commands_in_queue < BUFSIZE) get_available_commands();
-
-  millis_t ms = millis();
 
   if (max_inactive_time && ELAPSED(ms, previous_cmd_ms + max_inactive_time)) kill(PSTR(MSG_KILLED));
 
@@ -10430,7 +10439,6 @@ void kill(const char* lcd_msg) {
 }
 
 #if ENABLED(FILAMENT_RUNOUT_SENSOR)
-
   void handle_filament_runout() {
     if (!filament_ran_out) {
       filament_ran_out = true;
