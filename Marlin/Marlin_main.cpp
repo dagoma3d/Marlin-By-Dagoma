@@ -4364,12 +4364,14 @@ inline void gcode_G92() {
     if (codenum > 0) {
       codenum += previous_cmd_ms;  // wait until this time for a click
       KEEPALIVE_STATE(PAUSED_FOR_USER);
+      SERIAL_ECHOLN( "SUCTION WAIT 1" );
       while (PENDING(millis(), codenum) && !lcd_clicked()) idle();
       KEEPALIVE_STATE(IN_HANDLER);
       lcd_ignore_click(false);
     }
     else {
       if (!lcd_detected()) return;
+      SERIAL_ECHOLN( "SUCTION WAIT 2" );
       KEEPALIVE_STATE(PAUSED_FOR_USER);
       while (!lcd_clicked()) idle();
       KEEPALIVE_STATE(IN_HANDLER);
@@ -6664,9 +6666,43 @@ inline void gcode_M503() {
     #define RUNPLAN line_to_destination(feedrate);
   #endif
 
+  bool filament_present = true;
   #if ENABLED(DELTA_EXTRA) && ENABLED(Z_MIN_MAGIC)
 
     bool change_filament_by_tap_tap = false;
+
+    inline bool cant_enter_M600_or_D600();
+
+    inline void gcode_D601(){
+      SERIAL_ECHOLN( "LAUNCH SUCTION!!" );
+
+      //if (cant_enter_M600_or_D600()) return;
+      // Synchronize all moves
+      st_synchronize();
+
+      float previous_dest = destination[E_AXIS];
+      destination[E_AXIS] -= FILAMENTCHANGE_FINALRETRACT;
+
+      SET_FEEDRATE_FOR_EXTRUDER_MOVE;
+      RUNPLAN;
+      st_synchronize();
+      destination[E_AXIS] = previous_dest;
+      current_position[E_AXIS] = destination[E_AXIS];
+      sync_plan_position_e();
+    }
+
+    inline void manage_suction(){
+      if((READ(FILRUNOUT_PIN) ^ FIL_RUNOUT_INVERTING)){
+        if(!filament_present){
+          SERIAL_ECHOLN( "Filament not inserted but pin filrunout pressed" );
+          gcode_D601();
+          //enqueue_and_echo_commands_P(PSTR("D601"));
+        }
+        filament_present = true;
+      }else{
+        filament_present = false;
+      }
+    }
 
     inline void manage_tap_tap() {
       if ( !startup_auto_calibration
@@ -6679,8 +6715,6 @@ inline void gcode_M503() {
         enqueue_and_echo_commands_P(PSTR("G28\nM104 S180\nG0 F150 X0 Y0 Z100\nM109 S180\nD600\nM106 S255\nM104 S0\nG28"));
       }
     }
-
-    inline bool cant_enter_M600_or_D600();
 
     inline void gcode_D600() {
       SERIAL_ECHOLNPGM( "Filament expulsion" );
@@ -6879,8 +6913,8 @@ inline void gcode_M503() {
       millis_t next_tick = 0;
     #endif
     KEEPALIVE_STATE(PAUSED_FOR_USER);
-
     #if HAS_FILRUNOUT
+  
     bool can_exit_pause;
     do { // Loop while no filament
       can_exit_pause = true;
@@ -6931,6 +6965,10 @@ inline void gcode_M503() {
               gcode_D600();
             }
           #endif
+            if( !filament_present ){
+              gcode_D601();
+              filament_present = true
+            }
 
           idle(true);
         #else
@@ -6972,6 +7010,7 @@ inline void gcode_M503() {
           }
           #endif
         }
+
       } while( !can_exit_pause );
     #endif
 
@@ -9152,6 +9191,9 @@ void process_next_command() {
             gcode_D600();
             break;
         #endif
+        case 601:
+          gcode_D601();
+          break;
         case 851:
           gcode_D851();
           break;
@@ -10074,7 +10116,6 @@ void disable_all_steppers() {
 #if ENABLED( Z_MIN_MAGIC )
   millis_t last_debug_z_magic_timing = 0UL;
 #endif
-
 /**
  * Standard idle routine keeps the machine alive
  */
@@ -10109,6 +10150,9 @@ void idle(
       no_stepper_sleep
     #endif
   );
+  #if ENABLED(FILAMENTCHANGEENABLE)
+  manage_suction();
+  #endif
   host_keepalive();
   #if ENABLED(U8GLIB_SSD1306) && ENABLED(INTELLIGENT_LCD_REFRESH_RATE)
     if (IS_SD_PRINTING && axis_homed[X_AXIS] && axis_homed[Y_AXIS] && axis_homed[Z_AXIS]) {
