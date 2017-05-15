@@ -4364,14 +4364,12 @@ inline void gcode_G92() {
     if (codenum > 0) {
       codenum += previous_cmd_ms;  // wait until this time for a click
       KEEPALIVE_STATE(PAUSED_FOR_USER);
-      SERIAL_ECHOLN( "SUCTION WAIT 1" );
       while (PENDING(millis(), codenum) && !lcd_clicked()) idle();
       KEEPALIVE_STATE(IN_HANDLER);
       lcd_ignore_click(false);
     }
     else {
       if (!lcd_detected()) return;
-      SERIAL_ECHOLN( "SUCTION WAIT 2" );
       KEEPALIVE_STATE(PAUSED_FOR_USER);
       while (!lcd_clicked()) idle();
       KEEPALIVE_STATE(IN_HANDLER);
@@ -6667,6 +6665,7 @@ inline void gcode_M503() {
   #endif
 
   bool filament_present = true;
+  bool suctioning_filament = false;
   #if ENABLED(DELTA_EXTRA) && ENABLED(Z_MIN_MAGIC)
 
     bool change_filament_by_tap_tap = false;
@@ -6681,26 +6680,39 @@ inline void gcode_M503() {
       st_synchronize();
 
       float previous_dest = destination[E_AXIS];
-      destination[E_AXIS] -= FILAMENTCHANGE_FINALRETRACT;
+      if (code_seen('L') && code_value() != 0){
+        destination[E_AXIS] += code_value();
+      }
+      else destination[E_AXIS] -= FILAMENTCHANGE_FINALRETRACT;
+      //destination[E_AXIS] -= FILAMENTCHANGE_FINALRETRACT;
 
-      SET_FEEDRATE_FOR_EXTRUDER_MOVE;
+      //SET_FEEDRATE_FOR_EXTRUDER_MOVE;
+      feedrate = 3000;
       RUNPLAN;
       st_synchronize();
       destination[E_AXIS] = previous_dest;
       current_position[E_AXIS] = destination[E_AXIS];
       sync_plan_position_e();
+      filament_present = true;
+      suctioning_filament = false;
     }
 
     inline void manage_suction(){
-      if((READ(FILRUNOUT_PIN) ^ FIL_RUNOUT_INVERTING)){
-        if(!filament_present){
-          SERIAL_ECHOLN( "Filament not inserted but pin filrunout pressed" );
-          gcode_D601();
-          //enqueue_and_echo_commands_P(PSTR("D601"));
-        }
-        filament_present = true;
-      }else{
+      if(!(READ(FILRUNOUT_PIN) ^ FIL_RUNOUT_INVERTING)){
         filament_present = false;
+      }
+      else{
+        if(busy_state == NOT_BUSY 
+          && !filament_present 
+          && !IS_SD_PRINTING 
+          && !change_filament_by_tap_tap
+          && !suctioning_filament
+        ){
+          SERIAL_ECHOLNPGM("Filament : Heating and inserting filament from IDLE state");
+          suctioning_filament = true;
+          enqueue_and_echo_commands_P(PSTR("M302 P1\nG92 E0\nG0 F10200 E1100\nG28\nM104 S220\nM302 P0\nG0 F150 X0 Y0 Z100\nM109 S220\nD601 L200\nM106 S255\nM104 S0\nG28"));
+          //enqueue_and_echo_commands_P(PSTR("G28\nM104 S220\nG0 F150 X0 Y0 Z100\nM109 S220\nD601\nM106 S255\nM104 S0\nG28"));
+        }
       }
     }
 
@@ -6709,6 +6721,7 @@ inline void gcode_M503() {
         && !IS_SD_PRINTING
         && !change_filament_by_tap_tap
         && z_magic_hit_count > 1
+        && !suctioning_filament
       ) {
         SERIAL_ECHOLNPGM("Tap tap : Heating and changing filament from IDLE state");
         change_filament_by_tap_tap = true;
@@ -6965,9 +6978,8 @@ inline void gcode_M503() {
               gcode_D600();
             }
           #endif
-            if( !filament_present ){
+            if( (READ(FILRUNOUT_PIN) ^ FIL_RUNOUT_INVERTING) && !filament_present ){
               gcode_D601();
-              filament_present = true
             }
 
           idle(true);
