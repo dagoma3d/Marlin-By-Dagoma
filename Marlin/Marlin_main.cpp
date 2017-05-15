@@ -1050,7 +1050,7 @@ void loop() {
 
   if (commands_in_queue < BUFSIZE) get_available_commands();
 
-  #if ENABLED(SDSUPPORT)
+  #if ENABLED(SDSUPPORT) && DISABLED(ONE_BUTTON)
     card.checkautostart(false);
   #endif
 
