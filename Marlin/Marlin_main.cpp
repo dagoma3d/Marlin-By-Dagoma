@@ -6672,19 +6672,33 @@ inline void gcode_M503() {
 
     inline bool cant_enter_M600_or_D600();
 
-    inline void gcode_D601(bool called_directly = false){
+    inline void gcode_D601(bool called_directly = false, int phase = 0){
       SERIAL_ECHOLN( "LAUNCH SUCTION!!" );
 
       //if (cant_enter_M600_or_D600()) return;
       // Synchronize all moves
       st_synchronize();
-
       float previous_dest = destination[E_AXIS];
-      if (!called_directly && code_seen('L')){
-        destination[E_AXIS] += code_value();
+      if (!called_directly && code_seen('P')){
+        phase = code_value();
       }
-      else destination[E_AXIS] -= FILAMENTCHANGE_FINALRETRACT;
-      //destination[E_AXIS] -= FILAMENTCHANGE_FINALRETRACT;
+      switch (phase){
+        // HOT END IS HOT
+        case 0:
+          destination[E_AXIS] -= FILAMENTCHANGE_FINALRETRACT;
+          break;
+        //HOT END IS COLD HERE
+        case 1:
+          extrude_min_temp = 0;
+          destination[E_AXIS] -= (FILAMENTCHANGE_FINALRETRACT+ FILAMENT_SUCTION_GAP);
+          break;
+        // HOT END IS HOT
+        case 2:
+          destination[E_AXIS] += FILAMENT_SUCTION_GAP;
+          break;
+        default:
+          destination[E_AXIS] -= FILAMENTCHANGE_FINALRETRACT;
+      }
 
       //SET_FEEDRATE_FOR_EXTRUDER_MOVE;
       feedrate = 3000;
@@ -6695,6 +6709,9 @@ inline void gcode_M503() {
       sync_plan_position_e();
       filament_present = true;
       suctioning_filament = false;
+      if(phase == 1){
+        extrude_min_temp = EXTRUDE_MINTEMP;
+      }
     }
 
     inline void manage_suction(){
@@ -6710,7 +6727,8 @@ inline void gcode_M503() {
         ){
           SERIAL_ECHOLNPGM("Filament : Heating and inserting filament from IDLE state");
           suctioning_filament = true;
-          enqueue_and_echo_commands_P(PSTR("M302 P1\nG92 E0\nG0 F10200 E1100\nG28\nM104 S220\nM302 P0\nG0 F150 X0 Y0 Z100\nM109 S220\nD601 L200\nM106 S255\nM104 S0\nG28"));
+          enqueue_and_echo_commands_P(PSTR("D601 P1\nG28\nM104 S220\nG0 F150 X0 Y0 Z100\nM109 S220\nD601 P2\nM106 S255\nM104 S0\nG28"));
+          //enqueue_and_echo_commands_P(PSTR("M302 P1\nG92 E0\nG0 F10200 E1100\nG28\nM104 S220\nM302 P0\nG0 F150 X0 Y0 Z100\nM109 S220\nD601 L200\nM106 S255\nM104 S0\nG28"));
           //enqueue_and_echo_commands_P(PSTR("G28\nM104 S220\nG0 F150 X0 Y0 Z100\nM109 S220\nD601\nM106 S255\nM104 S0\nG28"));
         }
       }
@@ -6827,7 +6845,9 @@ inline void gcode_M503() {
     #ifdef FILAMENTCHANGE_ZADD
       else destination[Z_AXIS] += FILAMENTCHANGE_ZADD;
     #endif
-
+    if(destination[Z_AXIS] > (Z_MAX_POS-25)){
+      destination[Z_AXIS] = (Z_MAX_POS-25);
+    }
     SET_FEEDRATE_FOR_MOVE;
     RUNPLAN;
 
@@ -7004,6 +7024,8 @@ inline void gcode_M503() {
               #if ENABLED(HEATING_STOP)
               if(heating_stopped){
                 target_temperature[target_extruder] = previous_target_temperature;
+                //aspiration du filament début
+                gcode_D601(true, 1);
                 while(current_temperature[target_extruder] < target_temperature[target_extruder]) {
                   enable_x();
                   enable_y();
@@ -7011,10 +7033,13 @@ inline void gcode_M503() {
                   one_led_on();
                   idle(true);
                 }
+                gcode_D601(true, 2);
               }
-              #endif
+              else{
+              #endif 
               gcode_D601(true);
-              #if ENABLED(HEATING_STOP)
+              #if ENABLED(HEATING_STOP) 
+              }
               heating_stopped = false;
               pause_ms = millis();
               #endif
