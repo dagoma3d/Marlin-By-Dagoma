@@ -6672,7 +6672,7 @@ inline void gcode_M503() {
 
     inline bool cant_enter_M600_or_D600();
 
-    inline void gcode_D601(){
+    inline void gcode_D601(bool called_directly = false){
       SERIAL_ECHOLN( "LAUNCH SUCTION!!" );
 
       //if (cant_enter_M600_or_D600()) return;
@@ -6680,7 +6680,7 @@ inline void gcode_M503() {
       st_synchronize();
 
       float previous_dest = destination[E_AXIS];
-      if (code_seen('L') && code_value() != 0){
+      if (!called_directly && code_seen('L')){
         destination[E_AXIS] += code_value();
       }
       else destination[E_AXIS] -= FILAMENTCHANGE_FINALRETRACT;
@@ -6929,6 +6929,9 @@ inline void gcode_M503() {
     #if HAS_FILRUNOUT
   
     bool can_exit_pause;
+    millis_t pause_ms = millis();
+    uint8_t previous_target_temperature;
+    bool heating_stopped = false;
     do { // Loop while no filament
       can_exit_pause = true;
     #endif
@@ -6975,12 +6978,58 @@ inline void gcode_M503() {
           #if ENABLED(DELTA_EXTRA) && ENABLED(Z_MIN_MAGIC)
             // Must be check quicker than 2.5s
             if ( z_magic_hit_count > 1 ) {
+              //Chauffer si la temperature est froide;
+              #if ENABLED(HEATING_STOP)
+              if(heating_stopped){
+                target_temperature[target_extruder] = previous_target_temperature;
+                while(current_temperature[target_extruder] < target_temperature[target_extruder]) {
+                  enable_x();
+                  enable_y();
+                  enable_z();
+                  one_led_on();
+                  idle(true);
+                }
+              }
+              #endif
+              //Manage heating stop
               gcode_D600();
+              #if ENABLED(HEATING_STOP)
+              heating_stopped = false;
+              pause_ms = millis();
+              #endif
             }
           #endif
             if( (READ(FILRUNOUT_PIN) ^ FIL_RUNOUT_INVERTING) && !filament_present ){
-              gcode_D601();
+              //Chauffer si la temperature est froide;
+              #if ENABLED(HEATING_STOP)
+              if(heating_stopped){
+                target_temperature[target_extruder] = previous_target_temperature;
+                while(current_temperature[target_extruder] < target_temperature[target_extruder]) {
+                  enable_x();
+                  enable_y();
+                  enable_z();
+                  one_led_on();
+                  idle(true);
+                }
+              }
+              #endif
+              gcode_D601(true);
+              #if ENABLED(HEATING_STOP)
+              heating_stopped = false;
+              pause_ms = millis();
+              #endif
             }
+            #if ENABLED(HEATING_STOP)
+            if(ELAPSED(ms,pause_ms + HEATING_STOP_TIME) && !heating_stopped){
+              SERIAL_ECHOLNPGM("Heating Stopped");
+              heating_stopped = true;
+              previous_target_temperature = target_temperature[target_extruder];
+              target_temperature[target_extruder] = 0;
+              #if ENABLED(THERMAL_PROTECTION_HOTENDS)
+                start_watching_heater(target_extruder);
+              #endif
+            }
+            #endif
 
           idle(true);
         #else
@@ -6990,7 +7039,17 @@ inline void gcode_M503() {
           st_synchronize();
         #endif
       } // while(!lcd_clicked)
-
+      if(heating_stopped){
+        heating_stopped = false;
+        target_temperature[target_extruder] = previous_target_temperature;
+        while(current_temperature[target_extruder] < target_temperature[target_extruder]) {
+          enable_x();
+          enable_y();
+          enable_z();
+          one_led_on();
+          idle(true);
+        }
+      }
       #if ENABLED( NO_LCD_FOR_FILAMENTCHANGEABLE ) && ENABLED( FILAMENT_RUNOUT_SENSOR )
         // Wait a bit more to see if we want to disable filrunout sensor
         millis_t now = millis();
