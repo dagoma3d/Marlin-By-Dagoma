@@ -1813,7 +1813,7 @@ static void setup_for_endstop_move() {
     }
   #endif
 
-  static void run_z_probe() {
+  static void run_z_probe(bool fast=false) {
 
     /**
      * To prevent stepper_inactive_time from running out and
@@ -1831,7 +1831,12 @@ static void setup_for_endstop_move() {
       #endif
 
       // move down slowly until you find the bed
-      feedrate = homing_feedrate[Z_AXIS] / 4;
+      if (fast) {
+        feedrate = homing_feedrate[Z_AXIS] / 2;
+      }
+      else {
+        feedrate = homing_feedrate[Z_AXIS] / 4;
+      }
       destination[Z_AXIS] = -20;
       prepare_move_raw(); // this will also set_current_to_destination
       st_synchronize();
@@ -3370,6 +3375,7 @@ inline void gcode_G28() {
   #if ENABLED( DELTA_EXTRA )
 
     #if ENABLED( TRI_SHAPE_PROBING )
+      #error TRI_SHAPE_PROBING is deprecated
       float probe_point_XY_x = (delta_tower1_x + delta_tower2_x ) / 2.0;
       float probe_point_XY_y = (delta_tower1_y + delta_tower2_y ) / 2.0;
 
@@ -3392,22 +3398,29 @@ inline void gcode_G28() {
     // Predefine used functions
     inline void gcode_M500();
     inline void gcode_M665();
-    inline void gcode_G30();
+    inline void gcode_G30(bool fast=false);
 
-    inline float get_probed_Z_avg() {
+    #define Z_AVG_TOLERANCE 0.02
+
+    inline float get_probed_Z_avg(bool fast=false) {
 
       bool all_points_are_good = false;
       float z_read[3] = { 50.0 };
       float z_avg = 0.0;
 
       do {
-        gcode_G30();
+        gcode_G30(fast);
 
         z_read[2] = z_read[1];
         z_read[1] = z_read[0];
         z_read[0] = current_position[Z_AXIS];
 
-        z_avg = ( z_read[0] + z_read[1] + z_read[2] ) / 3.0;
+        if (fast) {
+          z_avg = ( z_read[0] + z_read[1] ) / 2.0;
+        }
+        else {
+          z_avg = ( z_read[0] + z_read[1] + z_read[2] ) / 3.0;
+        }
 
         set_destination_to_current();
         destination[ Z_AXIS ] = min( 50.0, destination[ Z_AXIS ] + 5.0 );
@@ -3421,9 +3434,9 @@ inline void gcode_G28() {
         else {
           // Check for all points
           all_points_are_good =
-            abs(z_read[0] - z_avg) < 0.05 &&
-            abs(z_read[1] - z_avg) < 0.05 &&
-            abs(z_read[2] - z_avg) < 0.05;
+            abs(z_read[0] - z_avg) < Z_AVG_TOLERANCE &&
+            abs(z_read[1] - z_avg) < Z_AVG_TOLERANCE &&
+            ( fast || abs(z_read[2] - z_avg) < Z_AVG_TOLERANCE );
         }
 
       } while( !all_points_are_good );
@@ -3609,49 +3622,49 @@ inline void gcode_G28() {
       destination[ Z_AXIS ] = 10.0;
       prepare_move();
       st_synchronize();
-      probed_tri_altitude[0] = get_probed_Z_avg();
+      probed_tri_altitude[0] = get_probed_Z_avg(true);
 
       destination[ X_AXIS ] = probe_point_XY_x;
       destination[ Y_AXIS ] = probe_point_XY_y;
       destination[ Z_AXIS ] = 10.0;
       prepare_move();
       st_synchronize();
-      probed_tri_altitude[1] = get_probed_Z_avg();
+      probed_tri_altitude[1] = get_probed_Z_avg(true);
 
       destination[ X_AXIS ] = delta_tower2_x;
       destination[ Y_AXIS ] = delta_tower2_y;
       destination[ Z_AXIS ] = 10.0;
       prepare_move();
       st_synchronize();
-      probed_tri_altitude[2] = get_probed_Z_avg();
+      probed_tri_altitude[2] = get_probed_Z_avg(true);
 
       destination[ X_AXIS ] = probe_point_YZ_x;
       destination[ Y_AXIS ] = probe_point_YZ_y;
       destination[ Z_AXIS ] = 10.0;
       prepare_move();
       st_synchronize();
-      probed_tri_altitude[3] = get_probed_Z_avg();
+      probed_tri_altitude[3] = get_probed_Z_avg(true);
 
       destination[ X_AXIS ] = delta_tower3_x;
       destination[ Y_AXIS ] = delta_tower3_y;
       destination[ Z_AXIS ] = 10.0;
       prepare_move();
       st_synchronize();
-      probed_tri_altitude[4] = get_probed_Z_avg();
+      probed_tri_altitude[4] = get_probed_Z_avg(true);
 
       destination[ X_AXIS ] = probe_point_ZX_x;
       destination[ Y_AXIS ] = probe_point_ZX_y;
       destination[ Z_AXIS ] = 10.0;
       prepare_move();
       st_synchronize();
-      probed_tri_altitude[5] = get_probed_Z_avg();
+      probed_tri_altitude[5] = get_probed_Z_avg(true);
 
       destination[ X_AXIS ] = 0.0;
       destination[ Y_AXIS ] = 0.0;
       destination[ Z_AXIS ] = 10.0;
       prepare_move();
       st_synchronize();
-      probed_tri_altitude[6] = get_probed_Z_avg();
+      probed_tri_altitude[6] = get_probed_Z_avg(true);
 
       SERIAL_ECHOLN( "Probed tri altitude:" );
       for(int i=0; i<7; i++) {
@@ -3714,7 +3727,7 @@ inline void gcode_G28() {
 
     }
 
-  #else // ELSE: DELTA_EXTRA
+  #else // ELSE: !DELTA_EXTRA
 
   /**
    * G29: Detailed Z probe, probes the bed at 3 or more points.
@@ -4252,7 +4265,7 @@ inline void gcode_G28() {
     /**
      * G30: Do a single Z probe at the current XY
      */
-    inline void gcode_G30() {
+    inline void gcode_G30(bool fast=false) {
       #if HAS_SERVO_ENDSTOPS
         raise_z_for_servo();
       #endif
@@ -4264,7 +4277,7 @@ inline void gcode_G28() {
 
       feedrate = homing_feedrate[Z_AXIS];
 
-      run_z_probe();
+      run_z_probe(fast);
       SERIAL_PROTOCOLPGM("Bed X: ");
       SERIAL_PROTOCOL(current_position[X_AXIS] + X_PROBE_OFFSET_FROM_EXTRUDER + 0.0001);
       SERIAL_PROTOCOLPGM(" Y: ");
