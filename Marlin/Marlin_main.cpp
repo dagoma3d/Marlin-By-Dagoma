@@ -3557,7 +3557,7 @@ inline void gcode_G28() {
           all_points_are_good =
             abs(z_read[0] - z_avg) < Z_AVG_TOLERANCE &&
             abs(z_read[1] - z_avg) < Z_AVG_TOLERANCE &&
-            ( fast || abs(z_read[2] - z_avg) < Z_AVG_TOLERANCE );
+            abs(z_read[2] - z_avg) < Z_AVG_TOLERANCE;
         }
 
       } while( !all_points_are_good );
@@ -3812,7 +3812,7 @@ inline void gcode_G28() {
         destination[ Z_AXIS ] = 10.0;
         prepare_move();
         st_synchronize();
-        probe_plan[i][2] = get_probed_Z_avg(true);
+        probe_plan[i][2] = get_probed_Z_avg();
       }
 
       #if ENABLED(DEBUG_LEVELING_FEATURE)
@@ -3829,8 +3829,6 @@ inline void gcode_G28() {
       #endif
 
       z_smooth_tri_leveling_height = 20.0;
-
-
 
       probing_postcompute_tri_parameters();
 
@@ -6811,6 +6809,12 @@ inline void gcode_M503() {
       if ( !startup_auto_calibration
         && !IS_SD_PRINTING
         && !change_filament_by_tap_tap
+        #if ENABLED(SUMMON_PRINT_PAUSE)
+        && !print_pause_summoned
+        #endif
+        #if ENABLED(FILAMENT_RUNOUT_SENSOR)
+        && !filament_ran_out
+        #endif
         && z_magic_hit_count > 1
       ) {
         SERIAL_ECHOLNPGM("Tap tap : Heating and changing filament from IDLE state");
@@ -6894,6 +6898,11 @@ inline void gcode_M503() {
 
     if (cant_enter_M600_or_D600()) return;
 
+    #if ENABLED(SUMMON_PRINT_PAUSE)
+      // Simulate direct call M600
+      print_pause_summoned = true;
+    #endif
+
     float lastpos[NUM_AXIS];
     float previous_feedrate;
 
@@ -6915,12 +6924,21 @@ inline void gcode_M503() {
     RUNPLAN;
 
     //lift Z
-    if (code_seen('Z')) destination[Z_AXIS] += code_value();
-    #ifdef FILAMENTCHANGE_ZADD
-      else destination[Z_AXIS] += FILAMENTCHANGE_ZADD;
-    #endif
     #if ENABLED(DELTA_EXTRA)
-      NOMORE(destination[Z_AXIS], (Z_MAX_POS-25.0));
+      float z_destination = destination[Z_AXIS];
+      if (code_seen('Z')) z_destination += code_value();
+      #ifdef FILAMENTCHANGE_ZADD
+        else z_destination += FILAMENTCHANGE_ZADD;
+      #endif
+      NOMORE(z_destination, (Z_MAX_POS-25.0));
+      if (z_destination > destination[Z_AXIS]) {
+        destination[Z_AXIS] = z_destination;
+      }
+    #else
+      if (code_seen('Z')) destination[Z_AXIS] += code_value();
+      #ifdef FILAMENTCHANGE_ZADD
+        else destination[Z_AXIS] += FILAMENTCHANGE_ZADD;
+      #endif
     #endif
 
     SET_FEEDRATE_FOR_MOVE;
@@ -7050,7 +7068,7 @@ inline void gcode_M503() {
             #if ENABLED( DELTA_EXTRA )
               // Only checked every 2.5s
               // Detected if sd is out
-              if ( !card.stillPluggedIn() ) {
+              if ( IS_SD_PRINTING && !card.stillPluggedIn() ) {
                 // Abort current print
                 while( true ) {
                   #if ENABLED(ONE_LED)
@@ -7086,7 +7104,7 @@ inline void gcode_M503() {
       #if ENABLED( NO_LCD_FOR_FILAMENTCHANGEABLE ) && ENABLED( FILAMENT_RUNOUT_SENSOR )
         // Wait a bit more to see if we want to disable filrunout sensor
         millis_t now = millis();
-        millis_t long_push = now + 1000UL;
+        millis_t long_push = now + 2000UL;
         delay( 200 );
         while (pin_number != -1 && digitalRead(pin_number) == target && PENDING(now, long_push)) {
           enable_x();
@@ -7595,353 +7613,6 @@ inline void gcode_D851() {
 
   gcode_G28();
 
-  #define THAT_FULL_AND_R2
-
-#ifdef THAT_FULL_AND_ROD_LENGTH
-  #error Not yet computing L
-  feedrate = homing_feedrate[ Z_AXIS ];
-
-  float tower1_altitude, tower2_altitude, tower3_altitude, center_altitude;
-
-  // TOWER 1
-  destination[X_AXIS] = delta_tower1_x;
-  destination[Y_AXIS] = delta_tower1_y;
-  destination[Z_AXIS] = 10.0f;
-  prepare_move();
-  st_synchronize();
-  tower1_altitude = get_probed_Z_avg();
-
-  // TOWER 2
-  destination[X_AXIS] = delta_tower2_x;
-  destination[Y_AXIS] = delta_tower2_y;
-  destination[Z_AXIS] = 10.0f;
-  prepare_move();
-  st_synchronize();
-  tower2_altitude = get_probed_Z_avg();
-
-  // TOWER 3
-  destination[X_AXIS] = delta_tower3_x;
-  destination[Y_AXIS] = delta_tower3_y;
-  destination[Z_AXIS] = 10.0f;
-  prepare_move();
-  st_synchronize();
-  tower3_altitude = get_probed_Z_avg();
-
-  // CENTER
-  destination[X_AXIS] = 0.0f;
-  destination[Y_AXIS] = 0.0f;
-  destination[Z_AXIS] = 10.0f;
-  prepare_move();
-  st_synchronize();
-  center_altitude = get_probed_Z_avg();
-
-  SERIAL_ECHOLN( "R probed points:" );
-  SERIAL_ECHO  ( "  T1: " );
-  SERIAL_ECHOLN( tower1_altitude );
-  SERIAL_ECHO  ( "  T2: " );
-  SERIAL_ECHOLN( tower2_altitude );
-  SERIAL_ECHO  ( "  T3: " );
-  SERIAL_ECHOLN( tower3_altitude );
-  SERIAL_ECHO  ( "   C: " );
-  SERIAL_ECHOLN( center_altitude );
-
-  float mean_ref_plan_altitude = ( tower1_altitude + tower2_altitude + tower3_altitude ) / 3.0;
-  float diff_center_altitude = center_altitude - mean_ref_plan_altitude;
-
-  SERIAL_ECHO( "Mean based difference: " );
-  SERIAL_ECHOLN( diff_center_altitude );
-
-  /*
-
-  do {
-
-    delta_radius -= 2.0 * diff_center_altitude;
-
-    gcode_M665();
-
-    destination[X_AXIS] = delta_tower1_x;
-    destination[Y_AXIS] = delta_tower1_y;
-    destination[Z_AXIS] = 10.0f;
-    prepare_move();
-    st_synchronize();
-    tower1_altitude = get_probed_Z_avg();
-
-    // TOWER 2
-    destination[X_AXIS] = delta_tower2_x;
-    destination[Y_AXIS] = delta_tower2_y;
-    destination[Z_AXIS] = 10.0f;
-    prepare_move();
-    st_synchronize();
-    tower2_altitude = get_probed_Z_avg();
-
-    // TOWER 3
-    destination[X_AXIS] = delta_tower3_x;
-    destination[Y_AXIS] = delta_tower3_y;
-    destination[Z_AXIS] = 10.0f;
-    prepare_move();
-    st_synchronize();
-    tower3_altitude = get_probed_Z_avg();
-
-    // CENTER
-    destination[X_AXIS] = 0.0f;
-    destination[Y_AXIS] = 0.0f;
-    destination[Z_AXIS] = 10.0f;
-    prepare_move();
-    st_synchronize();
-    center_altitude = get_probed_Z_avg();
-
-    SERIAL_ECHOLN( "R probed points:" );
-    SERIAL_ECHO  ( "  T1: " );
-    SERIAL_ECHOLN( tower1_altitude );
-    SERIAL_ECHO  ( "  T2: " );
-    SERIAL_ECHOLN( tower2_altitude );
-    SERIAL_ECHO  ( "  T3: " );
-    SERIAL_ECHOLN( tower3_altitude );
-    SERIAL_ECHO  ( "   C: " );
-    SERIAL_ECHOLN( center_altitude );
-
-    mean_ref_plan_altitude = ( tower1_altitude + tower2_altitude + tower3_altitude ) / 3.0;
-    diff_center_altitude = center_altitude - mean_ref_plan_altitude;
-
-    SERIAL_ECHO( "NEW Mean based difference: " );
-    SERIAL_ECHOLN( diff_center_altitude );
-  } while( abs( diff_center_altitude ) > 0.05 );
-
-  */
-
-  // Use last result as endstops adujst
-  endstop_adj[0] = tower1_altitude /*+ zprobe_zoffset*/;
-  endstop_adj[1] = tower2_altitude /*+ zprobe_zoffset*/;
-  endstop_adj[2] = tower3_altitude /*+ zprobe_zoffset*/;
-
-  // Store endstop adjust
-  gcode_M500();
-
-  // JUST FOR REPORTING BACK
-  // Take in account now
-  gcode_G28();
-
-  // TOWER 1
-  destination[X_AXIS] = delta_tower1_x;
-  destination[Y_AXIS] = delta_tower1_y;
-  destination[Z_AXIS] = 10.0f;
-  prepare_move();
-  st_synchronize();
-  tower1_altitude = get_probed_Z_avg();
-
-  // TOWER 2
-  destination[X_AXIS] = delta_tower2_x;
-  destination[Y_AXIS] = delta_tower2_y;
-  destination[Z_AXIS] = 10.0f;
-  prepare_move();
-  st_synchronize();
-  tower2_altitude = get_probed_Z_avg();
-
-  // TOWER 3
-  destination[X_AXIS] = delta_tower3_x;
-  destination[Y_AXIS] = delta_tower3_y;
-  destination[Z_AXIS] = 10.0f;
-  prepare_move();
-  st_synchronize();
-  tower3_altitude = get_probed_Z_avg();
-
-  // CENTER
-  destination[X_AXIS] = 0.0f;
-  destination[Y_AXIS] = 0.0f;
-  destination[Z_AXIS] = 10.0f;
-  prepare_move();
-  st_synchronize();
-  center_altitude = get_probed_Z_avg();
-
-  SERIAL_ECHOLN( "R probed points:" );
-  SERIAL_ECHO  ( "  T1: " );
-  SERIAL_ECHOLN( tower1_altitude );
-  SERIAL_ECHO  ( "  T2: " );
-  SERIAL_ECHOLN( tower2_altitude );
-  SERIAL_ECHO  ( "  T3: " );
-  SERIAL_ECHOLN( tower3_altitude );
-  SERIAL_ECHO  ( "   C: " );
-  SERIAL_ECHOLN( center_altitude );
-
-  mean_ref_plan_altitude = ( tower1_altitude + tower2_altitude + tower3_altitude ) / 3.0;
-  diff_center_altitude = center_altitude - mean_ref_plan_altitude;
-
-  SERIAL_ECHO( "FOR VERIF ONLY Mean based difference: " );
-  SERIAL_ECHOLN( diff_center_altitude );
-
-#elif defined ONLY_FIRST_ENDSTOP_ADJUST
-
-  feedrate = homing_feedrate[ Z_AXIS ];
-
-  float tower1_altitude, tower2_altitude, tower3_altitude, center_altitude;
-
-  // TOWER 1
-  destination[X_AXIS] = delta_tower1_x;
-  destination[Y_AXIS] = delta_tower1_y;
-  destination[Z_AXIS] = 10.0f;
-  prepare_move();
-  st_synchronize();
-  tower1_altitude = get_probed_Z_avg();
-
-  // TOWER 2
-  destination[X_AXIS] = delta_tower2_x;
-  destination[Y_AXIS] = delta_tower2_y;
-  destination[Z_AXIS] = 10.0f;
-  prepare_move();
-  st_synchronize();
-  tower2_altitude = get_probed_Z_avg();
-
-  // TOWER 3
-  destination[X_AXIS] = delta_tower3_x;
-  destination[Y_AXIS] = delta_tower3_y;
-  destination[Z_AXIS] = 10.0f;
-  prepare_move();
-  st_synchronize();
-  tower3_altitude = get_probed_Z_avg();
-
-  // CENTER
-  destination[X_AXIS] = 0.0f;
-  destination[Y_AXIS] = 0.0f;
-  destination[Z_AXIS] = 10.0f;
-  prepare_move();
-  st_synchronize();
-  center_altitude = get_probed_Z_avg();
-
-  SERIAL_ECHOLN( "R probed points:" );
-  SERIAL_ECHO  ( "  T1: " );
-  SERIAL_ECHOLN( tower1_altitude );
-  SERIAL_ECHO  ( "  T2: " );
-  SERIAL_ECHOLN( tower2_altitude );
-  SERIAL_ECHO  ( "  T3: " );
-  SERIAL_ECHOLN( tower3_altitude );
-  SERIAL_ECHO  ( "   C: " );
-  SERIAL_ECHOLN( center_altitude );
-
-  float mean_ref_plan_altitude = ( tower1_altitude + tower2_altitude + tower3_altitude ) / 3.0;
-  float diff_center_altitude = center_altitude - mean_ref_plan_altitude;
-
-  SERIAL_ECHO( "Mean based difference: " );
-  SERIAL_ECHOLN( diff_center_altitude );
-
-  /*
-
-  do {
-
-    delta_radius -= 2.0 * diff_center_altitude;
-
-    gcode_M665();
-
-    destination[X_AXIS] = delta_tower1_x;
-    destination[Y_AXIS] = delta_tower1_y;
-    destination[Z_AXIS] = 10.0f;
-    prepare_move();
-    st_synchronize();
-    tower1_altitude = get_probed_Z_avg();
-
-    // TOWER 2
-    destination[X_AXIS] = delta_tower2_x;
-    destination[Y_AXIS] = delta_tower2_y;
-    destination[Z_AXIS] = 10.0f;
-    prepare_move();
-    st_synchronize();
-    tower2_altitude = get_probed_Z_avg();
-
-    // TOWER 3
-    destination[X_AXIS] = delta_tower3_x;
-    destination[Y_AXIS] = delta_tower3_y;
-    destination[Z_AXIS] = 10.0f;
-    prepare_move();
-    st_synchronize();
-    tower3_altitude = get_probed_Z_avg();
-
-    // CENTER
-    destination[X_AXIS] = 0.0f;
-    destination[Y_AXIS] = 0.0f;
-    destination[Z_AXIS] = 10.0f;
-    prepare_move();
-    st_synchronize();
-    center_altitude = get_probed_Z_avg();
-
-    SERIAL_ECHOLN( "R probed points:" );
-    SERIAL_ECHO  ( "  T1: " );
-    SERIAL_ECHOLN( tower1_altitude );
-    SERIAL_ECHO  ( "  T2: " );
-    SERIAL_ECHOLN( tower2_altitude );
-    SERIAL_ECHO  ( "  T3: " );
-    SERIAL_ECHOLN( tower3_altitude );
-    SERIAL_ECHO  ( "   C: " );
-    SERIAL_ECHOLN( center_altitude );
-
-    mean_ref_plan_altitude = ( tower1_altitude + tower2_altitude + tower3_altitude ) / 3.0;
-    diff_center_altitude = center_altitude - mean_ref_plan_altitude;
-
-    SERIAL_ECHO( "NEW Mean based difference: " );
-    SERIAL_ECHOLN( diff_center_altitude );
-  } while( abs( diff_center_altitude ) > 0.05 );
-
-  */
-
-  // Use last result as endstops adujst
-  endstop_adj[0] = tower1_altitude /*+ zprobe_zoffset*/;
-  endstop_adj[1] = tower2_altitude /*+ zprobe_zoffset*/;
-  endstop_adj[2] = tower3_altitude /*+ zprobe_zoffset*/;
-
-  // Store endstop adjust
-  gcode_M500();
-
-  // JUST FOR REPORTING BACK
-  // Take in account now
-  gcode_G28();
-
-  // TOWER 1
-  destination[X_AXIS] = delta_tower1_x;
-  destination[Y_AXIS] = delta_tower1_y;
-  destination[Z_AXIS] = 10.0f;
-  prepare_move();
-  st_synchronize();
-  tower1_altitude = get_probed_Z_avg();
-
-  // TOWER 2
-  destination[X_AXIS] = delta_tower2_x;
-  destination[Y_AXIS] = delta_tower2_y;
-  destination[Z_AXIS] = 10.0f;
-  prepare_move();
-  st_synchronize();
-  tower2_altitude = get_probed_Z_avg();
-
-  // TOWER 3
-  destination[X_AXIS] = delta_tower3_x;
-  destination[Y_AXIS] = delta_tower3_y;
-  destination[Z_AXIS] = 10.0f;
-  prepare_move();
-  st_synchronize();
-  tower3_altitude = get_probed_Z_avg();
-
-  // CENTER
-  destination[X_AXIS] = 0.0f;
-  destination[Y_AXIS] = 0.0f;
-  destination[Z_AXIS] = 10.0f;
-  prepare_move();
-  st_synchronize();
-  center_altitude = get_probed_Z_avg();
-
-  SERIAL_ECHOLN( "R probed points:" );
-  SERIAL_ECHO  ( "  T1: " );
-  SERIAL_ECHOLN( tower1_altitude );
-  SERIAL_ECHO  ( "  T2: " );
-  SERIAL_ECHOLN( tower2_altitude );
-  SERIAL_ECHO  ( "  T3: " );
-  SERIAL_ECHOLN( tower3_altitude );
-  SERIAL_ECHO  ( "   C: " );
-  SERIAL_ECHOLN( center_altitude );
-
-  mean_ref_plan_altitude = ( tower1_altitude + tower2_altitude + tower3_altitude ) / 3.0;
-  diff_center_altitude = center_altitude - mean_ref_plan_altitude;
-
-  SERIAL_ECHO( "FOR VERIF ONLY Mean based difference: " );
-  SERIAL_ECHOLN( diff_center_altitude );
-
-#elif defined THAT_FULL_AND_R2
 
   feedrate = homing_feedrate[ Z_AXIS ];
   //feedrate = max_feedrate[ Z_AXIS ] * 60;
@@ -8019,25 +7690,30 @@ inline void gcode_D851() {
   st_synchronize();
   center_altitude = get_probed_Z_avg();
 
-  SERIAL_ECHOLN( "R probed points:" );
-  SERIAL_ECHO  ( "  T1: " );
-  SERIAL_ECHOLN( tower1_altitude );
-  SERIAL_ECHO  ( "  T2: " );
-  SERIAL_ECHOLN( tower2_altitude );
-  SERIAL_ECHO  ( "  T3: " );
-  SERIAL_ECHOLN( tower3_altitude );
-  SERIAL_ECHO  ( "   C: " );
-  SERIAL_ECHOLN( center_altitude );
+  SERIAL_ECHOLNPGM( "R probed points:" );
+  SERIAL_ECHOPGM  ( "  T1: " );
+  SERIAL_ECHOLN   ( tower1_altitude );
+  SERIAL_ECHOPGM  ( "  T2: " );
+  SERIAL_ECHOLN   ( tower2_altitude );
+  SERIAL_ECHOPGM  ( "  T3: " );
+  SERIAL_ECHOLN   ( tower3_altitude );
+  SERIAL_ECHOPGM  ( "   C: " );
+  SERIAL_ECHOLN   ( center_altitude );
 
   float mean_ref_plan_altitude = ( tower1_altitude + tower2_altitude + tower3_altitude ) / 3.0;
   float diff_center_altitude = center_altitude - mean_ref_plan_altitude;
 
-  SERIAL_ECHO( "Mean based difference: " );
-  SERIAL_ECHOLN( diff_center_altitude );
+  SERIAL_ECHOPGM( "Initial mean based difference: " );
+  SERIAL_ECHOLN ( diff_center_altitude );
+
+  SERIAL_ECHOPGM( "Initial delta radius: " );
+  SERIAL_ECHOLN ( delta_radius );
 
   do {
-
     delta_radius -= 2.0 * diff_center_altitude;
+
+    SERIAL_ECHOPGM( "Testing delta radius: " );
+    SERIAL_ECHOLN ( delta_radius );
 
     gcode_M665();
 
@@ -8072,29 +7748,35 @@ inline void gcode_D851() {
     st_synchronize();
     center_altitude = get_probed_Z_avg();
 
-    SERIAL_ECHOLN( "R probed points:" );
-    SERIAL_ECHO  ( "  T1: " );
-    SERIAL_ECHOLN( tower1_altitude );
-    SERIAL_ECHO  ( "  T2: " );
-    SERIAL_ECHOLN( tower2_altitude );
-    SERIAL_ECHO  ( "  T3: " );
-    SERIAL_ECHOLN( tower3_altitude );
-    SERIAL_ECHO  ( "   C: " );
-    SERIAL_ECHOLN( center_altitude );
+    SERIAL_ECHOLNPGM( "R probed points:" );
+    SERIAL_ECHOPGM  ( "  T1: " );
+    SERIAL_ECHOLN   ( tower1_altitude );
+    SERIAL_ECHOPGM  ( "  T2: " );
+    SERIAL_ECHOLN   ( tower2_altitude );
+    SERIAL_ECHOPGM  ( "  T3: " );
+    SERIAL_ECHOLN   ( tower3_altitude );
+    SERIAL_ECHOPGM  ( "   C: " );
+    SERIAL_ECHOLN   ( center_altitude );
 
     mean_ref_plan_altitude = ( tower1_altitude + tower2_altitude + tower3_altitude ) / 3.0;
     diff_center_altitude = center_altitude - mean_ref_plan_altitude;
 
-    SERIAL_ECHO( "NEW Mean based difference: " );
-    SERIAL_ECHOLN( diff_center_altitude );
+    SERIAL_ECHOPGM( "NEW Mean based difference: " );
+    SERIAL_ECHOLN ( diff_center_altitude );
+    SERIAL_ECHOPGM( "With delta radius: " );
+    SERIAL_ECHOLN ( delta_radius );
   } while( abs( diff_center_altitude ) > 0.05 );
+
+
+  SERIAL_ECHOPGM( "Storing delta radius: " );
+  SERIAL_ECHOLN ( delta_radius );
 
   // Store delta_radius
   gcode_M500();
 
-  // JUST FOR REPORTING BACK
   // Take in account now
   gcode_G28();
+  // Now, we need to adjust endstops offset with the corrected radius
 
   // TOWER 1
   destination[X_AXIS] = delta_tower1_x;
@@ -8128,23 +7810,24 @@ inline void gcode_D851() {
   st_synchronize();
   center_altitude = get_probed_Z_avg();
 
-  SERIAL_ECHOLN( "R probed points:" );
-  SERIAL_ECHO  ( "  T1: " );
-  SERIAL_ECHOLN( tower1_altitude );
-  SERIAL_ECHO  ( "  T2: " );
-  SERIAL_ECHOLN( tower2_altitude );
-  SERIAL_ECHO  ( "  T3: " );
-  SERIAL_ECHOLN( tower3_altitude );
-  SERIAL_ECHO  ( "   C: " );
-  SERIAL_ECHOLN( center_altitude );
+  SERIAL_ECHOLNPGM( "R probed points:" );
+  SERIAL_ECHOPGM  ( "  T1: " );
+  SERIAL_ECHOLN   ( tower1_altitude );
+  SERIAL_ECHOPGM  ( "  T2: " );
+  SERIAL_ECHOLN   ( tower2_altitude );
+  SERIAL_ECHOPGM  ( "  T3: " );
+  SERIAL_ECHOLN   ( tower3_altitude );
+  SERIAL_ECHOPGM  ( "   C: " );
+  SERIAL_ECHOLN   ( center_altitude );
 
   mean_ref_plan_altitude = ( tower1_altitude + tower2_altitude + tower3_altitude ) / 3.0;
   diff_center_altitude = center_altitude - mean_ref_plan_altitude;
 
-  SERIAL_ECHOPGM( "FOR VERIF ONLY Mean based difference: " );
+  SERIAL_ECHOPGM( "Mean based difference: " );
   SERIAL_ECHOLN( diff_center_altitude );
 
-
+  SERIAL_ECHOPGM( "With delta radius: " );
+  SERIAL_ECHOLN ( delta_radius );
 
   // Use last result as endstops adujst
   endstop_adj[0] += tower1_altitude /*+ zprobe_zoffset*/;
@@ -8154,483 +7837,65 @@ inline void gcode_D851() {
   // Store endstop adjust
   gcode_M500();
 
-  // JUST FOR REPORTING BACK
-  // Take in account now
-  gcode_G28();
-
-
-
-
-
-  // TOWER 1
-  destination[X_AXIS] = delta_tower1_x;
-  destination[Y_AXIS] = delta_tower1_y;
-  destination[Z_AXIS] = 10.0f;
-  prepare_move();
-  st_synchronize();
-  tower1_altitude = get_probed_Z_avg();
-
-  // TOWER 2
-  destination[X_AXIS] = delta_tower2_x;
-  destination[Y_AXIS] = delta_tower2_y;
-  destination[Z_AXIS] = 10.0f;
-  prepare_move();
-  st_synchronize();
-  tower2_altitude = get_probed_Z_avg();
-
-  // TOWER 3
-  destination[X_AXIS] = delta_tower3_x;
-  destination[Y_AXIS] = delta_tower3_y;
-  destination[Z_AXIS] = 10.0f;
-  prepare_move();
-  st_synchronize();
-  tower3_altitude = get_probed_Z_avg();
-
-  // CENTER
-  destination[X_AXIS] = 0.0f;
-  destination[Y_AXIS] = 0.0f;
-  destination[Z_AXIS] = 10.0f;
-  prepare_move();
-  st_synchronize();
-  center_altitude = get_probed_Z_avg();
-
-  SERIAL_ECHOLN( "R probed points:" );
-  SERIAL_ECHO  ( "  T1: " );
-  SERIAL_ECHOLN( tower1_altitude );
-  SERIAL_ECHO  ( "  T2: " );
-  SERIAL_ECHOLN( tower2_altitude );
-  SERIAL_ECHO  ( "  T3: " );
-  SERIAL_ECHOLN( tower3_altitude );
-  SERIAL_ECHO  ( "   C: " );
-  SERIAL_ECHOLN( center_altitude );
-
-  mean_ref_plan_altitude = ( tower1_altitude + tower2_altitude + tower3_altitude ) / 3.0;
-  diff_center_altitude = center_altitude - mean_ref_plan_altitude;
-
-  SERIAL_ECHOPGM( "FOR VERIF ONLY (last) Mean based difference: " );
-  SERIAL_ECHOLN( diff_center_altitude );
-
-#elif defined THAT_FULL_AND_R
-
-  feedrate = homing_feedrate[ Z_AXIS ];
-
-  float tower1_altitude, tower2_altitude, tower3_altitude, center_altitude;
-
-  // TOWER 1
-  destination[X_AXIS] = delta_tower1_x;
-  destination[Y_AXIS] = delta_tower1_y;
-  destination[Z_AXIS] = 10.0f;
-  prepare_move();
-  st_synchronize();
-  tower1_altitude = get_probed_Z_avg();
-
-  // TOWER 2
-  destination[X_AXIS] = delta_tower2_x;
-  destination[Y_AXIS] = delta_tower2_y;
-  destination[Z_AXIS] = 10.0f;
-  prepare_move();
-  st_synchronize();
-  tower2_altitude = get_probed_Z_avg();
-
-  // TOWER 3
-  destination[X_AXIS] = delta_tower3_x;
-  destination[Y_AXIS] = delta_tower3_y;
-  destination[Z_AXIS] = 10.0f;
-  prepare_move();
-  st_synchronize();
-  tower3_altitude = get_probed_Z_avg();
-
-  // CENTER
-  destination[X_AXIS] = 0.0f;
-  destination[Y_AXIS] = 0.0f;
-  destination[Z_AXIS] = 10.0f;
-  prepare_move();
-  st_synchronize();
-  center_altitude = get_probed_Z_avg();
-
-  SERIAL_ECHOLN( "R probed points:" );
-  SERIAL_ECHO  ( "  T1: " );
-  SERIAL_ECHOLN( tower1_altitude );
-  SERIAL_ECHO  ( "  T2: " );
-  SERIAL_ECHOLN( tower2_altitude );
-  SERIAL_ECHO  ( "  T3: " );
-  SERIAL_ECHOLN( tower3_altitude );
-  SERIAL_ECHO  ( "   C: " );
-  SERIAL_ECHOLN( center_altitude );
-
-  float mean_ref_plan_altitude = ( tower1_altitude + tower2_altitude + tower3_altitude ) / 3.0;
-  float diff_center_altitude = center_altitude - mean_ref_plan_altitude;
-
-  SERIAL_ECHO( "Mean based difference: " );
-  SERIAL_ECHOLN( diff_center_altitude );
-
-  do {
-
-    delta_radius -= 2.0 * diff_center_altitude;
-
-    gcode_M665();
-
-    destination[X_AXIS] = delta_tower1_x;
-    destination[Y_AXIS] = delta_tower1_y;
-    destination[Z_AXIS] = 10.0f;
-    prepare_move();
-    st_synchronize();
-    tower1_altitude = get_probed_Z_avg();
-
-    // TOWER 2
-    destination[X_AXIS] = delta_tower2_x;
-    destination[Y_AXIS] = delta_tower2_y;
-    destination[Z_AXIS] = 10.0f;
-    prepare_move();
-    st_synchronize();
-    tower2_altitude = get_probed_Z_avg();
-
-    // TOWER 3
-    destination[X_AXIS] = delta_tower3_x;
-    destination[Y_AXIS] = delta_tower3_y;
-    destination[Z_AXIS] = 10.0f;
-    prepare_move();
-    st_synchronize();
-    tower3_altitude = get_probed_Z_avg();
-
-    // CENTER
-    destination[X_AXIS] = 0.0f;
-    destination[Y_AXIS] = 0.0f;
-    destination[Z_AXIS] = 10.0f;
-    prepare_move();
-    st_synchronize();
-    center_altitude = get_probed_Z_avg();
-
-    SERIAL_ECHOLN( "R probed points:" );
-    SERIAL_ECHO  ( "  T1: " );
-    SERIAL_ECHOLN( tower1_altitude );
-    SERIAL_ECHO  ( "  T2: " );
-    SERIAL_ECHOLN( tower2_altitude );
-    SERIAL_ECHO  ( "  T3: " );
-    SERIAL_ECHOLN( tower3_altitude );
-    SERIAL_ECHO  ( "   C: " );
-    SERIAL_ECHOLN( center_altitude );
-
-    mean_ref_plan_altitude = ( tower1_altitude + tower2_altitude + tower3_altitude ) / 3.0;
-    diff_center_altitude = center_altitude - mean_ref_plan_altitude;
-
-    SERIAL_ECHO( "NEW Mean based difference: " );
-    SERIAL_ECHOLN( diff_center_altitude );
-  } while( abs( diff_center_altitude ) > 0.05 );
-
-  // Use last result as endstops adujst
-  endstop_adj[0] = tower1_altitude /*+ zprobe_zoffset*/;
-  endstop_adj[1] = tower2_altitude /*+ zprobe_zoffset*/;
-  endstop_adj[2] = tower3_altitude /*+ zprobe_zoffset*/;
-
-  // Store endstop adjust
-  gcode_M500();
-
-  // JUST FOR REPORTING BACK
-  // Take in account now
-  gcode_G28();
-
-  // TOWER 1
-  destination[X_AXIS] = delta_tower1_x;
-  destination[Y_AXIS] = delta_tower1_y;
-  destination[Z_AXIS] = 10.0f;
-  prepare_move();
-  st_synchronize();
-  tower1_altitude = get_probed_Z_avg();
-
-  // TOWER 2
-  destination[X_AXIS] = delta_tower2_x;
-  destination[Y_AXIS] = delta_tower2_y;
-  destination[Z_AXIS] = 10.0f;
-  prepare_move();
-  st_synchronize();
-  tower2_altitude = get_probed_Z_avg();
-
-  // TOWER 3
-  destination[X_AXIS] = delta_tower3_x;
-  destination[Y_AXIS] = delta_tower3_y;
-  destination[Z_AXIS] = 10.0f;
-  prepare_move();
-  st_synchronize();
-  tower3_altitude = get_probed_Z_avg();
-
-  // CENTER
-  destination[X_AXIS] = 0.0f;
-  destination[Y_AXIS] = 0.0f;
-  destination[Z_AXIS] = 10.0f;
-  prepare_move();
-  st_synchronize();
-  center_altitude = get_probed_Z_avg();
-
-  SERIAL_ECHOLN( "R probed points:" );
-  SERIAL_ECHO  ( "  T1: " );
-  SERIAL_ECHOLN( tower1_altitude );
-  SERIAL_ECHO  ( "  T2: " );
-  SERIAL_ECHOLN( tower2_altitude );
-  SERIAL_ECHO  ( "  T3: " );
-  SERIAL_ECHOLN( tower3_altitude );
-  SERIAL_ECHO  ( "   C: " );
-  SERIAL_ECHOLN( center_altitude );
-
-  mean_ref_plan_altitude = ( tower1_altitude + tower2_altitude + tower3_altitude ) / 3.0;
-  diff_center_altitude = center_altitude - mean_ref_plan_altitude;
-
-  SERIAL_ECHO( "FOR VERIF ONLY Mean based difference: " );
-  SERIAL_ECHOLN( diff_center_altitude );
-
-  #elif defined THAT_SIMPLE
-
-  feedrate = homing_feedrate[ Z_AXIS ];
-
-  float tower1_altitude, tower2_altitude, tower3_altitude, center_altitude;
-
-  // TOWER 1
-  destination[X_AXIS] = delta_tower1_x;
-  destination[Y_AXIS] = delta_tower1_y;
-  destination[Z_AXIS] = 10.0f;
-  prepare_move();
-  st_synchronize();
-  tower1_altitude = get_probed_Z_avg();
-
-  // TOWER 2
-  destination[X_AXIS] = delta_tower2_x;
-  destination[Y_AXIS] = delta_tower2_y;
-  destination[Z_AXIS] = 10.0f;
-  prepare_move();
-  st_synchronize();
-  tower2_altitude = get_probed_Z_avg();
-
-  // TOWER 3
-  destination[X_AXIS] = delta_tower3_x;
-  destination[Y_AXIS] = delta_tower3_y;
-  destination[Z_AXIS] = 10.0f;
-  prepare_move();
-  st_synchronize();
-  tower3_altitude = get_probed_Z_avg();
-
-  SERIAL_ECHOLN( "R probed points:" );
-  SERIAL_ECHO  ( "  T1: " );
-  SERIAL_ECHOLN( tower1_altitude );
-  SERIAL_ECHO  ( "  T2: " );
-  SERIAL_ECHOLN( tower2_altitude );
-  SERIAL_ECHO  ( "  T3: " );
-  SERIAL_ECHOLN( tower3_altitude );
-
-  // Use last result as endstops adujst
-  endstop_adj[0] = tower1_altitude + zprobe_zoffset;
-  endstop_adj[1] = tower2_altitude + zprobe_zoffset;
-  endstop_adj[2] = tower3_altitude + zprobe_zoffset;
-
-  // Store endstop adjust
-  gcode_M500();
-
-#else
-
-  feedrate = 8000;
-
-  float tower1_altitude, tower2_altitude, tower3_altitude, center_altitude;
-
-  // TOWER 1
-  destination[X_AXIS] = delta_tower1_x;
-  destination[Y_AXIS] = delta_tower1_y;
-  destination[Z_AXIS] = 10.0f;
-  prepare_move();
-  st_synchronize();
-
-  int da_pause;
-  da_pause = 10; do { idle(); delay(100); } while(--da_pause);
-
-  tower1_altitude = get_probed_Z_avg();
-
-  // TOWER 2
-  destination[X_AXIS] = delta_tower2_x;
-  destination[Y_AXIS] = delta_tower2_y;
-  destination[Z_AXIS] = 10.0f;
-  prepare_move();
-  st_synchronize();
-
-  da_pause = 10; do { idle(); delay(100); } while(--da_pause);
-
-  tower2_altitude = get_probed_Z_avg();
-
-  // TOWER 3
-  destination[X_AXIS] = delta_tower3_x;
-  destination[Y_AXIS] = delta_tower3_y;
-  destination[Z_AXIS] = 10.0f;
-  prepare_move();
-  st_synchronize();
-
-  da_pause = 10; do { idle(); delay(100); } while(--da_pause);
-
-  tower3_altitude = get_probed_Z_avg();;
-
-  SERIAL_ECHOLN( "endstop_adj probed points:" );
-  SERIAL_ECHO  ( "  T1: " );
-  SERIAL_ECHOLN( tower1_altitude );
-  SERIAL_ECHO  ( "  T2: " );
-  SERIAL_ECHOLN( tower2_altitude );
-  SERIAL_ECHO  ( "  T3: " );
-  SERIAL_ECHOLN( tower3_altitude );
-
-  endstop_adj[0] = tower1_altitude + zprobe_zoffset;
-  endstop_adj[1] = tower2_altitude + zprobe_zoffset;
-  endstop_adj[2] = tower3_altitude + zprobe_zoffset;
-
-  // Store endstop adjust
-  gcode_M500();
-
-  // Take in account now
-  gcode_G28();;
-
-  //
-  // NOW
-  // Reprobe each tower PLUS middle point
-  feedrate = homing_feedrate[ X_AXIS ];
-
-  // TOWER 1
-  destination[X_AXIS] = delta_tower1_x;
-  destination[Y_AXIS] = delta_tower1_y;
-  destination[Z_AXIS] = 10.0f;
-  prepare_move();
-  st_synchronize();
-
-  da_pause = 5; do { idle(); delay(100); } while(--da_pause);
-
-  tower1_altitude = get_probed_Z_avg();
-
-
-  // TOWER 2
-  destination[X_AXIS] = delta_tower2_x;
-  destination[Y_AXIS] = delta_tower2_y;
-  destination[Z_AXIS] = 10.0f;
-  prepare_move();
-  st_synchronize();
-
-  da_pause = 5; do { idle(); delay(100); } while(--da_pause);
-
-  tower2_altitude = get_probed_Z_avg();
-
-
-  // TOWER 3
-  destination[X_AXIS] = delta_tower3_x;
-  destination[Y_AXIS] = delta_tower3_y;
-  destination[Z_AXIS] = 10.0f;
-  prepare_move();
-  st_synchronize();
-
-  da_pause = 5; do { idle(); delay(100); } while(--da_pause);
-
-  tower3_altitude = get_probed_Z_avg();
-
-
-  // CENTER
-  destination[X_AXIS] = 0.0f;
-  destination[Y_AXIS] = 0.0f;
-  destination[Z_AXIS] = 10.0f;
-  prepare_move();
-  st_synchronize();
-
-  da_pause = 5; do { idle(); delay(100); } while(--da_pause);
-
-  center_altitude = get_probed_Z_avg();
-
-  SERIAL_ECHOLN( "R probed points:" );
-  SERIAL_ECHO  ( "  T1: " );
-  SERIAL_ECHOLN( tower1_altitude );
-  SERIAL_ECHO  ( "  T2: " );
-  SERIAL_ECHOLN( tower2_altitude );
-  SERIAL_ECHO  ( "  T3: " );
-  SERIAL_ECHOLN( tower3_altitude );
-  SERIAL_ECHO  ( "   C: " );
-  SERIAL_ECHOLN( center_altitude );
-
-  float mean_ref_plan_altitude = ( tower1_altitude + tower2_altitude + tower3_altitude ) / 3.0;
-  float diff_center_altitude = center_altitude - mean_ref_plan_altitude;
-
-  SERIAL_ECHO( "Mean based difference: " );
-  SERIAL_ECHOLN( diff_center_altitude );
-
-  if ( diff_center_altitude < 0.0 )
-    delta_radius += sqrt(abs(diff_center_altitude));
-  else
-    delta_radius -= sqrt(diff_center_altitude);
-
-  gcode_M665();
-
-  gcode_M500();
-
-  // Take in account now
-  gcode_G28();;
-
-  //
-  // NOW
-  // Reprobe each tower PLUS middle point
-  feedrate = homing_feedrate[ X_AXIS ];
-
-  // TOWER 1
-  destination[X_AXIS] = delta_tower1_x;
-  destination[Y_AXIS] = delta_tower1_y;
-  destination[Z_AXIS] = 10.0f;
-  prepare_move();
-  st_synchronize();
-
-  da_pause = 5; do { idle(); delay(100); } while(--da_pause);
-
-  tower1_altitude = get_probed_Z_avg();
-
-
-  // TOWER 2
-  destination[X_AXIS] = delta_tower2_x;
-  destination[Y_AXIS] = delta_tower2_y;
-  destination[Z_AXIS] = 10.0f;
-  prepare_move();
-  st_synchronize();
-
-  da_pause = 5; do { idle(); delay(100); } while(--da_pause);
-
-  tower2_altitude = get_probed_Z_avg();
-
-
-  // TOWER 3
-  destination[X_AXIS] = delta_tower3_x;
-  destination[Y_AXIS] = delta_tower3_y;
-  destination[Z_AXIS] = 10.0f;
-  prepare_move();
-  st_synchronize();
-
-  da_pause = 5; do { idle(); delay(100); } while(--da_pause);
-
-  tower3_altitude = get_probed_Z_avg();
-
-
-  // CENTER
-  destination[X_AXIS] = 0.0f;
-  destination[Y_AXIS] = 0.0f;
-  destination[Z_AXIS] = 10.0f;
-  prepare_move();
-  st_synchronize();
-
-  da_pause = 5; do { idle(); delay(100); } while(--da_pause);
-
-  center_altitude = get_probed_Z_avg();
-
-  SERIAL_ECHOLN( "NEW R probed points:" );
-  SERIAL_ECHO  ( "  T1: " );
-  SERIAL_ECHOLN( tower1_altitude );
-  SERIAL_ECHO  ( "  T2: " );
-  SERIAL_ECHOLN( tower2_altitude );
-  SERIAL_ECHO  ( "  T3: " );
-  SERIAL_ECHOLN( tower3_altitude );
-  SERIAL_ECHO  ( "   C: " );
-  SERIAL_ECHOLN( center_altitude );
-
-  mean_ref_plan_altitude = ( tower1_altitude + tower2_altitude + tower3_altitude ) / 3.0;
-  diff_center_altitude = center_altitude - mean_ref_plan_altitude;
-
-  SERIAL_ECHO( "NEW Mean based difference: " );
-  SERIAL_ECHOLN( diff_center_altitude );
-
-#endif
+  #if ENABLED(DEBUG_LEVELING_FEATURE)
+    if (DEBUGGING(LEVELING)) {
+
+      // JUST FOR REPORTING BACK
+      // Take in account now
+      gcode_G28();
+
+      // TOWER 1
+      destination[X_AXIS] = delta_tower1_x;
+      destination[Y_AXIS] = delta_tower1_y;
+      destination[Z_AXIS] = 10.0f;
+      prepare_move();
+      st_synchronize();
+      tower1_altitude = get_probed_Z_avg();
+
+      // TOWER 2
+      destination[X_AXIS] = delta_tower2_x;
+      destination[Y_AXIS] = delta_tower2_y;
+      destination[Z_AXIS] = 10.0f;
+      prepare_move();
+      st_synchronize();
+      tower2_altitude = get_probed_Z_avg();
+
+      // TOWER 3
+      destination[X_AXIS] = delta_tower3_x;
+      destination[Y_AXIS] = delta_tower3_y;
+      destination[Z_AXIS] = 10.0f;
+      prepare_move();
+      st_synchronize();
+      tower3_altitude = get_probed_Z_avg();
+
+      // CENTER
+      destination[X_AXIS] = 0.0f;
+      destination[Y_AXIS] = 0.0f;
+      destination[Z_AXIS] = 10.0f;
+      prepare_move();
+      st_synchronize();
+      center_altitude = get_probed_Z_avg();
+
+       SERIAL_ECHOLNPGM( "R probed points:" );
+      SERIAL_ECHOPGM  ( "  T1: " );
+      SERIAL_ECHOLN   ( tower1_altitude );
+      SERIAL_ECHOPGM  ( "  T2: " );
+      SERIAL_ECHOLN   ( tower2_altitude );
+      SERIAL_ECHOPGM  ( "  T3: " );
+      SERIAL_ECHOLN   ( tower3_altitude );
+      SERIAL_ECHOPGM  ( "   C: " );
+      SERIAL_ECHOLN   ( center_altitude );
+
+      mean_ref_plan_altitude = ( tower1_altitude + tower2_altitude + tower3_altitude ) / 3.0;
+      diff_center_altitude = center_altitude - mean_ref_plan_altitude;
+
+      SERIAL_ECHOPGM( "Mean based difference: " );
+      SERIAL_ECHOLN( diff_center_altitude );
+
+      SERIAL_ECHOPGM( "With delta radius: " );
+      SERIAL_ECHOLN ( delta_radius );
+    }
+  #endif
 
   gcode_G28();
 
@@ -9570,6 +8835,11 @@ void clamp_to_software_endstops(float target[3]) {
         delta[Y_AXIS] += zprobe_zoffset;
         delta[Z_AXIS] += zprobe_zoffset;
 
+        // Bed support smoothness
+        delta[X_AXIS] += 0.05;
+        delta[Y_AXIS] += 0.05;
+        delta[Z_AXIS] += 0.05;
+
       #endif // End DELTA_EXTRA
     }
   #endif // AUTO_BED_LEVELING_FEATURE
@@ -10394,7 +9664,6 @@ void manage_inactivity(bool ignore_stepper_queue/*=false*/) {
         if (frs_debounce_time == 0UL) {
           frs_debounce_time = ms + FRS_DEBOUNCE_DELAY;
         } else {
-          SERIAL_ECHOLNPGM("Pause : No more filament detected");
           handle_filament_runout();
         }
       }
@@ -10655,6 +9924,7 @@ void kill(const char* lcd_msg) {
 #if ENABLED(FILAMENT_RUNOUT_SENSOR)
   void handle_filament_runout() {
     if (!filament_ran_out) {
+      SERIAL_ECHOLNPGM("Pause : No more filament detected");
       filament_ran_out = true;
       enqueue_and_echo_commands_P(PSTR(FILAMENT_RUNOUT_SCRIPT));
       st_synchronize();
