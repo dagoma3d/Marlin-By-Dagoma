@@ -4389,7 +4389,11 @@ inline void gcode_G28() {
     /**
      * G30: Do a single Z probe at the current XY
      */
-    inline void gcode_G30(bool fast=false) {
+    #if ENABLED(DELTA_EXTRA)
+    inline void gcode_G30(bool fast/*default is declared above*/) {
+    #else
+    inline void gcode_G30() {
+    #endif
       #if HAS_SERVO_ENDSTOPS
         raise_z_for_servo();
       #endif
