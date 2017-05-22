@@ -6793,6 +6793,9 @@ inline void gcode_M503() {
     #ifdef FILAMENTCHANGE_ZADD
       else destination[Z_AXIS] += FILAMENTCHANGE_ZADD;
     #endif
+    #if ENABLED(DELTA_EXTRA)
+      NOMORE(destination[Z_AXIS], (Z_MAX_POS-25.0));
+    #endif
 
     SET_FEEDRATE_FOR_MOVE;
     RUNPLAN;
@@ -10398,23 +10401,28 @@ void kill(const char* lcd_msg) {
       abort_sd_printing();
       card.initsd();
       if ( card.cardOK ) {
-        card.openLogFile( "errmsg.d" );
+        char logfilename[30];
+        sprintf_P(logfilename, PSTR("errmsg.d"));
+        // First, delete previous if exists
+        card.removeFile( logfilename );
+        // Then, create it
+        card.openLogFile( logfilename );
         if ( card.saving ) {
           if ( card.writePGM( lcd_msg ) ) {
-            SERIAL_ECHOLN( PSTR("errmsg.d : file written, for more information.") );
+            SERIAL_ECHOLNPGM( "errmsg.d : file written, for more information." );
           }
           else {
-            SERIAL_ECHOLN( PSTR("errmsg.d : can't write file content") );
+            SERIAL_ECHOLNPGM( "errmsg.d : can't write file content" );
           }
           card.closefile();
           card.release();
         }
         else {
-          SERIAL_ECHOLN( PSTR("errmsg.d : can't create file") );
+          SERIAL_ECHOLNPGM( "errmsg.d : can't create file" );
         }
       }
       else {
-        SERIAL_ECHOLN( PSTR("errmsg.d : can't init sd card") );
+        SERIAL_ECHOLNPGM( "errmsg.d : can't init sd card" );
       }
     #endif
     gcode_G28();
