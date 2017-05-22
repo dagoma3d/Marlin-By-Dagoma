@@ -422,6 +422,8 @@ static uint8_t target_extruder;
   float delta[3] = { 0 };
   #define SIN_60 0.8660254037844386
   #define COS_60 0.5
+  #define SIN_30 COS_60
+  #define COS_30 SIN_60
   float endstop_adj[3] = { 0 };
   // these are the default values, can be overriden with M665
   float delta_radius = DELTA_RADIUS;
@@ -3374,26 +3376,145 @@ inline void gcode_G28() {
 
   #if ENABLED( DELTA_EXTRA )
 
-    #if ENABLED( TRI_SHAPE_PROBING )
-      #error TRI_SHAPE_PROBING is deprecated
-      float probe_point_XY_x = (delta_tower1_x + delta_tower2_x ) / 2.0;
-      float probe_point_XY_y = (delta_tower1_y + delta_tower2_y ) / 2.0;
+    #define PROBE_POINT_NUMBER 19 // 12 outer, 6 inner, 1 center
+    // Numbered from X tower cardinal axis,
+    // from outside to center
+    // Contains constant X,Y probe point,
+    // thrid and last float room will contain probed altitude
+    float probe_plan[PROBE_POINT_NUMBER][3] = {
+      // Outer
+      {
+        delta_tower1_x,
+        delta_tower1_y,
+        0.0
+      },
+      {
+        -COS_60 * delta_radius,
+        -SIN_60 * delta_radius,
+        0.0
+      },
+      {
+        0.0,
+        -1.0 * delta_radius,
+        0.0
+      },
+      {
+        COS_60 * delta_radius,
+        -SIN_60 * delta_radius,
+        0.0
+      },
+      {
+        delta_tower2_x,
+        delta_tower2_y,
+        0.0
+      },
+      {
+        delta_radius,
+        0.0,
+        0.0
+      },
+      {
+        SIN_60 * delta_radius,
+        COS_60 * delta_radius,
+        0.0
+      },
+      {
+        COS_60 * delta_radius,
+        SIN_60 * delta_radius,
+        0.0
+      },
+      {
+        delta_tower3_x,
+        delta_tower3_y,
+        0.0
+      },
+      {
+        -COS_60 * delta_radius,
+        SIN_60 * delta_radius,
+        0.0
+      },
+      {
+        -SIN_60 * delta_radius,
+        COS_60 * delta_radius,
+        0.0
+      },
+      {
+        -delta_radius,
+        0.0,
+        0.0
+      },
+      // Inner
+      {
+        -SIN_60 * delta_radius / 2.0,
+        -COS_60 * delta_radius / 2.0,
+        0.0
+      },
+      {
+        0.0,
+        -delta_radius / 2.0,
+        0.0
+      },
+      {
+        SIN_60 * delta_radius / 2.0,
+        -COS_60 * delta_radius / 2.0,
+        0.0
+      },
+      {
+        SIN_60 * delta_radius / 2.0,
+        COS_60 * delta_radius / 2.0,
+        0.0
+      },
+      {
+        0.0,
+        delta_radius / 2.0,
+        0.0
+      },
+      {
+        -SIN_60 * delta_radius / 2.0,
+         COS_60 * delta_radius / 2.0,
+        0.0
+      },
+      // Center
+      {
+        0.0,
+        0.0,
+        0.0
+      }
+    };
 
-      float probe_point_YZ_x = (delta_tower2_x + delta_tower3_x ) / 2.0;
-      float probe_point_YZ_y = (delta_tower2_y + delta_tower3_y ) / 2.0;
-
-      float probe_point_ZX_x = (delta_tower3_x + delta_tower1_x ) / 2.0;
-      float probe_point_ZX_y = (delta_tower3_y + delta_tower1_y ) / 2.0;
-    #else
-      float probe_point_XY_x =  0.0;
-      float probe_point_XY_y =  -1.0 * delta_radius;
-
-      float probe_point_YZ_x =  SIN_60 * delta_radius;
-      float probe_point_YZ_y =  COS_60 * delta_radius;
-
-      float probe_point_ZX_x = -SIN_60 * delta_radius;
-      float probe_point_ZX_y =  COS_60 * delta_radius;
-    #endif
+    // As probe_plan above,
+    // numbered from X tower cardinal axis
+    // From outside to center
+    #define PROBE_MESH_NUMBER 24
+    const short probe_plan_mesh[PROBE_MESH_NUMBER][3] = {
+      // Outer (one side outer) (12)
+      { 0, 1, 12 },
+      { 1, 2, 13 },
+      { 2, 3, 13 },
+      { 3, 4, 14 },
+      { 4, 5, 14 },
+      { 5, 6, 15 },
+      { 7, 6, 15 },
+      { 7, 8, 16 },
+      { 8, 9, 16 },
+      { 9, 10, 17 },
+      { 10, 11, 17 },
+      { 11, 0, 12 },
+      // Outer (one point outer) (6)
+      { 1, 13, 12 },
+      { 3, 14, 13 },
+      { 5, 15, 14 },
+      { 7, 16, 15 },
+      { 9, 17, 16 },
+      { 11, 12, 17 },
+      // Inner (6)
+      { 12, 13, 18 },
+      { 13, 14, 18 },
+      { 14, 15, 18 },
+      { 15, 16, 18 },
+      { 16, 17, 18 },
+      { 17, 12, 18 }
+    };
 
     // Predefine used functions
     inline void gcode_M500();
@@ -3459,143 +3580,213 @@ inline void gcode_G28() {
      *  T1       XY        T2
      */
 
+    float triangle_sign(const float x, const float y, const short p1, const short p2) {
+      return 
+        (x - probe_plan[p2][0]) * (probe_plan[p1][1] - probe_plan[p2][1]) -
+        (probe_plan[p1][0] - probe_plan[p2][0]) * (y - probe_plan[p2][1]);
+    }
+
+    bool triangle_contains(const float x, const float y, const short t) {
+      bool b1, b2, b3;
+
+      const short *triangle;
+      triangle = probe_plan_mesh[t];
+
+      b1 = triangle_sign(x, y, triangle[0], triangle[1]) <= 0.0;
+      b2 = triangle_sign(x, y, triangle[1], triangle[2]) <= 0.0;
+      b3 = triangle_sign(x, y, triangle[2], triangle[0]) <= 0.0;
+
+      return ((b1 == b2) && (b2 == b3));
+    }
+
+    #define PROBE_REGION_NUMBER 12
+    const short probe_plan_triangle_mesh_region[PROBE_REGION_NUMBER][4] = {
+      { 18, 12, 0 },
+      { 18, 12, 1 },
+      { 19, 13, 2 },
+      { 19, 13, 3 },
+      { 20, 14, 4 },
+      { 20, 14, 5 },
+      { 21, 15, 6 },
+      { 21, 15, 7 },
+      { 22, 16, 8 },
+      { 22, 16, 9 },
+      { 23, 17, 10 },
+      { 23, 17, 11 }
+    };
+
     // TODO: Move it to the right place
     // WHERE: on calculate_delta parameters ?
     // 'CAUSE: these values are fixed against delta R
-    float precalc_probed_tri_aref[4] = { 0.0, 0.0, 0.0, 0.0 };
+    float precalc_probe_plan_region_aref[8] = { 0.0 };
 
-    inline int triangle_index( const float x, const float y ) {
+    inline short triangle_index_in_region( const float x, const float y, const short r ) {
+      const short *region;
+      region = probe_plan_triangle_mesh_region[r];
+
+      if ( triangle_contains(x, y, region[0]) ) return region[0];
+      if ( triangle_contains(x, y, region[1]) ) return region[1];
+
+      return region[2];
+    };
+
+    inline short region_index( const float x, const float y ) {
 
       // While all tri equations are just: y = a.x;
       float aTested = y / x;
 
-      // Test to choice between 2 tri groups: 1,2,3 or 0,4,5
+      // Simple test to choice between 2 region groups: 2,3,4,5,6,7 or 8,9,10,11,0,1
       if ( x >= 0.0 ) {
-        // Index is one of 1, 2 or 3
-
-        // Test for tri idx 1 or 2,3
-        // aRef = delta_tower2_y / delta_tower2_x;
-        if ( aTested > precalc_probed_tri_aref[ 0 ] ) {
-          // Idx is one of 2 or 3
-          // Test for tri 2 or 3
-          // aRef = probe_point_YZ_y / probe_point_YZ_x;
-          if ( aTested > precalc_probed_tri_aref[ 1 ] ) {
-            return 3;
+        // Region is one of 2,3,4,5,6,7
+ 
+        // Simple test to choice between 2 sub region groups: 5,6,7 or 2,3,4
+        if (y >= 0.0 ) {
+          // Region is one of 5,6,7
+          if ( aTested > precalc_probe_plan_region_aref[4] ) {
+            // Region is one of 6, 7
+            if ( aTested > precalc_probe_plan_region_aref[5] ) {
+              return 7;
+            }
+            else {
+              return 6;
+            }
+          }
+          else {
+            return 5;
+          }
+        }
+        else {
+          // Region is one of 2,3,4
+          if ( aTested > precalc_probe_plan_region_aref[2] ) {
+            // Region is one of 3,4
+            if ( aTested > precalc_probe_plan_region_aref[3] ) {
+              return 4;
+            }
+            else {
+              return 3;
+            }
           }
           else {
             return 2;
           }
         }
-        else {
-          return 1;
-        }
       }
       else {
-        // Index is one of 0, 4 or 5
-        // Test for tri idx 0 or 4,5
-        // aRef = delta_tower1_y / delta_tower1_x;
-        if ( aTested > precalc_probed_tri_aref[ 2 ] ) {
-          return 0;
-        }
-        else {
-          // Index is one of 4 or 5
-          // Test for tri 4 or 5
-          // aRef = probe_point_ZX_y / probe_point_ZX_x;
-          if ( aTested > precalc_probed_tri_aref[ 3 ] ) {
-            return 5;
+        // Region is one of 8,9,10,11,0,1
+ 
+        // Simple test to choice between 2 sub region groups: 8,9,10 or 11,0,1
+        if (y >= 0.0 ) {
+          // Region is one of 8,9,10
+          if ( aTested > precalc_probe_plan_region_aref[6] ) {
+            // Region is one of 9,10
+            if ( aTested > precalc_probe_plan_region_aref[7] ) {
+              return 10;
+            }
+            else {
+              return 9;
+            }
           }
           else {
-            return 4;
+            return 8;
+          }
+        }
+        else {
+          // Region is one of 11,0,1
+          if ( aTested > precalc_probe_plan_region_aref[0] ) {
+            // Region is one of 0,1
+            if ( aTested > precalc_probe_plan_region_aref[1] ) {
+              return 1;
+            }
+            else {
+              return 0;
+            }
+          }
+          else {
+            return 11;
           }
         }
       }
 
-      // It's an error
-      return -1;
+      // At this point, it's an error
+      // but do not mess up print with 'index out of bound'
+      return 0;
     }
 
-    float probed_tri_altitude[7] = { 42.0, 42.0, 42.0, 42.0, 42.0, 42.0, 42.0 };
+    inline short triangle_index( const float x, const float y ) {
+      short r = region_index( x, y );
+      return triangle_index_in_region( x, y, r );
+    }
 
-    float probed_tri_postcompute_d[6] = { 0.0 };
-    float probed_tri_postcompute_nx[6] = { 0.0 };
-    float probed_tri_postcompute_ny[6] = { 0.0 };
-    float probed_tri_postcompute_nz[6] = { 0.0 };
+    float probed_tri_postcompute_a[PROBE_MESH_NUMBER] = { 0.0 };
+    float probed_tri_postcompute_b[PROBE_MESH_NUMBER] = { 0.0 };
+    float probed_tri_postcompute_c[PROBE_MESH_NUMBER] = { 0.0 };
+    float probed_tri_postcompute_d[PROBE_MESH_NUMBER] = { 0.0 };
 
     inline void probing_postcompute_tri_parameters() {
 
-      float ax[6] = {
-         delta_tower1_x
-        ,probe_point_XY_x
-        ,delta_tower2_x
-        ,probe_point_YZ_x
-        ,delta_tower3_x
-        ,probe_point_ZX_x
-      };
-      float ay[6] = {
-         delta_tower1_y
-        ,probe_point_XY_y
-        ,delta_tower2_y
-        ,probe_point_YZ_y
-        ,delta_tower3_y
-        ,probe_point_ZX_y
-      };
-      float az[6] = {
-         probed_tri_altitude[0]
-        ,probed_tri_altitude[1]
-        ,probed_tri_altitude[2]
-        ,probed_tri_altitude[3]
-        ,probed_tri_altitude[4]
-        ,probed_tri_altitude[5]
-      };
 
-      float bx[6] = {
-         probe_point_XY_x
-        ,delta_tower2_x
-        ,probe_point_YZ_x
-        ,delta_tower3_x
-        ,probe_point_ZX_x
-        ,delta_tower1_x
-      };
-      float by[6] = {
-         probe_point_XY_y
-        ,delta_tower2_y
-        ,probe_point_YZ_y
-        ,delta_tower3_y
-        ,probe_point_ZX_y
-        ,delta_tower1_y
-      };
-      float bz[6] = {
-         probed_tri_altitude[1]
-        ,probed_tri_altitude[2]
-        ,probed_tri_altitude[3]
-        ,probed_tri_altitude[4]
-        ,probed_tri_altitude[5]
-        ,probed_tri_altitude[0]
-      };
+      // Plane equation: a.x+b.y+c.z+d = 0
+      // Query to find z for given x,y will be
+      // z = (-d - b.y - a.x ) / c;
+      // z = -d/c - b.y/c - a.x/c;
+      // z = - (d + b.y + a.x) / c ;
+      // z = - (L/c + M/c + N/c);
+      // if
+      //   L = d/c
+      //   M = b/c
+      //   N = a/c
 
-      float cz = probed_tri_altitude[6];
 
-      for( int i=0; i<6; i++ ) {
+      //   C
+      //   ^
+      // AC|
+      //   |
+      //   A ----> B
+      //      AB
 
-        float cax, cay, caz, cbx, cby, cbz;
-        // x:a.x, y:a.y, z:a.z - c.z
-        cax = ax[i];
-        cay = ay[i];
-        caz = az[i] - cz;
-        // x:b.x, y:b.y, z:b.z - c.z
-        cbx = bx[i];
-        cby = by[i];
-        cbz = bz[i] - cz;
+      float *A;
+      float *B;
+      float *C;
 
-        // n.x: ca.y * cb.z - ca.z * cb.y
-        probed_tri_postcompute_nx[i] = cay * cbz - caz * cby;
-        // n.y: ca.z * cb.x - ca.x * cb.z
-        probed_tri_postcompute_ny[i] = caz * cbx - cax * cbz;
-        // n.z: ca.x * cb.y - ca.y * cb.x
-        probed_tri_postcompute_nz[i] = cax * cby - cay * cbx;
-        // d: - n.z * c.z;
-        probed_tri_postcompute_d[i] = - probed_tri_postcompute_nz[i] * cz;
+      #define X 0
+      #define Y 1
+      #define Z 2
+
+      int i;
+      for(i=0; i < PROBE_MESH_NUMBER; i++) {
+        A = probe_plan[probe_plan_mesh[i][0]];
+        B = probe_plan[probe_plan_mesh[i][1]];
+        C = probe_plan[probe_plan_mesh[i][2]];
+        float a = ( B[Y]-A[Y] )*( C[Z]-A[Z] ) - ( C[Y]-A[Y] )*( B[Z]-A[Z] );
+        float b = ( B[Z]-A[Z] )*( C[X]-A[X] ) - ( C[Z]-A[Z] )*( B[X]-A[X] );
+        float c = ( B[X]-A[X] )*( C[Y]-A[Y] ) - ( C[X]-A[X] )*( B[Y]-A[Y] );
+        float d = -(a*A[X]+b*A[Y]+c*A[Z]);
+
+        float l = d/c;
+        float m = b/c;
+        float n = a/c;
+
+        probed_tri_postcompute_a[i] = a;
+        probed_tri_postcompute_b[i] = b;
+        probed_tri_postcompute_c[i] = c;
+        probed_tri_postcompute_d[i] = d;
+
       }
+
+      // For memory:
+      // precalc_probed_tri_aref[ 0 ] = delta_tower2_y / delta_tower2_x;
+      // precalc_probed_tri_aref[ 1 ] = probe_point_YZ_y / probe_point_YZ_x;
+      // precalc_probed_tri_aref[ 2 ] = delta_tower1_y / delta_tower1_x;
+      // precalc_probed_tri_aref[ 3 ] = probe_point_ZX_y / probe_point_ZX_x;
+
+      precalc_probe_plan_region_aref[ 0 ] = probe_plan[ 0][1] / probe_plan[ 0][0];
+      precalc_probe_plan_region_aref[ 1 ] = probe_plan[ 1][1] / probe_plan[ 1][0];
+      precalc_probe_plan_region_aref[ 2 ] = probe_plan[ 3][1] / probe_plan[ 3][0];
+      precalc_probe_plan_region_aref[ 3 ] = probe_plan[ 4][1] / probe_plan[ 4][0];
+      precalc_probe_plan_region_aref[ 4 ] = probe_plan[ 6][1] / probe_plan[ 6][0];
+      precalc_probe_plan_region_aref[ 5 ] = probe_plan[ 7][1] / probe_plan[ 7][0];
+      precalc_probe_plan_region_aref[ 6 ] = probe_plan[ 9][1] / probe_plan[ 9][0];
+      precalc_probe_plan_region_aref[ 7 ] = probe_plan[10][1] / probe_plan[10][0];
 
       postcompute_tri_ready = true;
     }
@@ -3608,103 +3799,43 @@ inline void gcode_G28() {
 
       feedrate = homing_feedrate[ X_AXIS ];
 
+      int i;
       // Reset
-      probed_tri_altitude[0] =
-      probed_tri_altitude[1] =
-      probed_tri_altitude[2] =
-      probed_tri_altitude[3] =
-      probed_tri_altitude[4] =
-      probed_tri_altitude[5] =
-      probed_tri_altitude[6] = 42.0;
-
-      destination[ X_AXIS ] = delta_tower1_x;
-      destination[ Y_AXIS ] = delta_tower1_y;
-      destination[ Z_AXIS ] = 10.0;
-      prepare_move();
-      st_synchronize();
-      probed_tri_altitude[0] = get_probed_Z_avg(true);
-
-      destination[ X_AXIS ] = probe_point_XY_x;
-      destination[ Y_AXIS ] = probe_point_XY_y;
-      destination[ Z_AXIS ] = 10.0;
-      prepare_move();
-      st_synchronize();
-      probed_tri_altitude[1] = get_probed_Z_avg(true);
-
-      destination[ X_AXIS ] = delta_tower2_x;
-      destination[ Y_AXIS ] = delta_tower2_y;
-      destination[ Z_AXIS ] = 10.0;
-      prepare_move();
-      st_synchronize();
-      probed_tri_altitude[2] = get_probed_Z_avg(true);
-
-      destination[ X_AXIS ] = probe_point_YZ_x;
-      destination[ Y_AXIS ] = probe_point_YZ_y;
-      destination[ Z_AXIS ] = 10.0;
-      prepare_move();
-      st_synchronize();
-      probed_tri_altitude[3] = get_probed_Z_avg(true);
-
-      destination[ X_AXIS ] = delta_tower3_x;
-      destination[ Y_AXIS ] = delta_tower3_y;
-      destination[ Z_AXIS ] = 10.0;
-      prepare_move();
-      st_synchronize();
-      probed_tri_altitude[4] = get_probed_Z_avg(true);
-
-      destination[ X_AXIS ] = probe_point_ZX_x;
-      destination[ Y_AXIS ] = probe_point_ZX_y;
-      destination[ Z_AXIS ] = 10.0;
-      prepare_move();
-      st_synchronize();
-      probed_tri_altitude[5] = get_probed_Z_avg(true);
-
-      destination[ X_AXIS ] = 0.0;
-      destination[ Y_AXIS ] = 0.0;
-      destination[ Z_AXIS ] = 10.0;
-      prepare_move();
-      st_synchronize();
-      probed_tri_altitude[6] = get_probed_Z_avg(true);
-
-      SERIAL_ECHOLN( "Probed tri altitude:" );
-      for(int i=0; i<7; i++) {
-        SERIAL_ECHO( "                [" );
-        SERIAL_ECHO( i );
-        SERIAL_ECHO("]: ");
-        SERIAL_ECHOLN( probed_tri_altitude[i] );
+      for(i=0; i<PROBE_POINT_NUMBER; i++) {
+        probe_plan[i][2] = 42.0;
       }
 
-      z_smooth_tri_leveling_height =
-        max(probed_tri_altitude[0],
-        max(probed_tri_altitude[1],
-        max(probed_tri_altitude[2],
-        max(probed_tri_altitude[3],
-        max(probed_tri_altitude[4],
-        max(probed_tri_altitude[5],
-            probed_tri_altitude[7])))))) -
-        min(probed_tri_altitude[0],
-        min(probed_tri_altitude[1],
-        min(probed_tri_altitude[2],
-        min(probed_tri_altitude[3],
-        min(probed_tri_altitude[4],
-        min(probed_tri_altitude[5],
-            probed_tri_altitude[7]))))));
+      // Probing
+      for(i=0; i<PROBE_POINT_NUMBER; i++) {
+        destination[ X_AXIS ] = probe_plan[i][0];
+        destination[ Y_AXIS ] = probe_plan[i][1];
+        destination[ Z_AXIS ] = 10.0;
+        prepare_move();
+        st_synchronize();
+        probe_plan[i][2] = get_probed_Z_avg(true);
+      }
 
-      SERIAL_ECHO( "       smooth range: " );
-      SERIAL_ECHOLN( z_smooth_tri_leveling_height );
+      #if ENABLED(DEBUG_LEVELING_FEATURE)
+        if (DEBUGGING(LEVELING)) {
+          SERIAL_ECHOLNPGM("Probed tri altitude:");
+          for(i=0; i<PROBE_POINT_NUMBER; i++) {
+            SERIAL_ECHOPGM("               [" );
+            if(i<10) SERIAL_ECHOPGM( "0" );
+            SERIAL_ECHO( i );
+            SERIAL_ECHOPGM("]: ");
+            SERIAL_ECHOLN( probe_plan[i][2] );
+          }
+        }
+      #endif
 
       z_smooth_tri_leveling_height = 20.0;
 
-      SERIAL_ECHO( "     overrided with: " );
-      SERIAL_ECHOLN( z_smooth_tri_leveling_height );
 
-      precalc_probed_tri_aref[ 0 ] = delta_tower2_y / delta_tower2_x;
-      precalc_probed_tri_aref[ 1 ] = probe_point_YZ_y / probe_point_YZ_x;
-      precalc_probed_tri_aref[ 2 ] = delta_tower1_y / delta_tower1_x;
-      precalc_probed_tri_aref[ 3 ] = probe_point_ZX_y / probe_point_ZX_x;
+
+      probing_postcompute_tri_parameters();
+
 
       //#define TEST_SPECIAL_PROBE
-
       #ifdef TEST_SPECIAL_PROBE
 
         for( float y=-100.0; y < 100.0; y+= 10.0 ) {
@@ -3719,11 +3850,6 @@ inline void gcode_G28() {
         }
 
       #endif
-
-
-      probing_postcompute_tri_parameters();
-
-      //gcode_G28();
 
     }
 
@@ -7449,6 +7575,8 @@ inline void gcode_D999() {
 }
 
 inline void gcode_D851() {
+  
+  startup_auto_calibration = true;
 
   SERIAL_ECHOLNPGM( "Starting full Delta calibration" );
 
@@ -9262,26 +9390,86 @@ void clamp_to_software_endstops(float target[3]) {
     delta_diagonal_rod_2_tower_3 = sq(diagonal_rod + delta_diagonal_rod_trim_tower_3);
 
     #if ENABLED( DELTA_EXTRA )
-      #if ENABLED(TRI_SHAPE_PROBING)
-        #error TRI_SHAPE_PROBING deprecated
-        probe_point_XY_x = (delta_tower1_x + delta_tower2_x ) / 2.0;
-        probe_point_XY_y = (delta_tower1_y + delta_tower2_y ) / 2.0;
+      int i=0;
+      // Outer
+      probe_plan[i][0] = delta_tower1_x;
+      probe_plan[i][1] = delta_tower1_y;
+      i++;
 
-        probe_point_YZ_x = (delta_tower2_x + delta_tower3_x ) / 2.0;
-        probe_point_YZ_y = (delta_tower2_y + delta_tower3_y ) / 2.0;
+      probe_plan[i][0] = -COS_60 * radius;
+      probe_plan[i][1] = -SIN_60 * radius;
+      i++;
 
-        probe_point_ZX_x = (delta_tower3_x + delta_tower1_x ) / 2.0;
-        probe_point_ZX_y = (delta_tower3_y + delta_tower1_y ) / 2.0;
-      #else
-        probe_point_XY_x =  0.0;
-        probe_point_XY_y =  -1.0 * radius;
+      probe_plan[i][0] = 0.0;
+      probe_plan[i][1] = -1.0 * radius;
+      i++;
 
-        probe_point_YZ_x =  SIN_60 * radius;
-        probe_point_YZ_y =  COS_60 * radius;
+      probe_plan[i][0] = COS_60 * radius;
+      probe_plan[i][1] = -SIN_60 * radius;
+      i++;
 
-        probe_point_ZX_x = -SIN_60 * radius;
-        probe_point_ZX_y =  COS_60 * radius;
-      #endif
+      probe_plan[i][0] = delta_tower2_x;
+      probe_plan[i][1] = delta_tower2_y;
+      i++;
+
+      probe_plan[i][0] = radius;
+      probe_plan[i][1] = 0.0;
+      i++;
+
+      probe_plan[i][0] = SIN_60 * radius;
+      probe_plan[i][1] = COS_60 * radius;
+      i++;
+
+      probe_plan[i][0] = COS_60 * radius;
+      probe_plan[i][1] = SIN_60 * radius;
+      i++;
+
+      probe_plan[i][0] = delta_tower3_x;
+      probe_plan[i][1] = delta_tower3_y;
+      i++;
+
+      probe_plan[i][0] = -COS_60 * radius;
+      probe_plan[i][1] = SIN_60 * radius;
+      i++;
+
+      probe_plan[i][0] = -SIN_60 * radius;
+      probe_plan[i][1] = COS_60 * radius;
+      i++;
+
+      probe_plan[i][0] = -radius;
+      probe_plan[i][1] = 0.0;
+      i++;
+
+      // Inner
+      probe_plan[i][0] = -SIN_60 * radius / 2.0;
+      probe_plan[i][1] = -COS_60 * radius / 2.0;
+      i++;
+
+      probe_plan[i][0] = 0.0;
+      probe_plan[i][1] = -radius / 2.0;
+      i++;
+
+      probe_plan[i][0] = SIN_60 * radius / 2.0;
+      probe_plan[i][1] = -COS_60 * radius / 2.0;
+      i++;
+
+      probe_plan[i][0] = SIN_60 * radius / 2.0;
+      probe_plan[i][1] = COS_60 * radius / 2.0;
+      i++;
+
+      probe_plan[i][0] = 0.0;
+      probe_plan[i][1] = radius / 2.0;
+      i++;
+
+      probe_plan[i][0] = -SIN_60 * radius / 2.0;
+      probe_plan[i][1] = COS_60 * radius / 2.0;
+      i++;
+
+      // Center
+      probe_plan[i][0] = 0.0;
+      probe_plan[i][1] = 0.0;
+      i++;
+
     #endif
   }
 
@@ -9311,6 +9499,15 @@ void clamp_to_software_endstops(float target[3]) {
   }
 
   #if ENABLED(AUTO_BED_LEVELING_FEATURE)
+
+    inline float triangle_get_point_offset( const float x, const float y, const short t ) {
+      // z = - (d + b.y + a.x) / c ;
+      return - ( 
+        probed_tri_postcompute_d[t] +
+        probed_tri_postcompute_b[t] * y +
+        probed_tri_postcompute_a[t] * x
+      ) / probed_tri_postcompute_c[t];
+    }
 
     // Adjust print surface height by linear interpolation over the bed_level array.
     void adjust_delta(float cartesian[3]) {
@@ -9356,14 +9553,10 @@ void clamp_to_software_endstops(float target[3]) {
         if ( cartesian[Z_AXIS] > z_smooth_tri_leveling_height ) return;
 
         // Find the index tri for z correction
-        int idx = triangle_index( cartesian[X_AXIS], cartesian[Y_AXIS] );
+        short idx = triangle_index( cartesian[X_AXIS], cartesian[Y_AXIS] );
 
-        // -(pp.x * m.x + pp.y * m.y + pp.d) / pp.z;
-        float offset = - (
-            probed_tri_postcompute_nx[ idx ] * cartesian[X_AXIS]
-          + probed_tri_postcompute_ny[ idx ] * cartesian[Y_AXIS]
-          + probed_tri_postcompute_d [ idx ]
-        ) / probed_tri_postcompute_nz[ idx ] ;
+        // Get offset from tri equations
+        float offset = triangle_get_point_offset( cartesian[X_AXIS], cartesian[Y_AXIS], idx );
 
         // Adjust final-offset againt Z altitude
         // to reduce it after 0.6mm
