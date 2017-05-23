@@ -1833,12 +1833,16 @@ static void setup_for_endstop_move() {
       #endif
 
       // move down slowly until you find the bed
-      if (fast) {
-        feedrate = homing_feedrate[Z_AXIS] / 2;
-      }
-      else {
-        feedrate = homing_feedrate[Z_AXIS] / 4;
-      }
+      #if ENABLED(DELTA_EXTRA)
+        if (fast) {
+          feedrate = homing_feedrate[Z_AXIS] / 2;
+        }
+        else {
+      #endif
+          feedrate = homing_feedrate[Z_AXIS] / 4;
+      #if ENABLED(DELTA_EXTRA)
+        }
+      #endif
       destination[Z_AXIS] = -20;
       prepare_move_raw(); // this will also set_current_to_destination
       st_synchronize();
@@ -4405,7 +4409,11 @@ inline void gcode_G28() {
 
       feedrate = homing_feedrate[Z_AXIS];
 
-      run_z_probe(fast);
+      #if ENABLED(DELTA_EXTRA)
+        run_z_probe(fast);
+      #else
+        run_z_probe();
+      #endif
       SERIAL_PROTOCOLPGM("Bed X: ");
       SERIAL_PROTOCOL(current_position[X_AXIS] + X_PROBE_OFFSET_FROM_EXTRUDER + 0.0001);
       SERIAL_PROTOCOLPGM(" Y: ");
