@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 DEBUG=false
 DRYRUN=false
@@ -23,6 +23,23 @@ PROFILE_TO_APPLY=
 VARIANT_TO_LIST=
 declare -A VARIANTS_TO_APPLY
 declare -a VARIANTS_TO_APPLY_orders
+SED_REPLACE_INPLACE="sed -i"
+
+if [ "$(uname)" == "Darwin" ]; then
+	command -v brew >/dev/null 2>&1 || { 
+	/usr/bin/ruby -e "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/master/install)"
+	}
+	command -v gsed >/dev/null 2>&1 || { 
+		brew install gnu-sed
+	}
+	if ((BASH_VERSINFO[0] < 4))
+	then
+		brew install bash
+		echo "Please re-run the script, installation done"
+		exit 1
+	fi
+	SED_REPLACE_INPLACE="gsed -i"
+fi
 
 usage() {
 	echo "usage: ${BASE_NAME} [options] profile_name [variant_name] [checksum] [variant:value]*"
@@ -475,17 +492,17 @@ Enable() {
 		iln="$(grep -n 'macros.h' ${MARLIN_DIR}/Marlin/Configuration.h | cut -f1 -d:)"
 		iln="$(expr $iln + 2)"
 		debug "      Insertion line number: ${iln}"
-		dryrun eval "sed -i '${iln}i\\\\#define ${1}' ${MARLIN_DIR}/Marlin/Configuration.h"
+		dryrun eval "${SED_REPLACE_INPLACE} '${iln}i\\\\#define ${1}' ${MARLIN_DIR}/Marlin/Configuration.h"
 	else
-		dryrun eval "sed -i 's/\/\/ *\(#define *${1}\)/\1/g' ${MARLIN_DIR}/Marlin/Configuration.h"
-		dryrun eval "sed -i 's/\/\/ *\(#define *${1}\)/\1/g' ${MARLIN_DIR}/Marlin/Configuration_adv.h"
+		dryrun eval "${SED_REPLACE_INPLACE} 's/\/\/ *\(#define *${1}\)/\1/g' ${MARLIN_DIR}/Marlin/Configuration.h"
+		dryrun eval "${SED_REPLACE_INPLACE} 's/\/\/ *\(#define *${1}\)/\1/g' ${MARLIN_DIR}/Marlin/Configuration_adv.h"
 	fi
 }
 
 Disable() {
 	debug "Conf: Disable: ${*}"
-	dryrun eval "sed -i 's/\(\/\/ *\)*\(\#define *${1}\)\( \|\$\)/\/\/\2\3/g' ${MARLIN_DIR}/Marlin/Configuration.h"
-	dryrun eval "sed -i 's/\(\/\/ *\)*\(\#define *${1}\)\( \|\$\)/\/\/\2\3/g' ${MARLIN_DIR}/Marlin/Configuration_adv.h"
+	dryrun eval "${SED_REPLACE_INPLACE} 's/\(\/\/ *\)*\(\#define *${1}\)\( \|\$\)/\/\/\2\3/g' ${MARLIN_DIR}/Marlin/Configuration.h"
+	dryrun eval "${SED_REPLACE_INPLACE} 's/\(\/\/ *\)*\(\#define *${1}\)\( \|\$\)/\/\/\2\3/g' ${MARLIN_DIR}/Marlin/Configuration_adv.h"
 }
 
 Set() {
@@ -500,12 +517,12 @@ Set() {
 		iln="$(grep -n 'macros.h' ${MARLIN_DIR}/Marlin/Configuration.h | cut -f1 -d:)"
 		iln="$(expr $iln + 2)"
 		debug "      Insertion line number: ${iln}"
-		dryrun eval "sed -i '${iln}i\\\\#define ${1} ${2}' ${MARLIN_DIR}/Marlin/Configuration.h"
+		dryrun eval "${SED_REPLACE_INPLACE} '${iln}i\\\\#define ${1} ${2}' ${MARLIN_DIR}/Marlin/Configuration.h"
 	else
-		dryrun eval "sed -i 's/\(#define *${1}\) *.*\$/\1 ${2}/g' ${MARLIN_DIR}/Marlin/Configuration.h"
-		dryrun eval "sed -i 's/\(${1}\)\( *= *\)[^;]\+;.*\$/\1 = ${2};/g' ${MARLIN_DIR}/Marlin/Configuration.h"
-		dryrun eval "sed -i 's/\(#define *${1}\) *.*\$/\1 ${2}/g' ${MARLIN_DIR}/Marlin/Configuration_adv.h"
-		dryrun eval "sed -i 's/\(${1}\)\( *= *\)[^;]\+;.*\$/\1 = ${2};/g' ${MARLIN_DIR}/Marlin/Configuration_adv.h"
+		dryrun eval "${SED_REPLACE_INPLACE} 's/\(#define *${1}\) *.*\$/\1 ${2}/g' ${MARLIN_DIR}/Marlin/Configuration.h"
+		dryrun eval "${SED_REPLACE_INPLACE} 's/\(${1}\)\( *= *\)[^;]\+;.*\$/\1 = ${2};/g' ${MARLIN_DIR}/Marlin/Configuration.h"
+		dryrun eval "${SED_REPLACE_INPLACE} 's/\(#define *${1}\) *.*\$/\1 ${2}/g' ${MARLIN_DIR}/Marlin/Configuration_adv.h"
+		dryrun eval "${SED_REPLACE_INPLACE} 's/\(${1}\)\( *= *\)[^;]\+;.*\$/\1 = ${2};/g' ${MARLIN_DIR}/Marlin/Configuration_adv.h"
 	fi
 }
 
@@ -516,7 +533,7 @@ Pin() {
 	iln="$(grep -n '__PINS_H' ${MARLIN_DIR}/Marlin/pins.h | cut -f1 -d:)"
 	iln="$(expr $iln)"
 	debug "      Insertion line number: ${iln}"
-	dryrun eval "sed -i '${iln}i\\\\#undef ${1}\\n#define ${1} ${2}' ${MARLIN_DIR}/Marlin/pins.h"
+	dryrun eval "${SED_REPLACE_INPLACE} '${iln}i\\\\#undef ${1}\\n#define ${1} ${2}' ${MARLIN_DIR}/Marlin/pins.h"
 	
 }
 
