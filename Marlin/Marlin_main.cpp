@@ -6833,15 +6833,18 @@ inline void gcode_M503() {
       }
       switch (phase){
         // HOT END IS HOT
+        // Suctioning all the filament
         case 0:
           destination[E_AXIS] -= FILAMENTCHANGE_FINALRETRACT;
           break;
         //HOT END IS COLD HERE
+        //Suctioning first part
         case 1:
           extrude_min_temp = 0;
           destination[E_AXIS] -= (FILAMENTCHANGE_FINALRETRACT+ FILAMENT_SUCTION_GAP);
           break;
         // HOT END IS HOT
+        //Suctioning second part
         case 2:
           destination[E_AXIS] += FILAMENT_SUCTION_GAP;
           break;
@@ -7236,17 +7239,6 @@ inline void gcode_M503() {
           st_synchronize();
         #endif
       } // while(!lcd_clicked)
-      if(heating_stopped){
-        heating_stopped = false;
-        target_temperature[target_extruder] = previous_target_temperature;
-        while(current_temperature[target_extruder] < target_temperature[target_extruder]) {
-          enable_x();
-          enable_y();
-          enable_z();
-          one_led_on();
-          idle(true);
-        }
-      }
       #if ENABLED( NO_LCD_FOR_FILAMENTCHANGEABLE ) && ENABLED( FILAMENT_RUNOUT_SENSOR )
         // Wait a bit more to see if we want to disable filrunout sensor
         millis_t now = millis();
@@ -7280,6 +7272,19 @@ inline void gcode_M503() {
         }
 
       } while( !can_exit_pause );
+      #if ENABLED(HEATING_STOP)
+      if(heating_stopped){
+        heating_stopped = false;
+        target_temperature[target_extruder] = previous_target_temperature;
+        while(current_temperature[target_extruder] < target_temperature[target_extruder]) {
+          enable_x();
+          enable_y();
+          enable_z();
+          one_led_on();
+          idle(true);
+        }
+      }
+      #endif
     #endif
 
     KEEPALIVE_STATE(IN_HANDLER);
