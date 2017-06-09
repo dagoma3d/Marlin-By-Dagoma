@@ -11,6 +11,7 @@ D200_Melzi endstops:NC z-probe:White printer-head:Easy-V2 box-filamentRunout:Dis
 D200_Melzi endstops:NC z-probe:White printer-head:Original-V1 box-filamentRunout:Enabled
 D200_Melzi endstops:NC z-probe:White printer-head:Easy-V2 box-filamentRunout:Enabled
 D200_MKS screen:Enabled wifi:None
+Neva
 HereList
 )
 
@@ -20,6 +21,14 @@ while read config_to_test
 do
 	echo "Testing compilation of: ${config_to_test}"
 	LinuxAddons/Dagoma/bin/apply_configuration -gcof ${config_to_test}
+
+	if test "$?" -ne "0"
+        then
+                echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
+                echo "Unable to apply configuration: ${config_to_test}"
+                exit 1
+        fi 
+
 	
 	# Compilation test
 	pio run -d Marlin/ > /dev/null

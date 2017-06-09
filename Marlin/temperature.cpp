@@ -1388,6 +1388,7 @@ static void set_current_temp_raw() {
 }
 
 #if ENABLED( Z_MIN_MAGIC )
+  bool enable_z_magic_measurement = false;
   bool can_measure_z_magic = false;
   static unsigned long raw_z_magic_value = 0;
 
@@ -1406,17 +1407,21 @@ static void set_current_temp_raw() {
   millis_t z_magic_elasticity_max_timeout = 0UL;
   millis_t z_magic_hit_timeout = 0UL;
   millis_t z_magic_tap_timeout = 0UL;
+  millis_t z_magic_tap_reset_timeout = 0UL;
   
   int z_magic_value = 0;
+
+  static int z_magic_internal_hit_count = 0;
   int z_magic_hit_count = 0;
 
 inline void update_z_magic( ) {
-
   raw_z_magic_value = ADC;
   z_magic_value = raw_z_magic_value;
 
-  float z_magic_f = float( z_magic_value );
+  if (!enable_z_magic_measurement) return;
 
+  float z_magic_f = float( z_magic_value );
+  
   millis_t now = millis();
 
   z_magic_derivative_bias = ( z_magic_f - z_magic_last_measures_avg ) / 2.0;
@@ -1433,15 +1438,20 @@ inline void update_z_magic( ) {
       if ( z_magic_derivative_bias > Z_MAGIC_DERIVATIVE_BIAS_THRESHOLD ) {
         z_magic_elasticity_min_timeout = now + Z_MAGIC_EDGE_DELAY_MILLIS;
         z_magic_tap_timeout = now + Z_MAGIC_HIT_DELAY_MILLIS;
-        z_magic_hit_count += 1;
+        z_magic_internal_hit_count += 1;
       }
     }
   }
 
   if (ELAPSED(now, z_magic_tap_timeout)) {
-    z_magic_hit_count = 0;
+    z_magic_hit_count = z_magic_internal_hit_count;
+    z_magic_internal_hit_count = 0;
+    z_magic_tap_reset_timeout = now + Z_MAGIC_HIT_DELAY_MILLIS;
   }
   
+  if (ELAPSED(now, z_magic_tap_reset_timeout)) {
+    z_magic_hit_count = 0;
+  }
 
   // Update last_measures avg
   z_magic_last_measures[ z_magic_last_measures_idx ] = z_magic_f;

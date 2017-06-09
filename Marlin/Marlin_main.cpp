@@ -487,6 +487,9 @@ static uint8_t target_extruder;
     static bool filrunout_bypassed = false;
   #endif
 #endif
+#if ENABLED(Z_MIN_MAGIC)
+    static bool z_magic_probing = false;
+#endif
 #if ENABLED(U8GLIB_SSD1306) && ENABLED(INTELLIGENT_LCD_REFRESH_RATE)
   static float last_intelligent_z_lcd_update = 0;
   static float last_intelligent_F_lcd_update = 0;
@@ -1817,6 +1820,11 @@ static void setup_for_endstop_move() {
 
   static void run_z_probe(bool fast=false) {
 
+    #if ENABLED(Z_MIN_MAGIC)
+      z_magic_probing = true;
+      enable_z_magic_measurement = true;
+    #endif
+
     /**
      * To prevent stepper_inactive_time from running out and
      * EXTRUDER_RUNOUT_PREVENT from extruding
@@ -1917,6 +1925,10 @@ static void setup_for_endstop_move() {
       #endif
 
     #endif // !DELTA
+    #if ENABLED(Z_MIN_MAGIC)
+      enable_z_magic_measurement = false;
+      z_magic_probing = false;
+    #endif
   }
 
   /**
@@ -6819,7 +6831,7 @@ inline void gcode_M503() {
 
     inline void manage_tap_tap() {
       if ( !startup_auto_calibration
-        && !IS_SD_PRINTING
+        && !( IS_SD_PRINTING || print_job_timer.isRunning() )
         && !change_filament_by_tap_tap
         #if ENABLED(SUMMON_PRINT_PAUSE)
         && !print_pause_summoned
@@ -6827,11 +6839,16 @@ inline void gcode_M503() {
         #if ENABLED(FILAMENT_RUNOUT_SENSOR)
         && !filament_ran_out
         #endif
-        && z_magic_hit_count > 1
       ) {
-        SERIAL_ECHOLNPGM("Tap tap : Heating and changing filament from IDLE state");
-        change_filament_by_tap_tap = true;
-        enqueue_and_echo_commands_P(PSTR("G28\nM104 S180\nG0 F150 X0 Y0 Z100\nM109 S180\nD600\nM106 S255\nM104 S0\nG28"));
+        enable_z_magic_measurement = true;
+        if (z_magic_hit_count == 2) {
+          SERIAL_ECHOLNPGM("Tap tap : Heating and changing filament from IDLE state");
+          change_filament_by_tap_tap = true;
+          enqueue_and_echo_commands_P(PSTR("G28\nM104 S180\nG0 F150 X0 Y0 Z100\nM109 S180\nD600\nM106 S255\nM104 S0\nG28"));
+        }
+      }
+      else {
+        enable_z_magic_measurement = z_magic_probing;
       }
     }
 
@@ -6913,6 +6930,10 @@ inline void gcode_M503() {
     #if ENABLED(SUMMON_PRINT_PAUSE)
       // Simulate direct call M600
       print_pause_summoned = true;
+    #endif
+
+    #if ENABLED(Z_MIN_MAGIC)
+      enable_z_magic_measurement = true;
     #endif
 
     float lastpos[NUM_AXIS];
@@ -7099,7 +7120,7 @@ inline void gcode_M503() {
 
           #if ENABLED(DELTA_EXTRA) && ENABLED(Z_MIN_MAGIC)
             // Must be check quicker than 2.5s
-            if ( z_magic_hit_count > 1 ) {
+            if ( z_magic_hit_count == 2 ) {
               gcode_D600();
             }
           #endif
@@ -7211,6 +7232,10 @@ inline void gcode_M503() {
 
     // Restore previous feedrate
     feedrate = previous_feedrate;
+
+    #if ENABLED(Z_MIN_MAGIC)
+      enable_z_magic_measurement = false;
+    #endif
 
   }
 
@@ -9464,7 +9489,7 @@ void disable_all_steppers() {
       }
     }
     else {
-      if ( IS_SD_PRINTING ) {
+      if ( IS_SD_PRINTING || print_job_timer.isRunning() ) {
         one_led_on();
       }
       else {
@@ -9487,7 +9512,7 @@ void disable_all_steppers() {
       #endif
       ) {
       if (
-        IS_SD_PRINTING
+        ( IS_SD_PRINTING || print_job_timer.isRunning() )
         && ( READ(SUMMON_PRINT_PAUSE_PIN) ^ SUMMON_PRINT_PAUSE_INVERTING )
         && axis_homed[X_AXIS]
         && axis_homed[Y_AXIS]
@@ -9529,7 +9554,7 @@ void disable_all_steppers() {
     }
 
     if ( !startup_auto_calibration
-      && !IS_SD_PRINTING
+      && !( IS_SD_PRINTING || print_job_timer.isRunning() )
       && !asked_to_print
       && ( READ(ONE_BUTTON_PIN) ^ ONE_BUTTON_INVERTING )
     ) {
@@ -9562,7 +9587,7 @@ void disable_all_steppers() {
   }
 #endif
 
-#if ENABLED( Z_MIN_MAGIC )
+#if ENABLED( Z_MIN_MAGIC ) && ENABLED(DEBUG_LEVELING_FEATURE)
   millis_t last_debug_z_magic_timing = 0UL;
 #endif
 
@@ -9626,7 +9651,7 @@ void idle(
     manage_second_serial_status();
   #endif
 
-  #if ENABLED( Z_MIN_MAGIC )
+  #if ENABLED( Z_MIN_MAGIC ) && ENABLED(DEBUG_LEVELING_FEATURE)
     if (DEBUGGING(LEVELING)) {
       millis_t now = millis();
       if (ELAPSED(now, last_debug_z_magic_timing)) {
@@ -9662,7 +9687,7 @@ void manage_inactivity(bool ignore_stepper_queue/*=false*/) {
 
   #if HAS_FILRUNOUT
     if (
-      IS_SD_PRINTING
+      ( IS_SD_PRINTING || print_job_timer.isRunning() )
       #if ENABLED( SUMMON_PRINT_PAUSE )
       && !filrunout_bypassed
       && !print_pause_summoned
