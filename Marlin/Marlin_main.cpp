@@ -540,7 +540,6 @@ static bool send_ok[BUFSIZE];
 typedef enum {
    ACTIVITY_IDLE
   ,ACTIVITY_STARTUP_CALIBRATION
-  ,ACTIVITY_PROBING
   ,ACTIVITY_PRINTING
   ,ACTIVITY_PAUSED
 } ActivityState;
@@ -578,6 +577,7 @@ typedef struct {
   bool pause_asked;
   bool print_asked;
   bool homed;
+  bool probing;
 } PrinterStates;
 
 PrinterStates printer_states;
@@ -2923,8 +2923,7 @@ inline void gcode_G28() {
     if (DEBUGGING(LEVELING)) SERIAL_ECHOLNPGM("gcode_G28 >>>");
   #endif
 
-  ActivityState previous_activity_state = printer_states.activity_state;
-  printer_states.activity_state = ACTIVITY_PROBING;
+  printer_states.probing = true;
 
   // Wait for planner moves to finish!
   st_synchronize();
@@ -3271,7 +3270,7 @@ inline void gcode_G28() {
 
   gcode_M114(); // Send end position to RepetierHost
 
-  printer_states.activity_state = previous_activity_state;
+  printer_states.probing = false;
 }
 
 #if ENABLED(MESH_BED_LEVELING)
@@ -3609,7 +3608,7 @@ inline void gcode_G28() {
     inline float get_probed_Z_avg(bool fast=false) {
 
       bool all_points_are_good = false;
-      float z_read[3] = { 50.0 };
+      float z_read[3] = { 67.0 };
       float z_avg = 0.0;
 
       do {
@@ -3627,11 +3626,11 @@ inline void gcode_G28() {
         }
 
         set_destination_to_current();
-        destination[ Z_AXIS ] = min( 50.0, destination[ Z_AXIS ] + 5.0 );
+        destination[ Z_AXIS ] = min( 67.0, destination[ Z_AXIS ] + 5.0 );
         prepare_move();
         st_synchronize();
 
-        if ( destination[ Z_AXIS ] > 49.90 ) {
+        if ( destination[ Z_AXIS ] > 66.90 ) {
           int i=10; do { idle(true); delay(100); } while(--i);
           all_points_are_good = false;
         }
@@ -4478,8 +4477,7 @@ inline void gcode_G28() {
     inline void gcode_G30() {
     #endif
       
-      ActivityState previous_activity_state = printer_states.activity_state;
-      printer_states.activity_state = ACTIVITY_PROBING;
+      printer_states.probing = true;
       
       #if HAS_SERVO_ENDSTOPS
         raise_z_for_servo();
@@ -4518,7 +4516,7 @@ inline void gcode_G28() {
 
       gcode_M114(); // Send end position to RepetierHost
 
-      printer_states.activity_state = previous_activity_state;
+      printer_states.probing = false;
     }
 
   #endif //!Z_PROBE_SLED
@@ -8434,7 +8432,7 @@ inline void gcode_D851() {
   float z_home_offset;
   destination[X_AXIS] = 0;
   destination[Y_AXIS] = 0;
-  destination[Z_AXIS] = 50.0f;
+  destination[Z_AXIS] = 70.0f;
   prepare_move();
   st_synchronize();
   z_home_offset = get_probed_Z_avg();
@@ -10279,7 +10277,6 @@ void disable_all_steppers() {
     else {
       if (
         printer_states.activity_state == ACTIVITY_PRINTING
-        || printer_states.activity_state == ACTIVITY_PROBING
       ) {
         one_led_on();
       }
@@ -10433,7 +10430,7 @@ inline void manage_printer_states() {
   // Every time stuff
   // ----------------
   #if ENABLED(Z_MIN_MAGIC)
-    enable_z_magic_measurement = (printer_states.activity_state != ACTIVITY_PRINTING);
+    enable_z_magic_measurement = (printer_states.activity_state != ACTIVITY_PRINTING) || printer_states.probing;
   #endif
 
   #if ENABLED(ONE_LED)
