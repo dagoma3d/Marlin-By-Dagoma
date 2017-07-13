@@ -488,9 +488,6 @@ static uint8_t target_extruder;
 #endif
 #if ENABLED(SUMMON_PRINT_PAUSE)
   static bool print_pause_summoned = false;
-  #if ENABLED(FILAMENT_RUNOUT_SENSOR)
-    static bool filrunout_bypassed = false;
-  #endif
 #endif
 #if ENABLED(Z_MIN_MAGIC)
     static bool z_magic_probing = false;
@@ -578,6 +575,7 @@ typedef struct {
   bool print_asked;
   bool homed;
   bool probing;
+  bool filament_runout_bypassed;
 } PrinterStates;
 
 PrinterStates printer_states;
@@ -998,14 +996,6 @@ void setup() {
   #if ENABLED(SUMMON_PRINT_PAUSE) && SUMMON_PRINT_PAUSE_PIN != X_MIN_PIN && SUMMON_PRINT_PAUSE_PIN != Y_MAX_PIN && SUMMON_PRINT_PAUSE_PIN != Z_MIN_PIN
     SET_INPUT(SUMMON_PRINT_PAUSE_PIN);
     WRITE(SUMMON_PRINT_PAUSE_PIN, HIGH);
-
-    #if ENABLED(FILAMENT_RUNOUT_SENSOR)
-      delay( 100 );
-      if ( ONE_BUTTON_PRESSED ) {
-          filrunout_bypassed = true;
-          SERIAL_ECHOLN( PSTR("Filament sensor bypassed") );
-      }
-    #endif
   #elif ENABLED(ONE_BUTTON)
     SET_INPUT(ONE_BUTTON_PIN);
     WRITE(ONE_BUTTON_PIN, HIGH);
@@ -7082,8 +7072,6 @@ inline void gcode_M503() {
 
     ActivityState previous_activity_state = printer_states.activity_state;
     printer_states.activity_state = ACTIVITY_PAUSED;
-    
-    printer_states.activity_state = ACTIVITY_PAUSED;
 
     float x_heat_from, x_heat_to, y_heat_from, y_heat_to, z_heat_from, z_heat_to;
     x_heat_from = x_heat_to = current_position[X_AXIS];
@@ -10312,53 +10300,54 @@ void disable_all_steppers() {
     if (PENDING(now, next_one_button_check)) return;
     next_one_button_check = now + 100UL;
 
-    if (
-      !printer_states.print_asked
-      && ONE_BUTTON_PRESSED
-    ) {
-      // Warns user if no filament at start/resume.
-      #if HAS_FILRUNOUT
-        if( FILAMENT_NOT_PRESENT ) {
-          printer_states.filament_state = FILAMENT_OUT;
-          set_notify_warning();
-          return;
+    if (printer_states.print_asked) {
+      // The user has released the button
+      if (ONE_BUTTON_RELEASED) {
+        if (has_to_print_timeout == 0) {
+          SERIAL_ECHOLNPGM("one button: Start pending: Checking sd card content");
+          has_to_print_timeout = now + 2500UL;
+
+          #if ENABLED(ONE_LED)
+            one_led_on();
+          #endif
+
+          card.autostart_index = 0;
+          card.cardOK = false;
+          card.checkautostart( true );
         }
-        else {
-          printer_states.filament_state = FILAMENT_IN;
-        }
-      #else
-        printer_states.filament_state = FILAMENT_IN;
-      #endif
-
-      #if ENABLED( FILAMENT_RUNOUT_SENSOR )
-        filrunout_bypassed = false;
-      #endif
-      printer_states.print_asked = true;
-      has_to_print_timeout = now + 2500UL;
-
-      #if ENABLED(ONE_LED)
-        one_led_on();
-      #endif
-
-      card.autostart_index = 0;
-      card.cardOK = false;
-      card.checkautostart( true );
-
-      #if ENABLED(ONE_LED)
-        if ( !card.cardOK ) set_notify_warning();
-      #endif
+        if (ELAPSED(now, has_to_print_timeout)) {
+          // sd.checkautostart did not found some interesting file on sd card
+          SERIAL_ECHOLNPGM("one button: Start aborted: No suitable file on sd card");
+          #if ENABLED(ONE_LED)
+            set_notify_warning();
+          #endif
+          printer_states.print_asked = false;
+          has_to_print_timeout = 0;
+        } 
+      }
     }
+    else { //!printer_states.print_asked
+      if (ONE_BUTTON_PRESSED) {
+        #if HAS_FILRUNOUT
+          if( FILAMENT_NOT_PRESENT ) {
+            printer_states.filament_state = FILAMENT_OUT;
+          }
+          else {
+            printer_states.filament_state = FILAMENT_IN;
+          }
+        #else
+          printer_states.filament_state = FILAMENT_IN;
+        #endif
 
-    if (ELAPSED(now, has_to_print_timeout)) {
-      if (ONE_BUTTON_RELEASED && printer_states.print_asked) {
-        if (IS_SD_PRINTING) {
-          printer_states.activity_state = ACTIVITY_PRINTING;
+        if (printer_states.filament_state == FILAMENT_IN) {
+          SERIAL_ECHOLNPGM("one button: Start asked");
+          printer_states.print_asked = true;
         }
         else {
+          SERIAL_ECHOLNPGM("one button: Start aborted: No filament");
           set_notify_warning();
         }
       }
-      printer_states.print_asked = false;
     }
   }
 #endif
@@ -10454,8 +10443,9 @@ inline void manage_printer_states() {
     #endif
 
     // We can go to PRINTING state only if we were IDLE
-    if (print_job_timer.isRunning()) {
+    if (IS_SD_PRINTING || print_job_timer.isRunning()) {
       printer_states.activity_state = ACTIVITY_PRINTING;
+      printer_states.print_asked = false;
     }
   }
 
