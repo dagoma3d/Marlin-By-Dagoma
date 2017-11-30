@@ -733,7 +733,7 @@ const bool Z_MIN_PROBE_ENDSTOP_INVERTING = true; // set to true to invert the lo
   #define MANUAL_Y_HOME_POS 0
   //#define MANUAL_Z_HOME_POS 0
   //#define MANUAL_Z_HOME_POS 205 // For delta: Distance between nozzle and print surface after homing.
-  #define MANUAL_Z_HOME_POS 226 // 2017/03/10 For delta: Distance between nozzle and print surface after homing.
+  #define MANUAL_Z_HOME_POS 260 // 2017/03/10 For delta: Distance between nozzle and print surface after homing.
 #endif
 
 // Use "Z Safe Homing" to avoid homing with a Z probe outside the bed area.
@@ -768,7 +768,7 @@ const bool Z_MIN_PROBE_ENDSTOP_INVERTING = true; // set to true to invert the lo
 #define DEFAULT_AXIS_STEPS_PER_UNIT   {80.0, 80.0, 80.0, 98.0}  // default steps per unit for Ultimaker
 //#define DEFAULT_MAX_FEEDRATE          {300, 300, 300, 25}    // (mm/sec)
 //#define DEFAULT_MAX_FEEDRATE          {200, 200, 200, 25}    // (mm/sec)
-#define DEFAULT_MAX_FEEDRATE          {333, 333, 333, 170}    // (mm/sec) // Ju
+#define DEFAULT_MAX_FEEDRATE          {333, 333, 333, 66}    // (mm/sec) // Ju
 //#define DEFAULT_MAX_ACCELERATION      {3000,3000,3000,10000}    // X, Y, Z, E maximum start speed for accelerated moves. E default values are good for Skeinforge 40+, for older versions raise them a lot.
 #define DEFAULT_MAX_ACCELERATION      {9000,9000,9000,10000} // Ju
 //#define DEFAULT_MAX_ACCELERATION      {9000,9000,9000,10000}    // X, Y, Z, E maximum start speed for accelerated moves. E default values are good for Skeinforge 40+, for older versions raise them a lot.

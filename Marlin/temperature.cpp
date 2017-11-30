@@ -568,6 +568,7 @@ inline void _temp_error(int e, const char* serial_msg, const char* lcd_msg) {
   }
   #if DISABLED(BOGUS_TEMPERATURE_FAILSAFE_OVERRIDE)
     if (!killed) {
+      SERIAL_ECHOLNPGM("Ca killeu");
       Running = false;
       killed = true;
       kill(lcd_msg);
@@ -1080,6 +1081,9 @@ void tp_init() {
   #if ENABLED(FILAMENT_WIDTH_SENSOR)
     ANALOG_SELECT(FILWIDTH_PIN);
   #endif
+  #if ENABLED(Z_MIN_MAGIC)
+    ANALOG_SELECT(15);
+  #endif
 
   #if HAS_AUTO_FAN_0
     pinMode(EXTRUDER_0_AUTO_FAN_PIN, OUTPUT);
@@ -1388,80 +1392,242 @@ static void set_current_temp_raw() {
 }
 
 #if ENABLED( Z_MIN_MAGIC )
-  bool enable_z_magic_measurement = false;
-  bool can_measure_z_magic = false;
-  static unsigned long raw_z_magic_value = 0;
+  bool enable_z_magic_probe = false;
+  bool enable_z_magic_tap = false;
 
-  #define Z_MAGIC_LAST_MEASURES_NUMBER 5
-  volatile float z_magic_last_measures[Z_MAGIC_LAST_MEASURES_NUMBER] = { 0.0 };
-  volatile float z_magic_last_measures_avg = 0.0 ;
-  volatile int z_magic_last_measures_idx = 0;
-  float z_magic_derivative_bias = 0.0;
+  float z_magic_raw_value = 0; // Extern
+  float z_magic_mean = 0; // Extern
+  float z_magic_bias = 0; // Extern
+  float z_magic_bias_delta = 0; // Extern
+  float z_magic_bias_threshold = 0.0; // Extern
+  bool z_magic_hit_flag = false; // Extern
+  static float z_magic_reference = 0.0;
 
-  #define Z_MAGIC_DERIVATIVE_BIAS_THRESHOLD (8.0)
-  #define Z_MAGIC_MIN_ELASTICITY_RESPONSE_MILLIS 50UL
-  #define Z_MAGIC_MAX_ELASTICITY_RESPONSE_MILLIS 80UL
-  #define Z_MAGIC_EDGE_DELAY_MILLIS 150UL
-  #define Z_MAGIC_HIT_DELAY_MILLIS 500UL
-  millis_t z_magic_elasticity_min_timeout = 0UL;
-  millis_t z_magic_elasticity_max_timeout = 0UL;
-  millis_t z_magic_hit_timeout = 0UL;
-  millis_t z_magic_tap_timeout = 0UL;
-  millis_t z_magic_tap_reset_timeout = 0UL;
-  
-  int z_magic_value = 0;
+  millis_t z_magic_calibration_timeout;
+  millis_t z_magic_need_to_go_up_timeout;
+  millis_t z_magic_multi_tap_emit;
+  millis_t z_magic_multi_tap_timeout;
+  millis_t z_magic_for_scratch_disabled_timeout;
 
-  static int z_magic_internal_hit_count = 0;
-  int z_magic_hit_count = 0;
+  static int z_magic_internal_tap_count = 0;
+  static bool z_magic_internal_not_yet_tap_flag = false;
+  static bool z_magic_need_to_go_down = true;
+  static bool z_magic_need_to_go_up = false;
+  volatile int z_magic_tap_count = 0; // Extern
+
+void reset_z_magic() {
+  // #if ENABLED(DEBUG_LEVELING_FEATURE)
+  //   if (DEBUGGING(LEVELING)) {
+  //     SERIAL_ECHOPGM("Reseting Z-Magic@");
+      
+  //     SERIAL_ECHOPGM("raw:");
+  //     SERIAL_ECHO(z_magic_raw_value);
+  //     SERIAL_ECHOPGM(" ");
+      
+  //     SERIAL_ECHOPGM("mean:");
+  //     SERIAL_ECHO(z_magic_mean);
+  //     SERIAL_ECHOPGM(" ");
+
+  //     SERIAL_ECHOPGM("bias:");
+  //     SERIAL_ECHO(z_magic_bias);
+  //     SERIAL_ECHOPGM(" ");
+
+  //     SERIAL_ECHOPGM("delta:");
+  //     SERIAL_ECHO(z_magic_bias_delta);
+  //     SERIAL_ECHOPGM(" ");
+
+  //     SERIAL_ECHOPGM("hit:");
+  //     SERIAL_ECHO(z_magic_tap_count);
+  //     SERIAL_ECHOPGM(" ");
+
+  //     SERIAL_ECHOLNPGM("");
+  //   }
+  // #endif
+
+  z_magic_mean = z_magic_raw_value;
+  z_magic_bias = 0.0;
+  z_magic_bias_delta = 0.0;
+  z_magic_bias_threshold = 0.0;
+  z_magic_calibration_timeout = millis() + 100UL;
+  z_magic_internal_not_yet_tap_flag = true;
+  z_magic_hit_flag = false;
+}
 
 inline void update_z_magic( ) {
-  raw_z_magic_value = ADC;
-  z_magic_value = raw_z_magic_value;
-
-  if (!enable_z_magic_measurement) return;
-
-  float z_magic_f = float( z_magic_value );
   
   millis_t now = millis();
 
-  z_magic_derivative_bias = ( z_magic_f - z_magic_last_measures_avg ) / 2.0;
+  if (enable_z_magic_probe || enable_z_magic_tap) {
 
-  if ( ELAPSED(now, z_magic_hit_timeout) ) {
-    if ( z_magic_derivative_bias < -Z_MAGIC_DERIVATIVE_BIAS_THRESHOLD ) {
-      z_magic_hit_timeout = now + Z_MAGIC_EDGE_DELAY_MILLIS;
-      z_magic_elasticity_max_timeout = now + Z_MAGIC_MAX_ELASTICITY_RESPONSE_MILLIS;
+    z_magic_raw_value = float(ADC);
+    z_magic_bias = z_magic_raw_value - z_magic_mean;
+    z_magic_bias_delta += z_magic_bias;
+    z_magic_mean = z_magic_raw_value;
+
+    //if (!enable_z_magic_measurement) return;
+
+    //float absbm;
+    //float deltabs = fabsf(z_magic_bias_delta);
+
+    /*
+    #if ENABLED(DEBUG_LEVELING_FEATURE)
+      if (DEBUGGING(LEVELING)) {
+        SERIAL_ECHOPGM("Z-Magic@");
+        
+        SERIAL_ECHOPGM("raw:");
+        SERIAL_ECHO(z_magic_raw_value);
+        SERIAL_ECHOPGM(" ");
+        
+        SERIAL_ECHOPGM("mean:");
+        SERIAL_ECHO(z_magic_mean);
+        SERIAL_ECHOPGM(" ");
+
+        SERIAL_ECHOPGM("bias:");
+        SERIAL_ECHO(z_magic_bias);
+        SERIAL_ECHOPGM(" ");
+
+        SERIAL_ECHOPGM("delta:");
+        SERIAL_ECHO(z_magic_bias_delta);
+        SERIAL_ECHOPGM(" ");
+
+        SERIAL_ECHOPGM("hit:");
+        SERIAL_ECHO(z_magic_tap_count);
+        SERIAL_ECHOPGM(" ");
+
+        SERIAL_ECHOPGM("flag:");
+        SERIAL_ECHO(z_magic_hit_flag);
+        SERIAL_ECHOPGM(" ");
+
+        SERIAL_ECHOLNPGM("");
+      }
+    #endif
+    */
+
+    if (!z_magic_hit_flag && z_magic_bias_delta < -10.0) {
+      z_magic_hit_flag = true;
+      /*
+      z_magic_hit_flag = true;
+      if (z_magic_internal_not_yet_tap_flag && z_magic_bias_delta < -20.0) {
+        z_magic_tap_count++;
+        z_magic_multi_tap_timeout = now + 500UL;
+        z_magic_calibration_timeout = now + 100UL;
+        z_magic_internal_not_yet_tap_flag = false;
+      }
+      */
+      z_magic_calibration_timeout = now + 100UL;
     }
-  }
+    
+    if (enable_z_magic_tap) {
+      if (ELAPSED(now, z_magic_for_scratch_disabled_timeout)) {
+        if (z_magic_need_to_go_down && z_magic_bias_delta < -30.0) {
+          z_magic_need_to_go_down = false;
+          z_magic_need_to_go_up = true;
+          //z_magic_calibration_timeout = now + 100UL;
+          z_magic_multi_tap_emit = now + 500UL;
+          z_magic_need_to_go_up_timeout = now + 200UL;
+        }
 
-  if ( PENDING(now, z_magic_elasticity_max_timeout) ) {
-    if ( ELAPSED(now, z_magic_elasticity_min_timeout) ) {
-      if ( z_magic_derivative_bias > Z_MAGIC_DERIVATIVE_BIAS_THRESHOLD ) {
-        z_magic_elasticity_min_timeout = now + Z_MAGIC_EDGE_DELAY_MILLIS;
-        z_magic_tap_timeout = now + Z_MAGIC_HIT_DELAY_MILLIS;
-        z_magic_internal_hit_count += 1;
+        if (z_magic_need_to_go_up && z_magic_bias_delta < -30.0 && ELAPSED(now, z_magic_need_to_go_up_timeout)) {
+          z_magic_for_scratch_disabled_timeout = now + 2000UL;
+          z_magic_need_to_go_down = true;
+          z_magic_need_to_go_up = false;
+        }
+
+        if (z_magic_need_to_go_up && z_magic_bias_delta > 10.0) {
+          if (PENDING(now, z_magic_need_to_go_up_timeout)) {
+            z_magic_internal_tap_count++;
+            z_magic_multi_tap_emit = now + 500UL;
+          }
+          z_magic_need_to_go_down = true;
+          z_magic_need_to_go_up = false;
+        }
+
+        // Was 1 block below, after 'if (ELAPSED(now, z_magic_calibration_timeout))' 
+        if (ELAPSED(now, z_magic_multi_tap_emit)) {
+          z_magic_need_to_go_down = true;
+          z_magic_need_to_go_up = false;
+          if(z_magic_internal_tap_count > 0) {
+            z_magic_tap_count = z_magic_internal_tap_count;
+            z_magic_internal_tap_count = 0;
+            z_magic_multi_tap_timeout = now + 500UL;
+          }
+        }
+      }
+      else {
+        // Scratch disabled
+        z_magic_need_to_go_down = true;
+        z_magic_need_to_go_up = false;
+        z_magic_internal_tap_count = 0;
+        z_magic_tap_count = 0;
       }
     }
+
+    /* Cycle reset */
+    if (ELAPSED(now, z_magic_calibration_timeout)) {
+      z_magic_bias_delta = 0.0;
+      //z_magic_internal_not_yet_tap_flag = true;
+      z_magic_calibration_timeout = now + 100UL; // Re-Arm anyway
+    }
   }
 
-  if (ELAPSED(now, z_magic_tap_timeout)) {
-    z_magic_hit_count = z_magic_internal_hit_count;
-    z_magic_internal_hit_count = 0;
-    z_magic_tap_reset_timeout = now + Z_MAGIC_HIT_DELAY_MILLIS;
-  }
-  
-  if (ELAPSED(now, z_magic_tap_reset_timeout)) {
-    z_magic_hit_count = 0;
+  if (ELAPSED(now, z_magic_multi_tap_timeout)) {
+    z_magic_tap_count = 0;
   }
 
-  // Update last_measures avg
-  z_magic_last_measures[ z_magic_last_measures_idx ] = z_magic_f;
-  z_magic_last_measures_idx = ( z_magic_last_measures_idx + 1 ) % Z_MAGIC_LAST_MEASURES_NUMBER;
+  /*
+  if (PENDING(now, z_magic_calibration_timeout)) {
+    //z_magic_bias = z_magic_raw_value - z_magic_mean;
+    //z_magic_mean = (z_magic_raw_value + z_magic_mean ) / 2.0;
 
-  z_magic_last_measures_avg = z_magic_last_measures[0];
-  for( int i=1; i<Z_MAGIC_LAST_MEASURES_NUMBER; i++ ) {
-    z_magic_last_measures_avg += z_magic_last_measures[ i ];
+    if (deltabs > 10.0) {
+      reset_z_magic();
+    }
+
+    // absbm = fabsf(z_magic_bias);
+    // if (absbm > 5.0) {
+    //   reset_z_magic();
+    // }
+    // else {
+    //   z_magic_bias_threshold = fmax(z_magic_bias_threshold, absbm);
+    //   z_magic_reference = z_magic_mean + z_magic_bias_threshold/2.0;
+    // }
   }
-  z_magic_last_measures_avg /= float( Z_MAGIC_LAST_MEASURES_NUMBER );
+  else {
+    
+    //z_magic_bias = z_magic_raw_value - z_magic_reference;
+    //z_magic_mean = (z_magic_raw_value + z_magic_mean ) / 2.0;
+
+    //absbm = fabsf(z_magic_bias);
+
+
+    if (z_magic_bias_delta < -10.0) {
+      z_magic_hit_flag = true;
+      if (z_magic_internal_not_yet_tap_flag && z_magic_bias_delta < -20.0) {
+        z_magic_tap_count++;
+        z_magic_multi_tap_timeout = now + 500UL;
+        z_magic_internal_not_yet_tap_flag = false;
+      }
+    }
+
+    if (deltabs > 20.0) {
+      reset_z_magic();
+    }
+
+    // if (absbm > z_magic_bias_threshold*1.5) {
+    //   z_magic_hit_flag = true;
+    //   if (absbm > z_magic_bias_threshold*5.0) {
+    //     if (z_magic_internal_not_yet_tap_flag) {
+    //       z_magic_tap_count++;
+    //       z_magic_multi_tap_timeout = now + 500UL;
+    //       z_magic_internal_not_yet_tap_flag = true;
+    //     }
+    //   }
+    //   if (z_magic_bias>0.0) {
+    //     reset_z_magic();
+    //   }
+    // }
+  }
+  */
 }
 
 #endif
@@ -1722,18 +1888,12 @@ ISR(TIMER0_COMPB_vect) {
       #endif
       lcd_buttons_update();
       temp_state = MeasureTemp_0;
-      #if ENABLED( Z_MIN_MAGIC )
-        can_measure_z_magic = false;
-      #endif
       break;
     case MeasureTemp_0:
       #if HAS_TEMP_0
         raw_temp_value[0] += ADC;
       #endif
       temp_state = PrepareTemp_BED;
-      #if ENABLED( Z_MIN_MAGIC )
-        can_measure_z_magic = false;
-      #endif
       break;
 
     case PrepareTemp_BED:
@@ -1743,7 +1903,6 @@ ISR(TIMER0_COMPB_vect) {
       lcd_buttons_update();
       temp_state = MeasureTemp_BED;
       #if ENABLED( Z_MIN_MAGIC )
-        can_measure_z_magic = true;
         START_ADC(15);
       #endif
       break;
@@ -1753,7 +1912,6 @@ ISR(TIMER0_COMPB_vect) {
       #endif
       temp_state = PrepareTemp_1;
       #if ENABLED( Z_MIN_MAGIC )
-        can_measure_z_magic = true;
         update_z_magic();
       #endif
       break;
@@ -1765,7 +1923,6 @@ ISR(TIMER0_COMPB_vect) {
       lcd_buttons_update();
       temp_state = MeasureTemp_1;
       #if ENABLED( Z_MIN_MAGIC )
-        can_measure_z_magic = true;
         START_ADC(15);
       #endif
       break;
@@ -1775,7 +1932,6 @@ ISR(TIMER0_COMPB_vect) {
       #endif
       temp_state = PrepareTemp_2;
       #if ENABLED( Z_MIN_MAGIC )
-        can_measure_z_magic = true;
         update_z_magic();
       #endif
       break;
@@ -1787,7 +1943,6 @@ ISR(TIMER0_COMPB_vect) {
       lcd_buttons_update();
       temp_state = MeasureTemp_2;
       #if ENABLED( Z_MIN_MAGIC )
-        can_measure_z_magic = true;
         START_ADC(15);
       #endif
       break;
@@ -1797,7 +1952,6 @@ ISR(TIMER0_COMPB_vect) {
       #endif
       temp_state = PrepareTemp_3;
       #if ENABLED( Z_MIN_MAGIC )
-        can_measure_z_magic = true;
         update_z_magic();
       #endif
       break;
@@ -1809,7 +1963,6 @@ ISR(TIMER0_COMPB_vect) {
       lcd_buttons_update();
       temp_state = MeasureTemp_3;
       #if ENABLED( Z_MIN_MAGIC )
-        can_measure_z_magic = true;
         START_ADC(15);
       #endif
       break;
@@ -1819,7 +1972,6 @@ ISR(TIMER0_COMPB_vect) {
       #endif
       temp_state = Prepare_FILWIDTH;
       #if ENABLED( Z_MIN_MAGIC )
-        can_measure_z_magic = true;
         update_z_magic();
       #endif
       break;
@@ -1831,7 +1983,6 @@ ISR(TIMER0_COMPB_vect) {
       lcd_buttons_update();
       temp_state = Measure_FILWIDTH;
       #if ENABLED( Z_MIN_MAGIC )
-        can_measure_z_magic = true;
         START_ADC(15);
       #endif
       break;
@@ -1846,7 +1997,6 @@ ISR(TIMER0_COMPB_vect) {
       temp_state = PrepareTemp_0;
       temp_count++;
       #if ENABLED( Z_MIN_MAGIC )
-        can_measure_z_magic = true;
         update_z_magic();
       #endif
       break;

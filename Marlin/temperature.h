@@ -187,11 +187,21 @@ FORCE_INLINE void autotempShutdown() {
 }
 
 #if ENABLED( Z_MIN_MAGIC )
-  extern bool enable_z_magic_measurement;
-  extern bool can_measure_z_magic;
-  extern int z_magic_value;
-  extern float z_magic_derivative_bias;
-  extern int z_magic_hit_count;
+  extern float z_magic_raw_value;
+  extern float z_magic_mean;
+  extern float z_magic_bias;
+  extern float z_magic_bias_delta;
+  extern float z_magic_bias_threshold;
+  extern bool z_magic_hit_flag;
+
+  extern volatile int z_magic_tap_count;
+
+  extern bool enable_z_magic_probe;
+  extern bool enable_z_magic_tap;
+  void reset_z_magic();
+  void enable_z_magic();
+  void disable_z_magic();
+  inline void z_magic_hit_ack() { z_magic_hit_flag = false; }
 #endif
 
 #endif // TEMPERATURE_H

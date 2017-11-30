@@ -526,31 +526,15 @@ inline void update_endstops() {
 
         #if ENABLED(Z_MIN_PROBE_ENDSTOP) && DISABLED(Z_MIN_PROBE_USES_Z_MIN_ENDSTOP_PIN) && ENABLED(HAS_Z_MIN_PROBE)
           #if ENABLED( Z_MIN_MAGIC )
-              if ( z_probe_is_active /*&& can_measure_z_magic*/ ) {
-                //int z_sensor_i = analogRead( Z_MIN_PROBE_PIN );
-                int z_sensor_i = z_magic_value;
-                float z_sensor_f = float( z_sensor_i );
-                float derivative_bias = ( z_sensor_f - last_measures_avg ) / 2.0;
-
-                /*if ( derivative_bias > -2.0 ) {*/
-                if ( z_magic_derivative_bias > -5.0 ) {
-                  // We do not hit anything
-                  SET_BIT(current_endstop_bits, Z_MIN_PROBE, 0 );
+              if ( z_probe_is_active ) {
+                if (z_magic_hit_flag) {
+                  reset_z_magic();
+                  SET_BIT(current_endstop_bits, Z_MIN_PROBE, 1 );
+                  old_endstop_bits = current_endstop_bits;
                 }
                 else {
-                  // We hit something
-                  SET_BIT(current_endstop_bits, Z_MIN_PROBE, 1 );
+                  SET_BIT(current_endstop_bits, Z_MIN_PROBE, 0 );
                 }
-
-                // Update last_measures avg
-                last_measures[ last_measures_idx ] = z_sensor_f;
-                last_measures_idx = ( last_measures_idx + 1 ) % LAST_MEASURE_NUMBER;
-
-                last_measures_avg = last_measures[0];
-                for( int i=1; i<LAST_MEASURE_NUMBER; i++ ) {
-                  last_measures_avg += last_measures[ i ];
-                }
-                last_measures_avg /= float( LAST_MEASURE_NUMBER );
 
                 if (TEST_ENDSTOP(_ENDSTOP(Z, MIN_PROBE)) && current_block->steps[_AXIS(Z)] > 0) {
                   _SET_TRIGSTEPS(Z);
@@ -1058,23 +1042,35 @@ void st_init() {
   #endif
 
   #if HAS_X_MAX
-    SET_INPUT(X_MAX_PIN);
-    #if ENABLED(ENDSTOPPULLUP_XMAX)
-      WRITE(X_MAX_PIN,HIGH);
+    #if ENABLED(DELTA_EXTRA)
+      pinMode(X_MAX_PIN, INPUT_PULLUP);
+    #else
+      SET_INPUT(X_MAX_PIN);
+      #if ENABLED(ENDSTOPPULLUP_XMAX)
+        WRITE(X_MAX_PIN,HIGH);
+      #endif
     #endif
   #endif
 
   #if HAS_Y_MAX
-    SET_INPUT(Y_MAX_PIN);
-    #if ENABLED(ENDSTOPPULLUP_YMAX)
-      WRITE(Y_MAX_PIN,HIGH);
+    #if ENABLED(DELTA_EXTRA)
+      pinMode(Y_MAX_PIN, INPUT_PULLUP);
+    #else
+      SET_INPUT(Y_MAX_PIN);
+      #if ENABLED(ENDSTOPPULLUP_YMAX)
+        WRITE(Y_MAX_PIN,HIGH);
+      #endif
     #endif
   #endif
 
   #if HAS_Z_MAX
-    SET_INPUT(Z_MAX_PIN);
-    #if ENABLED(ENDSTOPPULLUP_ZMAX)
-      WRITE(Z_MAX_PIN,HIGH);
+    #if ENABLED(DELTA_EXTRA)
+      pinMode(Z_MAX_PIN, INPUT_PULLUP);
+    #else
+      SET_INPUT(Z_MAX_PIN);
+      #if ENABLED(ENDSTOPPULLUP_ZMAX)
+        WRITE(Z_MAX_PIN,HIGH);
+      #endif
     #endif
   #endif
 
@@ -1085,7 +1081,7 @@ void st_init() {
     #endif
   #endif
 
-  #if HAS_Z_PROBE && ENABLED(Z_MIN_PROBE_ENDSTOP) // Check for Z_MIN_PROBE_ENDSTOP so we don't pull a pin high unless it's to be used.
+  #if HAS_Z_PROBE && ENABLED(Z_MIN_PROBE_ENDSTOP) && DISABLED(Z_MIN_MAGIC) // Check for Z_MIN_PROBE_ENDSTOP so we don't pull a pin high unless it's to be used.
     SET_INPUT(Z_MIN_PROBE_PIN);
     #if ENABLED(ENDSTOPPULLUP_ZMIN_PROBE)
       WRITE(Z_MIN_PROBE_PIN,HIGH);

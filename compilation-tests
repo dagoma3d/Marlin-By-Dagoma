@@ -3,15 +3,19 @@
 echo "Running some compilation tests"
 
 CONFIGURATIONS_TO_TEST=$(cat <<HereList
-Delta endstops:NO screen:None
 E200 filamentRunout:Disabled screen:Disabled
 E200 filamentRunout:Disabled screen:Enabled
+E200 filamentRunout:Enabled screen:Disabled
+E200 filamentRunout:Enabled screen:Enabled
 D200_Melzi endstops:NC z-probe:White printer-head:Original-V1 box-filamentRunout:Disabled
 D200_Melzi endstops:NC z-probe:White printer-head:Easy-V2 box-filamentRunout:Disabled
 D200_Melzi endstops:NC z-probe:White printer-head:Original-V1 box-filamentRunout:Enabled
 D200_Melzi endstops:NC z-probe:White printer-head:Easy-V2 box-filamentRunout:Enabled
 D200_MKS screen:Enabled wifi:None
-Neva
+D200_MKS screen:Disabled wifi:None
+Neva version:1.0
+Neva version:1.1
+E350 tools:Mono-Extruder z-carriage:Dual z-probe:bl-touch zsteps:4mm
 HereList
 )
 
