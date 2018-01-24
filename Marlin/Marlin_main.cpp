@@ -6982,9 +6982,21 @@ inline void gcode_M503() {
 
   #if ENABLED(DELTA_EXTRA) && ENABLED(Z_MIN_MAGIC)
 
+    #define NOT_YET_CALIBRATED \
+      ( \
+        endstop_adj[X_AXIS] == 0 && \
+        endstop_adj[Y_AXIS] == 0 && \
+        endstop_adj[Z_AXIS] == 0 && \
+        printer_states.activity_state != ACTIVITY_STARTUP_CALIBRATION \
+      )
+
     inline void manage_tap_tap() {
       if ( !printer_states.pause_asked ) {
         if (z_magic_tap_count == 2) {
+          if (NOT_YET_CALIBRATED) {
+            SERIAL_ERRORLNPGM("Printer not yet calibrated. Please calibrate.");
+            return;
+          }
           if (FILAMENT_PRESENT) {
             SERIAL_ECHOLNPGM("Pause : Asked by tap tap");
 
@@ -10461,7 +10473,7 @@ void disable_all_steppers() {
 #if ENABLED(ONE_BUTTON)
 
   inline void manage_one_button_start_print() {
-    // De-Bounce bouton press
+    // De-Bounce button press
     millis_t now = millis();
     if (PENDING(now, next_one_button_check)) return;
     next_one_button_check = now + 100UL;
@@ -10494,6 +10506,10 @@ void disable_all_steppers() {
     }
     else { //!printer_states.print_asked
       if (ONE_BUTTON_PRESSED) {
+        if (NOT_YET_CALIBRATED) {
+          SERIAL_ERRORLNPGM("Printer not yet calibrated. Please calibrate.");
+          return;
+        }
         if (printer_states.filament_state == FILAMENT_IN) {
           SERIAL_ECHOLNPGM("one button: Start asked");
           printer_states.print_asked = true;
@@ -10515,6 +10531,10 @@ inline void manage_filament_auto_insertion() {
       printer_states.filament_state == FILAMENT_OUT
       && FILAMENT_PRESENT
     ) {
+      if (NOT_YET_CALIBRATED) {
+        SERIAL_ERRORLNPGM("Printer not yet calibrated. Please calibrate.");
+        return;
+      }
       SERIAL_ECHOLNPGM("Filament auto-insertion preamble");
 
       printer_states.filament_state = FILAMENT_PRE_INSERTING;
