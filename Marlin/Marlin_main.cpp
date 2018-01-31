@@ -6958,6 +6958,32 @@ inline void gcode_M503() {
   inline void set_notify_warning();
 #endif
 
+#if ENABLED(Z_MIN_MAGIC)
+  
+  enum Z_Magic_TapTap_State {
+    WAITING_HIT_START = 0,
+    GO_DOWN,
+    GO_UP,
+    SETTLE,
+    DISABLE_DUE_TO_SCRATCH = 9
+  };
+
+  Z_Magic_TapTap_State tt_state = WAITING_HIT_START;
+
+  millis_t z_magic_need_to_timeout;
+  millis_t z_magic_multi_tap_emit;
+  millis_t z_magic_multi_tap_timeout;
+  millis_t z_magic_for_scratch_disabled_timeout;
+  float z_magic_bias_delta_min_reached;
+  
+  int z_magic_internal_tap_count = 0;
+  int z_magic_tap_count = 0;
+
+  #if ENABLED(DEBUG_LEVELING_FEATURE)
+    millis_t last_debug_z_magic_timing = 0UL;
+  #endif
+#endif
+
 #if ENABLED(FILAMENTCHANGEENABLE)
 
   // Generally :
@@ -8807,12 +8833,20 @@ inline void gcode_D852() {
   do {
     now = millis();
 
+    SERIAL_ECHOPGM("tstp:");
+    SERIAL_ECHO   (now);
+    SERIAL_ECHOPGM(" ");
+
+    SERIAL_ECHOPGM("step:");
+    SERIAL_ECHO   (tt_state);
+    SERIAL_ECHOPGM(" ");
+
     SERIAL_ECHOPGM("raw:");
     SERIAL_ECHO   (z_magic_raw_value);
     SERIAL_ECHOPGM(" ");
 
-    SERIAL_ECHOPGM("mean:");
-    SERIAL_ECHO   (z_magic_mean);
+    SERIAL_ECHOPGM("prev:");
+    SERIAL_ECHO   (z_magic_previous);
     SERIAL_ECHOPGM(" ");
 
     SERIAL_ECHOPGM("bias:");
@@ -8825,16 +8859,8 @@ inline void gcode_D852() {
     SERIAL_ECHO   (z_magic_bias_delta);
     SERIAL_ECHOPGM(" ");
 
-    SERIAL_ECHOPGM("bias_threshold:");
-    SERIAL_ECHO   (z_magic_bias_threshold);
-    SERIAL_ECHOPGM(" ");
-
     SERIAL_ECHOPGM("tap_count:");
     SERIAL_ECHO( z_magic_tap_count );
-    SERIAL_ECHOPGM(" ");
-
-    SERIAL_ECHOPGM("weight:");
-    SERIAL_ECHO( (expf((1110.0 - z_magic_raw_value)/105.0)-100.0) );
 
     SERIAL_ECHOLNPGM("");
 
@@ -9828,11 +9854,11 @@ void clamp_to_software_endstops(float target[3]) {
         delta[Z_AXIS] += zprobe_zoffset;
 
         // Bed support smoothness
-        /*
+        
         delta[X_AXIS] += 0.05;
         delta[Y_AXIS] += 0.05;
         delta[Z_AXIS] += 0.05;
-        */
+        
 
       #endif // End DELTA_EXTRA
     }
@@ -10650,9 +10676,6 @@ inline void manage_printer_states() {
   }
 }
 
-#if ENABLED( Z_MIN_MAGIC ) && ENABLED(DEBUG_LEVELING_FEATURE)
-  millis_t last_debug_z_magic_timing = 0UL;
-#endif
 /**
  * Standard idle routine keeps the machine alive
  */
@@ -10697,31 +10720,102 @@ void idle(
     manage_second_serial_status();
   #endif
 
-  #if ENABLED( Z_MIN_MAGIC ) && ENABLED(DEBUG_LEVELING_FEATURE)
-    if (DEBUGGING(LEVELING)) {
-      millis_t now = millis();
-      if (ELAPSED(now, last_debug_z_magic_timing)) {
-        SERIAL_ECHOPGM("Z Magic (tstp / value / bias / delta / threshold / tap / hit): ");
-        SERIAL_ECHO( millis() );
-        SERIAL_ECHOPGM(" / ");
-        SERIAL_ECHO( z_magic_raw_value );
-        SERIAL_ECHOPGM(" / ");
-        SERIAL_ECHO( z_magic_mean );
-        SERIAL_ECHOPGM(" / ");
-        SERIAL_ECHO( z_magic_bias );
-        SERIAL_ECHOPGM(" / ");
-        SERIAL_ECHO( z_magic_bias_delta );
-        SERIAL_ECHOPGM(" / ");
-        SERIAL_ECHO( z_magic_bias_threshold );
-        SERIAL_ECHOPGM(" / ");
-        SERIAL_ECHO( z_magic_tap_count );
-        SERIAL_ECHOPGM(" / ");
-        SERIAL_ECHO( z_magic_hit_flag );
-        SERIAL_ECHOLNPGM("");
-        last_debug_z_magic_timing = now + 250UL; // 2times a second
+  #if ENABLED( Z_MIN_MAGIC )
+    millis_t now = millis();
+    if (enable_z_magic_tap) {
+      // --------8<---------------------
+      if (tt_state == WAITING_HIT_START) {
+        if (z_magic_bias_delta < -10.0) {
+          tt_state = GO_DOWN;
+          z_magic_need_to_timeout = now + 50UL;
+          z_magic_bias_delta_min_reached = 0.0;
+          // TODO: Clean :: z_magic_calibration_timeout = now + 100UL;
+        }
+      }
+      // --------8<---------------------
+      // 'Boing' protector
+      if (tt_state != WAITING_HIT_START && tt_state != DISABLE_DUE_TO_SCRATCH) {
+        if (z_magic_bias_delta > 0.0) {
+          tt_state = DISABLE_DUE_TO_SCRATCH;
+          z_magic_need_to_timeout = now + 1000UL;
+        }
+      }
+      // --------8<---------------------
+      if (tt_state == GO_DOWN) {
+        if (ELAPSED(now, z_magic_need_to_timeout)) {
+          // Min Down Pick level collection finished
+          // Let's check how deep the bed was went down
+          if (z_magic_bias_delta_min_reached < -30.0) {
+            tt_state = GO_UP;
+            z_magic_need_to_timeout = now + 120UL;
+          }
+          else {
+            // This was not suffiscient
+            tt_state = DISABLE_DUE_TO_SCRATCH;
+            z_magic_need_to_timeout = now + 1000UL;
+          }
+        }
+        else {
+          // Collect max down value reached
+          z_magic_bias_delta_min_reached = min(z_magic_bias_delta, z_magic_bias_delta_min_reached);
+        }
+      }
+      // --------8<---------------------
+      if (tt_state == GO_UP) {
+        if (ELAPSED(now, z_magic_need_to_timeout)) {
+            tt_state = DISABLE_DUE_TO_SCRATCH;
+            z_magic_need_to_timeout = now + 1000UL;
+        }
+        else {
+          if (z_magic_bias_delta > z_magic_bias_delta_min_reached/3.0) {
+            tt_state = SETTLE;
+            z_magic_need_to_timeout = now + 30UL;
+          }
+        }
+      }
+      // --------8<---------------------
+      if (tt_state == SETTLE) {
+        if (ELAPSED(now, z_magic_need_to_timeout)) {
+          // Success
+          tt_state = WAITING_HIT_START;
+
+          // Count a tap
+          z_magic_internal_tap_count++;
+          // Total count will be emit in a few millis
+          z_magic_multi_tap_emit = now + 500UL;
+
+        }
+        else {
+          if (z_magic_bias_delta < z_magic_bias_delta_min_reached/2.0) {
+            // Fail to settle
+            tt_state = DISABLE_DUE_TO_SCRATCH;
+            z_magic_need_to_timeout = now + 1000UL;
+          }
+        }
+      }
+      // --------8<---------------------
+      if (tt_state == DISABLE_DUE_TO_SCRATCH) {
+        z_magic_internal_tap_count = 0;
+        z_magic_tap_count = 0;
+        
+        if (ELAPSED(now, z_magic_need_to_timeout)) {
+          tt_state = WAITING_HIT_START;
+        }
+      }
+      // --------8<---------------------
+      if (z_magic_internal_tap_count > 0 && ELAPSED(now, z_magic_multi_tap_emit)) {
+        z_magic_tap_count = z_magic_internal_tap_count;
+        z_magic_internal_tap_count = 0;
+        z_magic_multi_tap_timeout = now + 500UL;
       }
     }
+
+    // Check to reset that, even if enable_z_magic_tap is disabled
+    if (z_magic_tap_count > 0 && ELAPSED(now, z_magic_multi_tap_timeout)) {
+      z_magic_tap_count = 0;
+    }
   #endif
+
 }
 
 /**

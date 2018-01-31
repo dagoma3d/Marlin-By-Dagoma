@@ -1396,239 +1396,47 @@ static void set_current_temp_raw() {
   bool enable_z_magic_tap = false;
 
   float z_magic_raw_value = 0; // Extern
-  float z_magic_mean = 0; // Extern
+  float z_magic_previous = 0; // Extern
   float z_magic_bias = 0; // Extern
   float z_magic_bias_delta = 0; // Extern
-  float z_magic_bias_threshold = 0.0; // Extern
   bool z_magic_hit_flag = false; // Extern
-  static float z_magic_reference = 0.0;
 
   millis_t z_magic_calibration_timeout;
-  millis_t z_magic_need_to_go_up_timeout;
-  millis_t z_magic_multi_tap_emit;
-  millis_t z_magic_multi_tap_timeout;
-  millis_t z_magic_for_scratch_disabled_timeout;
 
-  static int z_magic_internal_tap_count = 0;
-  static bool z_magic_internal_not_yet_tap_flag = false;
-  static bool z_magic_need_to_go_down = true;
-  static bool z_magic_need_to_go_up = false;
-  volatile int z_magic_tap_count = 0; // Extern
+  void reset_z_magic() {
+    z_magic_previous = z_magic_raw_value;
+    z_magic_bias = 0.0;
+    z_magic_bias_delta = 0.0;
+    z_magic_calibration_timeout = millis() + 100UL;
+    z_magic_hit_flag = false;
+  }
 
-void reset_z_magic() {
-  // #if ENABLED(DEBUG_LEVELING_FEATURE)
-  //   if (DEBUGGING(LEVELING)) {
-  //     SERIAL_ECHOPGM("Reseting Z-Magic@");
-      
-  //     SERIAL_ECHOPGM("raw:");
-  //     SERIAL_ECHO(z_magic_raw_value);
-  //     SERIAL_ECHOPGM(" ");
-      
-  //     SERIAL_ECHOPGM("mean:");
-  //     SERIAL_ECHO(z_magic_mean);
-  //     SERIAL_ECHOPGM(" ");
+  inline void update_z_magic( ) {
+    
+    millis_t now = millis();
 
-  //     SERIAL_ECHOPGM("bias:");
-  //     SERIAL_ECHO(z_magic_bias);
-  //     SERIAL_ECHOPGM(" ");
+    if (enable_z_magic_probe || enable_z_magic_tap) {
 
-  //     SERIAL_ECHOPGM("delta:");
-  //     SERIAL_ECHO(z_magic_bias_delta);
-  //     SERIAL_ECHOPGM(" ");
+      z_magic_raw_value = float(ADC);
+      z_magic_bias = z_magic_raw_value - z_magic_previous;
+      z_magic_previous = z_magic_raw_value;
+      z_magic_bias_delta += z_magic_bias;
 
-  //     SERIAL_ECHOPGM("hit:");
-  //     SERIAL_ECHO(z_magic_tap_count);
-  //     SERIAL_ECHOPGM(" ");
-
-  //     SERIAL_ECHOLNPGM("");
-  //   }
-  // #endif
-
-  z_magic_mean = z_magic_raw_value;
-  z_magic_bias = 0.0;
-  z_magic_bias_delta = 0.0;
-  z_magic_bias_threshold = 0.0;
-  z_magic_calibration_timeout = millis() + 100UL;
-  z_magic_internal_not_yet_tap_flag = true;
-  z_magic_hit_flag = false;
-}
-
-inline void update_z_magic( ) {
-  
-  millis_t now = millis();
-
-  if (enable_z_magic_probe || enable_z_magic_tap) {
-
-    z_magic_raw_value = float(ADC);
-    z_magic_bias = z_magic_raw_value - z_magic_mean;
-    z_magic_bias_delta += z_magic_bias;
-    z_magic_mean = z_magic_raw_value;
-
-    //if (!enable_z_magic_measurement) return;
-
-    //float absbm;
-    //float deltabs = fabsf(z_magic_bias_delta);
-
-    /*
-    #if ENABLED(DEBUG_LEVELING_FEATURE)
-      if (DEBUGGING(LEVELING)) {
-        SERIAL_ECHOPGM("Z-Magic@");
-        
-        SERIAL_ECHOPGM("raw:");
-        SERIAL_ECHO(z_magic_raw_value);
-        SERIAL_ECHOPGM(" ");
-        
-        SERIAL_ECHOPGM("mean:");
-        SERIAL_ECHO(z_magic_mean);
-        SERIAL_ECHOPGM(" ");
-
-        SERIAL_ECHOPGM("bias:");
-        SERIAL_ECHO(z_magic_bias);
-        SERIAL_ECHOPGM(" ");
-
-        SERIAL_ECHOPGM("delta:");
-        SERIAL_ECHO(z_magic_bias_delta);
-        SERIAL_ECHOPGM(" ");
-
-        SERIAL_ECHOPGM("hit:");
-        SERIAL_ECHO(z_magic_tap_count);
-        SERIAL_ECHOPGM(" ");
-
-        SERIAL_ECHOPGM("flag:");
-        SERIAL_ECHO(z_magic_hit_flag);
-        SERIAL_ECHOPGM(" ");
-
-        SERIAL_ECHOLNPGM("");
+      if (!z_magic_hit_flag && z_magic_bias_delta < -10.0) {
+        z_magic_hit_flag = true;
       }
-    #endif
-    */
 
-    if (!z_magic_hit_flag && z_magic_bias_delta < -10.0) {
-      z_magic_hit_flag = true;
-      /*
-      z_magic_hit_flag = true;
-      if (z_magic_internal_not_yet_tap_flag && z_magic_bias_delta < -20.0) {
-        z_magic_tap_count++;
-        z_magic_multi_tap_timeout = now + 500UL;
+      if (z_magic_bias < -4.0 || z_magic_bias > 4.0) {
         z_magic_calibration_timeout = now + 100UL;
-        z_magic_internal_not_yet_tap_flag = false;
       }
-      */
-      z_magic_calibration_timeout = now + 100UL;
-    }
-    
-    if (enable_z_magic_tap) {
-      if (ELAPSED(now, z_magic_for_scratch_disabled_timeout)) {
-        if (z_magic_need_to_go_down && z_magic_bias_delta < -30.0) {
-          z_magic_need_to_go_down = false;
-          z_magic_need_to_go_up = true;
-          //z_magic_calibration_timeout = now + 100UL;
-          z_magic_multi_tap_emit = now + 500UL;
-          z_magic_need_to_go_up_timeout = now + 200UL;
-        }
 
-        if (z_magic_need_to_go_up && z_magic_bias_delta < -30.0 && ELAPSED(now, z_magic_need_to_go_up_timeout)) {
-          z_magic_for_scratch_disabled_timeout = now + 2000UL;
-          z_magic_need_to_go_down = true;
-          z_magic_need_to_go_up = false;
-        }
-
-        if (z_magic_need_to_go_up && z_magic_bias_delta > 10.0) {
-          if (PENDING(now, z_magic_need_to_go_up_timeout)) {
-            z_magic_internal_tap_count++;
-            z_magic_multi_tap_emit = now + 500UL;
-          }
-          z_magic_need_to_go_down = true;
-          z_magic_need_to_go_up = false;
-        }
-
-        // Was 1 block below, after 'if (ELAPSED(now, z_magic_calibration_timeout))' 
-        if (ELAPSED(now, z_magic_multi_tap_emit)) {
-          z_magic_need_to_go_down = true;
-          z_magic_need_to_go_up = false;
-          if(z_magic_internal_tap_count > 0) {
-            z_magic_tap_count = z_magic_internal_tap_count;
-            z_magic_internal_tap_count = 0;
-            z_magic_multi_tap_timeout = now + 500UL;
-          }
-        }
-      }
-      else {
-        // Scratch disabled
-        z_magic_need_to_go_down = true;
-        z_magic_need_to_go_up = false;
-        z_magic_internal_tap_count = 0;
-        z_magic_tap_count = 0;
+      /* Cycle reset */
+      if (ELAPSED(now, z_magic_calibration_timeout)) {
+        z_magic_bias_delta = 0.0;
+        z_magic_calibration_timeout = now + 100UL; // Re-Arm anyway
       }
     }
-
-    /* Cycle reset */
-    if (ELAPSED(now, z_magic_calibration_timeout)) {
-      z_magic_bias_delta = 0.0;
-      //z_magic_internal_not_yet_tap_flag = true;
-      z_magic_calibration_timeout = now + 100UL; // Re-Arm anyway
-    }
   }
-
-  if (ELAPSED(now, z_magic_multi_tap_timeout)) {
-    z_magic_tap_count = 0;
-  }
-
-  /*
-  if (PENDING(now, z_magic_calibration_timeout)) {
-    //z_magic_bias = z_magic_raw_value - z_magic_mean;
-    //z_magic_mean = (z_magic_raw_value + z_magic_mean ) / 2.0;
-
-    if (deltabs > 10.0) {
-      reset_z_magic();
-    }
-
-    // absbm = fabsf(z_magic_bias);
-    // if (absbm > 5.0) {
-    //   reset_z_magic();
-    // }
-    // else {
-    //   z_magic_bias_threshold = fmax(z_magic_bias_threshold, absbm);
-    //   z_magic_reference = z_magic_mean + z_magic_bias_threshold/2.0;
-    // }
-  }
-  else {
-    
-    //z_magic_bias = z_magic_raw_value - z_magic_reference;
-    //z_magic_mean = (z_magic_raw_value + z_magic_mean ) / 2.0;
-
-    //absbm = fabsf(z_magic_bias);
-
-
-    if (z_magic_bias_delta < -10.0) {
-      z_magic_hit_flag = true;
-      if (z_magic_internal_not_yet_tap_flag && z_magic_bias_delta < -20.0) {
-        z_magic_tap_count++;
-        z_magic_multi_tap_timeout = now + 500UL;
-        z_magic_internal_not_yet_tap_flag = false;
-      }
-    }
-
-    if (deltabs > 20.0) {
-      reset_z_magic();
-    }
-
-    // if (absbm > z_magic_bias_threshold*1.5) {
-    //   z_magic_hit_flag = true;
-    //   if (absbm > z_magic_bias_threshold*5.0) {
-    //     if (z_magic_internal_not_yet_tap_flag) {
-    //       z_magic_tap_count++;
-    //       z_magic_multi_tap_timeout = now + 500UL;
-    //       z_magic_internal_not_yet_tap_flag = true;
-    //     }
-    //   }
-    //   if (z_magic_bias>0.0) {
-    //     reset_z_magic();
-    //   }
-    // }
-  }
-  */
-}
 
 #endif
 
