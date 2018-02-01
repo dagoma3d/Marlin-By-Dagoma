@@ -10539,6 +10539,7 @@ void disable_all_steppers() {
         if (printer_states.filament_state == FILAMENT_IN) {
           SERIAL_ECHOLNPGM("one button: Start asked");
           printer_states.print_asked = true;
+          has_to_print_timeout = 0;
         }
         else {
           SERIAL_ECHOLNPGM("one button: Start aborted: No filament");
