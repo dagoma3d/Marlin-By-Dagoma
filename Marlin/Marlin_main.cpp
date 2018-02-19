@@ -859,11 +859,25 @@ void servo_init() {
   inline void one_led_off() {
     digitalWrite( ONE_LED_PIN, false ^ ONE_LED_INVERTING );
   }
+
+  // Pre-declaration
+  inline void set_notify_warning();
+  inline void set_notify_not_calibrated();
 #endif
 
 #if ENABLED(ONE_BUTTON) || ENABLED(SUMMON_PRINT_PAUSE)
   #define ONE_BUTTON_PRESSED  (READ( SUMMON_PRINT_PAUSE_PIN ) ^ SUMMON_PRINT_PAUSE_INVERTING)
   #define ONE_BUTTON_RELEASED (!ONE_BUTTON_PRESSED)
+#endif
+
+#if ENABLED(DELTA_EXTRA) && ENABLED(Z_MIN_MAGIC)
+    #define NOT_YET_CALIBRATED \
+      ( \
+        endstop_adj[X_AXIS] == 0 && \
+        endstop_adj[Y_AXIS] == 0 && \
+        endstop_adj[Z_AXIS] == 0 && \
+        printer_states.activity_state != ACTIVITY_STARTUP_CALIBRATION \
+      )
 #endif
 
 /**
@@ -1029,6 +1043,7 @@ void setup() {
       }
       else {
         enqueue_and_echo_commands_P( PSTR("M106 S255\nG28") );
+        if (NOT_YET_CALIBRATED) set_notify_not_calibrated();
       }
     #endif
   #endif
@@ -3440,10 +3455,11 @@ inline void gcode_G28() {
   #if ENABLED( DELTA_EXTRA )
 
     #define PROBE_POINT_NUMBER 19 // 12 outer, 6 inner, 1 center
-    // Numbered from X tower cardinal axis,
+    // Numbered from cardinal X tower, counter-clockwize to cardinal Z tower
     // from outside to center
+    // in two counter-clockwize turns.
     // Contains constant X,Y probe point,
-    // thrid and last float room will contain probed altitude
+    // third and last float room will contain probed altitude
     float probe_plan[PROBE_POINT_NUMBER][3] = {
       // Outer
       {
@@ -3546,8 +3562,9 @@ inline void gcode_G28() {
     };
 
     // As probe_plan above,
-    // numbered from X tower cardinal axis
-    // From outside to center
+    // numbered from cardinal X tower to cardinal Z tower
+    // (2 counter-clockwize turns from outside to center)
+    // Tris are referenced by indexes in counter-clockwize polygon convention
     #define PROBE_MESH_NUMBER 24
     const short probe_plan_mesh[PROBE_MESH_NUMBER][3] = {
       // Outer (one side outer) (12)
@@ -3563,7 +3580,7 @@ inline void gcode_G28() {
       { 9, 10, 17 },
       { 10, 11, 17 },
       { 11, 0, 12 },
-      // Outer (one point outer) (6)
+      // Outer (one point outer, one side inner) (6)
       { 1, 13, 12 },
       { 3, 14, 13 },
       { 5, 15, 14 },
@@ -6953,11 +6970,6 @@ inline void gcode_M503() {
 
 #endif // CUSTOM_M_CODE_SET_Z_PROBE_OFFSET
 
-#if ENABLED(ONE_LED)
-  // Pre-declaration
-  inline void set_notify_warning();
-#endif
-
 #if ENABLED(Z_MIN_MAGIC)
   
   enum Z_Magic_TapTap_State {
@@ -7008,22 +7020,21 @@ inline void gcode_M503() {
 
   #if ENABLED(DELTA_EXTRA) && ENABLED(Z_MIN_MAGIC)
 
-    #define NOT_YET_CALIBRATED \
-      ( \
-        endstop_adj[X_AXIS] == 0 && \
-        endstop_adj[Y_AXIS] == 0 && \
-        endstop_adj[Z_AXIS] == 0 && \
-        printer_states.activity_state != ACTIVITY_STARTUP_CALIBRATION \
-      )
-
     inline void manage_tap_tap() {
       if ( !printer_states.pause_asked ) {
         if (z_magic_tap_count == 2) {
           if (NOT_YET_CALIBRATED) {
             SERIAL_ERRORLNPGM("Printer not yet calibrated. Please calibrate.");
+            set_notify_not_calibrated();
             return;
           }
-          if (FILAMENT_PRESENT) {
+          
+          /* FIX: We need to try extracting filament at least a bit
+             in case we have go to far away from detector
+             Removing filament presence test here.
+             @See: M600 FILAMENT_NEED_TO_BE_EXPULSED */
+
+          /*if (FILAMENT_PRESENT) {*/
             SERIAL_ECHOLNPGM("Pause : Asked by tap tap");
 
             //enqueue_and_echo_commands_P(PSTR("G28\nM104 S180\nG0 F150 X0 Y0 Z100\nM109 S180\nD600\nM106 S255\nM104 S0\nG28"));
@@ -7036,11 +7047,13 @@ inline void gcode_M503() {
 
             enqueue_and_echo_commands_P(PSTR(FILAMENTCHANGE_EXTRACTION_SCRIPT));
             //enqueue_and_echo_commands_P(PSTR("G28\nM104 S180\nG0 F150 X0 Y0 Z100\nM109 S180\nD600\nM106 S255\nM104 S0\nG28"));
+          /*
           }
           else {
             // Avoid filament expulsion if filament not present
             set_notify_warning();
           }
+          */
         }
       }
     }
@@ -7428,6 +7441,12 @@ inline void gcode_M503() {
         sync_plan_position_e();
 
         RESCHEDULE_HOTEND_AUTO_SHUTDOWN;
+
+        // Auto-exit, when: we were not printing and we have inserted a filament successfuly
+        if (FILAMENT_PRESENT && previous_activity_state != ACTIVITY_PRINTING) {
+          SERIAL_ECHOLNPGM( "pause: resuming printing after filament insertion success" );
+          exit_pause_asked = true;
+        }
       }
 
       // Filament extraction case
@@ -7439,19 +7458,6 @@ inline void gcode_M503() {
 
         current_position[E_AXIS] = destination[E_AXIS];
         sync_plan_position_e();
-
-        // Purge first
-        #if false
-        if (FILAMENT_PRESENT) {
-          SERIAL_ECHOLNPGM( "pause: filament head correction" );
-          SET_FEEDRATE_FOR_EXTRUDER_MOVE;
-          destination[E_AXIS] += FILAMENTCHANGE_AUTO_INSERTION_PURGE_BEFORE_EXTRACTION_LENGTH;
-          prepare_move();
-          st_synchronize();
-          current_position[E_AXIS] = destination[E_AXIS];
-          sync_plan_position_e();
-        }
-        #endif
 
         float destination_to_reach;
         destination_to_reach = destination[E_AXIS] + FILAMENTCHANGE_FINALRETRACT;
@@ -7489,13 +7495,19 @@ inline void gcode_M503() {
       // Tap-tap case
       #if ENABLED(Z_MIN_MAGIC)
         if (z_magic_tap_count == 2) {
-          if (printer_states.filament_state == FILAMENT_IN) {
+          /* FIX: We need to try extracting filament at least a bit
+             in case we have go to far away from detector
+             Removing filament presence test here.
+             @See: M600 FILAMENT_NEED_TO_BE_EXPULSED */
+          /* if (printer_states.filament_state == FILAMENT_IN) { */
             filament_direction = FILAMENT_NEED_TO_BE_EXPULSED;
             RESCHEDULE_HOTEND_AUTO_SHUTDOWN;
+          /*
           }
           else {
             set_notify_warning();
           }
+          */
 
         }
       #endif
@@ -10420,10 +10432,17 @@ void disable_all_steppers() {
   millis_t next_one_led_tick = 0;
   bool notify_warning = false;
   millis_t notify_warning_timeout = 0;
+  unsigned long led_refresh_rate_speed = 150UL;
 
   inline void set_notify_warning() {
     notify_warning = true;
     notify_warning_timeout = millis() + 2000UL;
+  }
+
+  inline void set_notify_not_calibrated() {
+    notify_warning = true;
+    notify_warning_timeout = millis() + 10000UL;
+    led_refresh_rate_speed = 50UL;
   }
 
   inline void manage_one_led() {
@@ -10431,7 +10450,7 @@ void disable_all_steppers() {
     if ( PENDING( now, next_one_led_tick ) ) return;
 
     state_blink = ( state_blink + 1 ) % 10;
-    next_one_led_tick = now + 150UL;
+    next_one_led_tick = now + led_refresh_rate_speed;
 
     if ( printer_states.activity_state == ACTIVITY_STARTUP_CALIBRATION ) {
       switch( state_blink ) {
@@ -10451,6 +10470,7 @@ void disable_all_steppers() {
       state_blink % 2 ? one_led_on() : one_led_off();
       if ( ELAPSED(now, notify_warning_timeout) ) {
         notify_warning = false;
+        led_refresh_rate_speed = 150UL;
       }
     }
     else if (
@@ -10534,6 +10554,7 @@ void disable_all_steppers() {
       if (ONE_BUTTON_PRESSED) {
         if (NOT_YET_CALIBRATED) {
           SERIAL_ERRORLNPGM("Printer not yet calibrated. Please calibrate.");
+          set_notify_not_calibrated();
           return;
         }
         if (printer_states.filament_state == FILAMENT_IN) {
@@ -10560,6 +10581,7 @@ inline void manage_filament_auto_insertion() {
     ) {
       if (NOT_YET_CALIBRATED) {
         SERIAL_ERRORLNPGM("Printer not yet calibrated. Please calibrate.");
+        set_notify_not_calibrated();
         return;
       }
       SERIAL_ECHOLNPGM("Filament auto-insertion preamble");
