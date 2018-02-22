@@ -10750,7 +10750,7 @@ void idle(
       if (tt_state == WAITING_HIT_START) {
         if (z_magic_bias_delta < -10.0) {
           tt_state = GO_DOWN;
-          z_magic_need_to_timeout = now + 50UL;
+          z_magic_need_to_timeout = now + 50UL; // GO_DOWN duration
           z_magic_bias_delta_min_reached = 0.0;
           // TODO: Clean :: z_magic_calibration_timeout = now + 100UL;
         }
@@ -10758,7 +10758,7 @@ void idle(
       // --------8<---------------------
       // 'Boing' protector
       if (tt_state != WAITING_HIT_START && tt_state != DISABLE_DUE_TO_SCRATCH) {
-        if (z_magic_bias_delta > 0.0) {
+        if (z_magic_bias_delta > 10.0) {
           tt_state = DISABLE_DUE_TO_SCRATCH;
           z_magic_need_to_timeout = now + 1000UL;
         }
@@ -10768,9 +10768,9 @@ void idle(
         if (ELAPSED(now, z_magic_need_to_timeout)) {
           // Min Down Pick level collection finished
           // Let's check how deep the bed was went down
-          if (z_magic_bias_delta_min_reached < -30.0) {
+          if (z_magic_bias_delta_min_reached < -20.0) {
             tt_state = GO_UP;
-            z_magic_need_to_timeout = now + 120UL;
+            z_magic_need_to_timeout = now + 120UL; // GO_UP duration
           }
           else {
             // This was not suffiscient
@@ -10792,7 +10792,7 @@ void idle(
         else {
           if (z_magic_bias_delta > z_magic_bias_delta_min_reached/3.0) {
             tt_state = SETTLE;
-            z_magic_need_to_timeout = now + 30UL;
+            z_magic_need_to_timeout = now + 30UL; // SETTLE duration
           }
         }
       }

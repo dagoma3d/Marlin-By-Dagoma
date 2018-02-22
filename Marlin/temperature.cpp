@@ -1427,7 +1427,7 @@ static void set_current_temp_raw() {
       }
 
       if (z_magic_bias < -4.0 || z_magic_bias > 4.0) {
-        z_magic_calibration_timeout = now + 100UL;
+        z_magic_calibration_timeout = now + 250UL;
       }
 
       /* Cycle reset */
