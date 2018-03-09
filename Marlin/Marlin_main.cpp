@@ -1122,7 +1122,7 @@ void loop() {
 
   if (commands_in_queue < BUFSIZE) get_available_commands();
 
-  #if ENABLED(SDSUPPORT) && DISABLED(ONE_BUTTON)
+  #if ENABLED(SDSUPPORT) && DISABLED(DELTA_EXTRA)
     card.checkautostart(false);
   #endif
 
@@ -2148,8 +2148,9 @@ static void setup_for_endstop_move() {
     #endif
 
     z_probe_is_active = true;
+    #if ENABLED(Z_MIN_MAGIC)
     reset_z_magic();
-
+    #endif
   }
 
   static void stow_z_probe(bool doRaise = true) {
@@ -6998,6 +6999,10 @@ inline void gcode_M503() {
 
 #if ENABLED(FILAMENTCHANGEENABLE)
 
+  #if ENABLED(AUTO_FILAMENT_CHANGE) && DISABLED(Z_MIN_MAGIC)
+    #define LONG_PRESS_SUPPORT
+  #endif
+
   // Generally :
   //   homing_feedrate is expressed in mm/min
   //   max_feedrate is expressed in mm/s
@@ -7013,7 +7018,7 @@ inline void gcode_M503() {
     #define SET_FEEDRATE_FOR_MOVE                   feedrate = homing_feedrate[X_AXIS];
     #define SET_FEEDRATE_FOR_EXTRUDER_MOVE          feedrate = (max_feedrate[E_AXIS] * 60.0);
     #define SET_FEEDRATE_FOR_PREAMBLE_EXTRUDER_MOVE feedrate = (max_feedrate[E_AXIS] * 60.0 * FILAMENTCHANGE_AUTO_INSERTION_PREAMBLE_FEEDRATE_FACTOR);
-    #define SET_FEEDRATE_FOR_PURGE;                 feedrate = (max_feedrate[E_AXIS] * 60.0 * FILAMENTCHANGE_AUTO_INSERTION_PURGE_FEEDRATE_FACTOR);
+    #define SET_FEEDRATE_FOR_PURGE                  feedrate = (max_feedrate[E_AXIS] * 60.0 * FILAMENTCHANGE_AUTO_INSERTION_PURGE_FEEDRATE_FACTOR);
     // The following plan method use feedrate expressed in mm/min
     #define RUNPLAN line_to_destination(feedrate);
   #endif
@@ -7060,6 +7065,35 @@ inline void gcode_M503() {
 
   #endif
 
+  #if ENABLED(LONG_PRESS_SUPPORT)
+    #define LONG_PRESS_TIMEOUT 2000UL
+    millis_t long_press_timeout = 0UL;
+
+    void manage_long_press_filament_expulsion() {
+      if ( !printer_states.pause_asked ) {
+        if (ONE_BUTTON_PRESSED) {
+          millis_t now = millis();
+          if (long_press_timeout == 0UL) {
+            long_press_timeout = now + LONG_PRESS_TIMEOUT;
+          }
+          if (ELAPSED(now, long_press_timeout)) {
+            SERIAL_ECHOLNPGM("Pause : Asked by long press");
+            printer_states.pause_asked = true;
+
+            if (!printer_states.homed) {
+              gcode_G28();
+            }
+
+            enqueue_and_echo_commands_P(PSTR(FILAMENTCHANGE_EXTRACTION_SCRIPT));
+          }
+        }
+        else {
+          long_press_timeout = 0UL;
+        }
+      }
+    }
+  #endif
+
   /**
    * M600: Pause for filament change
    *
@@ -7083,6 +7117,7 @@ inline void gcode_M503() {
    *  Default values are used for omitted arguments.
    *
    */
+
   inline void gcode_M600() {
     #define DEBUG_POS(var) do { \
       SERIAL_ECHOPGM("debug pos X:"); \
@@ -7306,6 +7341,7 @@ inline void gcode_M503() {
     millis_t now = millis();
     millis_t next_low_latency_checks = 0UL;
     millis_t auto_shutdown_heat_time = 0UL;
+    millis_t long_press_timeout = 0UL;
     #define RESCHEDULE_HOTEND_AUTO_SHUTDOWN (auto_shutdown_heat_time = now + HEATING_STOP_TIME)
 
     RESCHEDULE_HOTEND_AUTO_SHUTDOWN;
@@ -7375,6 +7411,7 @@ inline void gcode_M503() {
         need_to_go_first = false;
       }
 
+      #if ENABLED(AUTO_FILAMENT_CHANGE)
       //
       // Filament insertion case
       if (
@@ -7491,6 +7528,7 @@ inline void gcode_M503() {
           RESCHEDULE_HOTEND_AUTO_SHUTDOWN;
         }
       }
+      #endif // AUTO_FILAMENT_CHANGE
 
       // Tap-tap case
       #if ENABLED(Z_MIN_MAGIC)
@@ -7512,37 +7550,39 @@ inline void gcode_M503() {
         }
       #endif
 
-      // Filament insertion preamble case
-      if (
-        printer_states.filament_state == FILAMENT_OUT
-        && FILAMENT_PRESENT
-      ) {
-        SERIAL_ECHOLNPGM( "pause: filament insertion detected" );
+      #if ENABLED(AUTO_FILAMENT_CHANGE)
+        // Filament insertion preamble case
+        if (
+          printer_states.filament_state == FILAMENT_OUT
+          && FILAMENT_PRESENT
+        ) {
+          SERIAL_ECHOLNPGM( "pause: filament insertion detected" );
 
-        extrude_min_temp = 0;
+          extrude_min_temp = 0;
 
-        printer_states.filament_state = FILAMENT_PRE_INSERTING;
-        float previous_e_pos = current_position[E_AXIS];
-        destination[E_AXIS] = current_position[E_AXIS];
-        destination[E_AXIS] += FILAMENTCHANGE_AUTO_INSERTION_CONFIRMATION_LENGTH;
-        SET_FEEDRATE_FOR_PREAMBLE_EXTRUDER_MOVE;
+          printer_states.filament_state = FILAMENT_PRE_INSERTING;
+          float previous_e_pos = current_position[E_AXIS];
+          destination[E_AXIS] = current_position[E_AXIS];
+          destination[E_AXIS] += FILAMENTCHANGE_AUTO_INSERTION_CONFIRMATION_LENGTH;
+          SET_FEEDRATE_FOR_PREAMBLE_EXTRUDER_MOVE;
 
-        prepare_move();
-        st_synchronize();
-        if (FILAMENT_PRESENT) {
-          filament_direction = FILAMENT_NEED_TO_BE_INSERTED;
+          prepare_move();
+          st_synchronize();
+          if (FILAMENT_PRESENT) {
+            filament_direction = FILAMENT_NEED_TO_BE_INSERTED;
+          }
+          else {
+            // The user removed the filament before filament change procedure launch
+            printer_states.filament_state = FILAMENT_OUT;
+          }
+          // Restore things
+          current_position[E_AXIS] = destination[E_AXIS] = previous_e_pos;
+          sync_plan_position_e();
+          extrude_min_temp = EXTRUDE_MINTEMP;
+
+          RESCHEDULE_HOTEND_AUTO_SHUTDOWN;
         }
-        else {
-          // The user removed the filament before filament change procedure launch
-          printer_states.filament_state = FILAMENT_OUT;
-        }
-        // Restore things
-        current_position[E_AXIS] = destination[E_AXIS] = previous_e_pos;
-        sync_plan_position_e();
-        extrude_min_temp = EXTRUDE_MINTEMP;
-
-        RESCHEDULE_HOTEND_AUTO_SHUTDOWN;
-      }
+      #endif // AUTO_FILAMENT_CHANGE
 
       //
       //
@@ -7610,8 +7650,25 @@ inline void gcode_M503() {
       //
       // 'Listen' for exit actions
       if (pin_number != -1 && digitalRead(pin_number) == target) {
-        SERIAL_ECHOLNPGM("pause: button pushed");
-        exit_pause_asked = true;
+        #if ENABLED(LONG_PRESS_SUPPORT)
+          long_press_timeout = now + LONG_PRESS_TIMEOUT;
+          do {
+            delay(100); idle(true);
+            now = millis();
+          } while( digitalRead(pin_number) == target && PENDING(now, long_press_timeout) );
+          if ( digitalRead(pin_number) == target && ELAPSED(now, long_press_timeout) ) {
+            SERIAL_ECHOLNPGM( "pause: long press detected" );
+            filament_direction = FILAMENT_NEED_TO_BE_EXPULSED;
+            RESCHEDULE_HOTEND_AUTO_SHUTDOWN;
+          }
+          else {
+            SERIAL_ECHOLNPGM("pause: button pushed");
+            exit_pause_asked = true;
+          }
+        #else
+          SERIAL_ECHOLNPGM("pause: button pushed");
+          exit_pause_asked = true;
+        #endif
       }
 
       #if ENABLED(ULTRA_LCD) && DISABLED(NO_LCD_FOR_FILAMENTCHANGEABLE)
@@ -10516,7 +10573,7 @@ void disable_all_steppers() {
 
 #endif // SUMMON_PRINT_PAUSE
 
-#if ENABLED(ONE_BUTTON)
+#if ENABLED(ONE_BUTTON) && ENABLED(DELTA_EXTRA)
 
   inline void manage_one_button_start_print() {
     // De-Bounce button press
@@ -10579,17 +10636,25 @@ inline void manage_filament_auto_insertion() {
       printer_states.filament_state == FILAMENT_OUT
       && FILAMENT_PRESENT
     ) {
-      if (NOT_YET_CALIBRATED) {
-        SERIAL_ERRORLNPGM("Printer not yet calibrated. Please calibrate.");
-        set_notify_not_calibrated();
-        return;
-      }
+      #if ENABLED(DELTA_EXTRA)
+        if (NOT_YET_CALIBRATED) {
+          SERIAL_ERRORLNPGM("Printer not yet calibrated. Please calibrate.");
+          set_notify_not_calibrated();
+          return;
+        }
+      #endif
       SERIAL_ECHOLNPGM("Filament auto-insertion preamble");
 
       printer_states.filament_state = FILAMENT_PRE_INSERTING;
       float previous_feedrate = feedrate;
-      feedrate = max_feedrate[E_AXIS] * 60.0 * FILAMENTCHANGE_AUTO_INSERTION_PREAMBLE_FEEDRATE_FACTOR;
+      SET_FEEDRATE_FOR_PREAMBLE_EXTRUDER_MOVE;
 
+      SERIAL_ECHO(" pfeedrate:");
+      SERIAL_ECHO(previous_feedrate);
+      SERIAL_ECHO(" feedrate:");
+      SERIAL_ECHO(feedrate);
+      SERIAL_ECHO(" cposition:");
+      SERIAL_ECHO(current_position[E_AXIS]);
       /*
       if (!printer_states.homed) {
         gcode_G28();
@@ -10605,12 +10670,17 @@ inline void manage_filament_auto_insertion() {
       float destination_to_reach;
       destination_to_reach = destination[E_AXIS] + FILAMENTCHANGE_AUTO_INSERTION_CONFIRMATION_LENGTH;
 
+
+      SERIAL_ECHO(" destination_to_reach:");
+      SERIAL_ECHO(destination_to_reach);
+      SERIAL_ECHOLN("");
       do {
         current_position[E_AXIS] += FILAMENTCHANGE_AUTO_INSERTION_VERIFICATION_LENGTH_MM;
         destination[E_AXIS] = current_position[E_AXIS];
         RUNPLAN;
       } while( destination[E_AXIS] < destination_to_reach && FILAMENT_PRESENT);
       st_synchronize();
+                                                                                  SERIAL_ECHOLNPGM("Loop exit");
 
       // Restore things
       current_position[E_AXIS] = destination[E_AXIS] = previous_e_pos;
@@ -10630,6 +10700,7 @@ inline void manage_filament_auto_insertion() {
         enqueue_and_echo_commands_P(PSTR(FILAMENTCHANGE_INSERTION_SCRIPT));
       }
       else {
+                                                                                  SERIAL_ECHOLNPGM("Junk");
         // The user removed the filament before filament change procedure launch
         printer_states.filament_state = FILAMENT_OUT;
       }
@@ -10659,7 +10730,7 @@ inline void manage_printer_states() {
   // Conditional stuff
   // -----------------
   if (printer_states.activity_state == ACTIVITY_IDLE) {
-    #if ENABLED(ONE_BUTTON)
+    #if ENABLED(ONE_BUTTON) && ENABLED(DELTA_EXTRA)
       manage_one_button_start_print();
     #endif
     #if ENABLED(FILAMENT_RUNOUT_SENSOR)
@@ -10668,13 +10739,19 @@ inline void manage_printer_states() {
     #if ENABLED(Z_MIN_MAGIC)
       manage_tap_tap();
     #endif
+    // Alternatively to tap_tap, we can:
+    #if ENABLED(LONG_PRESS_SUPPORT)
+      manage_long_press_filament_expulsion();
+    #endif
 
     #if HAS_FILRUNOUT
-      if( FILAMENT_NOT_PRESENT ) {
-        printer_states.filament_state = FILAMENT_OUT;
-      }
-      else {
-        printer_states.filament_state = FILAMENT_IN;
+      if (printer_states.filament_state != FILAMENT_PRE_INSERTING) {
+        if( FILAMENT_NOT_PRESENT ) {
+          printer_states.filament_state = FILAMENT_OUT;
+        }
+        else {
+          printer_states.filament_state = FILAMENT_IN;
+        }
       }
     #else
       printer_states.filament_state = FILAMENT_IN;
