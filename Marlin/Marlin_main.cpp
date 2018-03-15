@@ -2266,8 +2266,6 @@ static void setup_for_endstop_move() {
   // Probe bed height at position (x,y), returns the measured z value
   static float probe_pt(float x, float y, float z_before, ProbeAction probe_action = ProbeDeployAndStow, int verbose_level = 1) {
 
-    printer_states.probing = true;
-
     #if ENABLED(DEBUG_LEVELING_FEATURE)
       if (DEBUGGING(LEVELING)) {
         SERIAL_ECHOLNPGM("probe_pt >>>");
@@ -2334,8 +2332,6 @@ static void setup_for_endstop_move() {
     #if ENABLED(DEBUG_LEVELING_FEATURE)
       if (DEBUGGING(LEVELING)) SERIAL_ECHOLNPGM("<<< probe_pt");
     #endif
-
-    printer_states.probing = false;
 
     return measured_z;
   }
@@ -4480,8 +4476,6 @@ inline void gcode_G28() {
     inline void gcode_G30() {
     #endif
       
-      printer_states.probing = true;
-      
       #if HAS_SERVO_ENDSTOPS
         raise_z_for_servo();
       #endif
@@ -4518,8 +4512,6 @@ inline void gcode_G28() {
       stow_z_probe(false); // Retract Z Servo endstop if available. Z_PROBE_SLED is missed here.
 
       gcode_M114(); // Send end position to RepetierHost
-
-      printer_states.probing = false;
     }
 
   #endif //!Z_PROBE_SLED
@@ -8623,6 +8615,8 @@ inline void gcode_D851() {
   // Store endstop adjust
   gcode_M500();
 
+  #define R_L_CORRECTION
+#if ENABLED(R_L_CORRECTION)
   // JUST FOR REPORTING BACK
   // Take in account now
   gcode_G28();
@@ -8808,6 +8802,7 @@ inline void gcode_D851() {
 
   // Store endstop adjust
   gcode_M500();
+#endif // R_L_CORRECTION
 
   #if ENABLED(DEBUG_LEVELING_FEATURE)
     if (DEBUGGING(LEVELING)) {
@@ -8870,7 +8865,6 @@ inline void gcode_D851() {
   #endif
 
   gcode_G28();
-
   
   printer_states.activity_state = ACTIVITY_IDLE;
 }
@@ -10715,7 +10709,7 @@ inline void manage_printer_states() {
   // Every time stuff
   // ----------------
   #if ENABLED(Z_MIN_MAGIC)
-    //enable_z_magic_measurement = (printer_states.activity_state != ACTIVITY_PRINTING) || printer_states.probing;
+    printer_states.probing = z_probe_is_active;
     enable_z_magic_probe = printer_states.probing;
     enable_z_magic_tap = (printer_states.activity_state != ACTIVITY_PRINTING) && !printer_states.probing;
   #endif

@@ -1415,16 +1415,25 @@ static void set_current_temp_raw() {
     
     millis_t now = millis();
 
+    z_magic_raw_value = float(ADC);
+
     if (enable_z_magic_probe || enable_z_magic_tap) {
 
-      z_magic_raw_value = float(ADC);
       z_magic_bias = z_magic_raw_value - z_magic_previous;
       z_magic_previous = z_magic_raw_value;
       z_magic_bias_delta += z_magic_bias;
 
+      // FIX: Old Neva does not support bias accumulator detection
+      /*
       if (!z_magic_hit_flag && z_magic_bias_delta < -10.0) {
         z_magic_hit_flag = true;
       }
+      */
+      
+      // FIX: Should work on both Magis and old Neva
+      if (!z_magic_hit_flag && (z_magic_bias < -7.0 || z_magic_bias_delta < -10.0 || z_magic_bias_delta > 10.0)) {
+        z_magic_hit_flag = true;
+      } 
 
       if (z_magic_bias < -4.0 || z_magic_bias > 4.0) {
         z_magic_calibration_timeout = now + 250UL;
@@ -1730,18 +1739,18 @@ ISR(TIMER0_COMPB_vect) {
       #endif
       lcd_buttons_update();
       temp_state = MeasureTemp_1;
-      #if ENABLED( Z_MIN_MAGIC )
-        START_ADC(15);
-      #endif
+      // #if ENABLED( Z_MIN_MAGIC )
+      //   START_ADC(15);
+      // #endif
       break;
     case MeasureTemp_1:
       #if HAS_TEMP_1
         raw_temp_value[1] += ADC;
       #endif
       temp_state = PrepareTemp_2;
-      #if ENABLED( Z_MIN_MAGIC )
-        update_z_magic();
-      #endif
+      // #if ENABLED( Z_MIN_MAGIC )
+      //   update_z_magic();
+      // #endif
       break;
 
     case PrepareTemp_2:
@@ -1770,18 +1779,18 @@ ISR(TIMER0_COMPB_vect) {
       #endif
       lcd_buttons_update();
       temp_state = MeasureTemp_3;
-      #if ENABLED( Z_MIN_MAGIC )
-        START_ADC(15);
-      #endif
+      // #if ENABLED( Z_MIN_MAGIC )
+      //   START_ADC(15);
+      // #endif
       break;
     case MeasureTemp_3:
       #if HAS_TEMP_3
         raw_temp_value[3] += ADC;
       #endif
       temp_state = Prepare_FILWIDTH;
-      #if ENABLED( Z_MIN_MAGIC )
-        update_z_magic();
-      #endif
+      // #if ENABLED( Z_MIN_MAGIC )
+      //   update_z_magic();
+      // #endif
       break;
 
     case Prepare_FILWIDTH:
