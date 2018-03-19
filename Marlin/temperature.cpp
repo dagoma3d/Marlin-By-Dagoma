@@ -1431,7 +1431,7 @@ static void set_current_temp_raw() {
       */
       
       // FIX: Should work on both Magis and old Neva
-      if (!z_magic_hit_flag && (z_magic_bias < -7.0 || z_magic_bias_delta < -10.0 || z_magic_bias_delta > 10.0)) {
+      if (!z_magic_hit_flag && (z_magic_bias < -8.0 || z_magic_bias_delta < -15.0 || z_magic_bias_delta > 15.0)) {
         z_magic_hit_flag = true;
       } 
 
