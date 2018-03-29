@@ -7073,6 +7073,10 @@ inline void gcode_M503() {
             printer_states.pause_asked = true;
 
             if (!printer_states.homed) {
+              char tmp[16]; // tmp will be freed exiting this scope.
+              memset(tmp, '\0', sizeof(tmp));
+              strcpy(tmp, "X Y\0");
+              current_command_args = tmp;
               gcode_G28();
             }
 
@@ -10643,12 +10647,6 @@ inline void manage_filament_auto_insertion() {
       float previous_feedrate = feedrate;
       SET_FEEDRATE_FOR_PREAMBLE_EXTRUDER_MOVE;
 
-      SERIAL_ECHO(" pfeedrate:");
-      SERIAL_ECHO(previous_feedrate);
-      SERIAL_ECHO(" feedrate:");
-      SERIAL_ECHO(feedrate);
-      SERIAL_ECHO(" cposition:");
-      SERIAL_ECHO(current_position[E_AXIS]);
       /*
       if (!printer_states.homed) {
         gcode_G28();
@@ -10664,17 +10662,12 @@ inline void manage_filament_auto_insertion() {
       float destination_to_reach;
       destination_to_reach = destination[E_AXIS] + FILAMENTCHANGE_AUTO_INSERTION_CONFIRMATION_LENGTH;
 
-
-      SERIAL_ECHO(" destination_to_reach:");
-      SERIAL_ECHO(destination_to_reach);
-      SERIAL_ECHOLN("");
       do {
         current_position[E_AXIS] += FILAMENTCHANGE_AUTO_INSERTION_VERIFICATION_LENGTH_MM;
         destination[E_AXIS] = current_position[E_AXIS];
         RUNPLAN;
       } while( destination[E_AXIS] < destination_to_reach && FILAMENT_PRESENT);
       st_synchronize();
-                                                                                  SERIAL_ECHOLNPGM("Loop exit");
 
       // Restore things
       current_position[E_AXIS] = destination[E_AXIS] = previous_e_pos;
@@ -10688,13 +10681,23 @@ inline void manage_filament_auto_insertion() {
         printer_states.pause_asked = true;
 
         if (!printer_states.homed) {
-          enqueue_and_echo_commands_P(PSTR("G28"));
+          #if ENABLED(DELTA_EXTRA)
+            // Home all axis
+          #else
+            // Home only X, Y axis
+            char tmp[16]; // tmp will be freed exiting this scope.
+            memset(tmp, '\0', sizeof(tmp));
+            strcpy(tmp, "X Y\0");
+            current_command_args = tmp;
+          #endif
+          gcode_G28();
+          //enqueue_and_echo_commands_P(PSTR("G28"));
         }
 
         enqueue_and_echo_commands_P(PSTR(FILAMENTCHANGE_INSERTION_SCRIPT));
       }
       else {
-                                                                                  SERIAL_ECHOLNPGM("Junk");
+        SERIAL_ECHOLNPGM("Filament auto-insertion aborted");
         // The user removed the filament before filament change procedure launch
         printer_states.filament_state = FILAMENT_OUT;
       }
