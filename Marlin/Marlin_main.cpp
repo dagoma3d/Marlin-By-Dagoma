@@ -574,6 +574,7 @@ typedef struct {
   bool homed;
   bool probing;
   bool filament_runout_bypassed;
+  bool in_critical_section;
 } PrinterStates;
 
 PrinterStates printer_states;
@@ -1023,9 +1024,10 @@ void setup() {
     printer_states.hotend_state   = HOTEND_UNKNOWN;
     printer_states.position_state = POSITION_UNKNOWN;
     printer_states.filament_state = FILAMENT_PRESENT ? FILAMENT_IN : FILAMENT_OUT;
-    printer_states.homed          = false;
-    printer_states.pause_asked    = false;
-    printer_states.print_asked    = false;
+    printer_states.homed               = false;
+    printer_states.pause_asked         = false;
+    printer_states.print_asked         = false;
+    printer_states.in_critical_section = false;
   #endif
 
   #if ENABLED( DELTA_EXTRA )
@@ -7426,6 +7428,8 @@ inline void gcode_M503() {
         // PTFE length part
         destination_to_reach = destination[E_AXIS] - (FILAMENTCHANGE_FINALRETRACT+3*FILAMENTCHANGE_AUTO_INSERTION_PURGE_LENGTH);
         SET_FEEDRATE_FOR_EXTRUDER_MOVE;
+
+        printer_states.in_critical_section = true;
         do {
           current_position[E_AXIS] += FILAMENTCHANGE_AUTO_INSERTION_VERIFICATION_LENGTH_MM;
           destination[E_AXIS] = current_position[E_AXIS];
@@ -7434,18 +7438,22 @@ inline void gcode_M503() {
           RUNPLAN;
         } while( destination[E_AXIS] < destination_to_reach && FILAMENT_PRESENT);
         st_synchronize();
+        printer_states.in_critical_section = false;
 
         // Purge part
         // But, can we continue to slowly purge ?
         if (FILAMENT_PRESENT) {
           SET_FEEDRATE_FOR_PURGE;         ;
           destination_to_reach = destination[E_AXIS] + 2.5*FILAMENTCHANGE_AUTO_INSERTION_PURGE_LENGTH;
+
+          printer_states.in_critical_section = true;
           do {
             current_position[E_AXIS] += FILAMENTCHANGE_AUTO_INSERTION_VERIFICATION_LENGTH_MM;
             destination[E_AXIS] = current_position[E_AXIS];
             RUNPLAN;
           } while( destination[E_AXIS] < destination_to_reach && FILAMENT_PRESENT);
           st_synchronize();
+          printer_states.in_critical_section = false;
         }
 
         // Finally, Do we reached end of filament insertion WITH FILAMENT ?
@@ -7499,6 +7507,8 @@ inline void gcode_M503() {
         destination_at_least_to_reach = destination[E_AXIS] - FILAMENTCHANGE_AUTO_INSERTION_CONFIRMATION_LENGTH;
 
         SET_FEEDRATE_FOR_EXTRUDER_MOVE;
+
+        printer_states.in_critical_section = true;
         do {
           current_position[E_AXIS] -= FILAMENTCHANGE_AUTO_INSERTION_VERIFICATION_LENGTH_MM;
           destination[E_AXIS] = current_position[E_AXIS];
@@ -7510,6 +7520,7 @@ inline void gcode_M503() {
           )
         );
         st_synchronize();
+        printer_states.in_critical_section = false;
 
         current_position[E_AXIS] = destination[E_AXIS];
         sync_plan_position_e();
@@ -7603,10 +7614,6 @@ inline void gcode_M503() {
           }
         #endif
 
-        #if ENABLED(ULTRA_LCD) && DISABLED(NO_LCD_FOR_FILAMENTCHANGEABLE)
-          lcd_quick_feedback();
-        #endif
-
         // Update states to support manual removal
         #if HAS_FILRUNOUT
           if( FILAMENT_NOT_PRESENT ) {
@@ -7671,6 +7678,7 @@ inline void gcode_M503() {
         if (lcd_clicked()) {
           SERIAL_ECHOLNPGM("pause: lcd clicked");
           exit_pause_asked = true;
+          lcd_quick_feedback();
         }
       #endif
 
@@ -7714,6 +7722,12 @@ inline void gcode_M503() {
     #if ENABLED(ULTRA_LCD) && DISABLED(NO_LCD_FOR_FILAMENTCHANGEABLE)
       lcd_quick_feedback(); // click sound feedback
       lcd_reset_alert_level();
+      if (previous_activity_state == ACTIVITY_PRINTING) {
+        LCD_MESSAGEPGM(MSG_RESUMING);
+      }
+      else {
+        LCD_MESSAGEPGM(WELCOME_MSG);
+      }
     #endif
 
 
@@ -7781,6 +7795,11 @@ inline void gcode_M503() {
     printer_states.pause_asked = false;
     printer_states.activity_state = previous_activity_state;
 
+    #if DISABLED(DELTA_EXTRA) && ENABLED(SDSUPPORT)
+      if (previous_activity_state != ACTIVITY_PRINTING) {
+        enqueue_and_echo_commands_P(PSTR(SD_FINISHED_RELEASECOMMAND));
+      }
+    #endif
     /*
     //finish moves
     // st_synchronize();
@@ -10662,12 +10681,14 @@ inline void manage_filament_auto_insertion() {
       float destination_to_reach;
       destination_to_reach = destination[E_AXIS] + FILAMENTCHANGE_AUTO_INSERTION_CONFIRMATION_LENGTH;
 
+      printer_states.in_critical_section = true;
       do {
         current_position[E_AXIS] += FILAMENTCHANGE_AUTO_INSERTION_VERIFICATION_LENGTH_MM;
         destination[E_AXIS] = current_position[E_AXIS];
         RUNPLAN;
       } while( destination[E_AXIS] < destination_to_reach && FILAMENT_PRESENT);
       st_synchronize();
+      printer_states.in_critical_section = false;
 
       // Restore things
       current_position[E_AXIS] = destination[E_AXIS] = previous_e_pos;
@@ -10773,6 +10794,10 @@ inline void manage_printer_states() {
   }
 }
 
+#if ENABLED(ULTRA_LCD) && DISABLED(NO_LCD_FOR_FILAMENTCHANGEABLE)
+  millis_t next_lcd_feedback = 0UL;
+#endif
+
 /**
  * Standard idle routine keeps the machine alive
  */
@@ -10792,33 +10817,46 @@ void idle(
     #endif
   );
   host_keepalive();
-  #if ENABLED(U8GLIB_SSD1306) && ENABLED(INTELLIGENT_LCD_REFRESH_RATE)
-    if (IS_SD_PRINTING && axis_homed[X_AXIS] && axis_homed[Y_AXIS] && axis_homed[Z_AXIS]) {
 
-      if ( last_intelligent_F_lcd_update != feedrate ) {
-        last_intelligent_F_authorized_lcd_update = feedrate > last_intelligent_F_lcd_update;
-        last_intelligent_F_lcd_update = feedrate;
+  if (!printer_states.in_critical_section) {
+    #if ENABLED(U8GLIB_SSD1306) && ENABLED(INTELLIGENT_LCD_REFRESH_RATE)
+      if (IS_SD_PRINTING && axis_homed[X_AXIS] && axis_homed[Y_AXIS] && axis_homed[Z_AXIS]) {
+
+        if ( last_intelligent_F_lcd_update != feedrate ) {
+          last_intelligent_F_authorized_lcd_update = feedrate > last_intelligent_F_lcd_update;
+          last_intelligent_F_lcd_update = feedrate;
+        }
+
+        if ( last_intelligent_z_lcd_update != current_position[Z_AXIS] || last_intelligent_F_authorized_lcd_update ) {
+          last_intelligent_z_lcd_update = current_position[Z_AXIS];
+          lcd_update();
+        }
+
       }
-
-      if ( last_intelligent_z_lcd_update != current_position[Z_AXIS] || last_intelligent_F_authorized_lcd_update ) {
-        last_intelligent_z_lcd_update = current_position[Z_AXIS];
+      else {
         lcd_update();
       }
-
-    }
-    else {
+    #else
       lcd_update();
-    }
-  #else
-    lcd_update();
-  #endif
+    #endif
+  }
 
   #if ENABLED( WIFI_PRINT )
     manage_second_serial_status();
   #endif
 
+  millis_t now = millis();
+
+  #if ENABLED(ULTRA_LCD) && DISABLED(NO_LCD_FOR_FILAMENTCHANGEABLE)
+    if (printer_states.activity_state == ACTIVITY_PAUSED) {
+      if (ELAPSED(now, next_lcd_feedback)) {
+        next_lcd_feedback = now + 2500UL;
+        lcd_quick_feedback();
+      }
+    }
+  #endif
+
   #if ENABLED( Z_MIN_MAGIC )
-    millis_t now = millis();
     if (enable_z_magic_tap) {
       // --------8<---------------------
       if (tt_state == WAITING_HIT_START) {
