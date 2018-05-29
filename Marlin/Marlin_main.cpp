@@ -3660,7 +3660,7 @@ inline void gcode_G28() {
      */
 
     float triangle_sign(const float x, const float y, const short p1, const short p2) {
-      return 
+      return
         (x - probe_plan[p2][0]) * (probe_plan[p1][1] - probe_plan[p2][1]) -
         (probe_plan[p1][0] - probe_plan[p2][0]) * (y - probe_plan[p2][1]);
     }
@@ -3717,7 +3717,7 @@ inline void gcode_G28() {
       // Simple test to choice between 2 region groups: 2,3,4,5,6,7 or 8,9,10,11,0,1
       if ( x >= 0.0 ) {
         // Region is one of 2,3,4,5,6,7
- 
+
         // Simple test to choice between 2 sub region groups: 5,6,7 or 2,3,4
         if (y >= 0.0 ) {
           // Region is one of 5,6,7
@@ -3752,7 +3752,7 @@ inline void gcode_G28() {
       }
       else {
         // Region is one of 8,9,10,11,0,1
- 
+
         // Simple test to choice between 2 sub region groups: 8,9,10 or 11,0,1
         if (y >= 0.0 ) {
           // Region is one of 8,9,10
@@ -4477,7 +4477,7 @@ inline void gcode_G28() {
     #else
     inline void gcode_G30() {
     #endif
-      
+
       #if HAS_SERVO_ENDSTOPS
         raise_z_for_servo();
       #endif
@@ -5451,7 +5451,7 @@ inline void gcode_M109() {
   bool x_progress, y_progress, z_progress;
   float x_from, x_to, y_from, y_to, z_from, z_to;
   x_progress = y_progress = z_progress = false;
-  
+
   if (code_seen('X')) {
     x_to = code_value();
     if (code_seen('U')) {
@@ -6966,7 +6966,7 @@ inline void gcode_M503() {
 #endif // CUSTOM_M_CODE_SET_Z_PROBE_OFFSET
 
 #if ENABLED(Z_MIN_MAGIC)
-  
+
   enum Z_Magic_TapTap_State {
     WAITING_HIT_START = 0,
     GO_DOWN,
@@ -6982,7 +6982,7 @@ inline void gcode_M503() {
   millis_t z_magic_multi_tap_timeout;
   millis_t z_magic_for_scratch_disabled_timeout;
   float z_magic_bias_delta_min_reached;
-  
+
   int z_magic_internal_tap_count = 0;
   int z_magic_tap_count = 0;
 
@@ -7027,7 +7027,7 @@ inline void gcode_M503() {
             set_notify_not_calibrated();
             return;
           }
-          
+
           /* FIX: We need to try extracting filament at least a bit
              in case we have go to far away from detector
              Removing filament presence test here.
@@ -7037,9 +7037,9 @@ inline void gcode_M503() {
             SERIAL_ECHOLNPGM("Pause : Asked by tap tap");
 
             //enqueue_and_echo_commands_P(PSTR("G28\nM104 S180\nG0 F150 X0 Y0 Z100\nM109 S180\nD600\nM106 S255\nM104 S0\nG28"));
-            
+
             printer_states.pause_asked = true;
-            
+
             if (!printer_states.homed) {
               gcode_G28();
             }
@@ -7237,32 +7237,30 @@ inline void gcode_M503() {
     // Determine exit/pin state
     int pin_number = -1;
     int target = -1;
-    if (code_seen('P')) {
-      char nextChar = *(seen_pointer + 1);
-      if (nextChar == 'A') {
-        pin_number = X_MIN_PIN;
-      }
-      else if (nextChar == 'B') {
-        pin_number = Y_MAX_PIN;
-      }
-      else if (nextChar == 'C') {
-        pin_number = Z_MIN_PIN;
-      }
-      else {
-        pin_number = code_value();
-      }
-    }
-    else {
-      #if ENABLED(ONE_BUTTON)
-        pin_number = ONE_BUTTON_PIN;
-        #if ONE_BUTTON_INVERTING
-          pin_state = 0; // equivalent to target = LOW
-        #else
-          pin_state = 1;
-        #endif
+    #if ENABLED(ONE_BUTTON)
+      pin_number = ONE_BUTTON_PIN;
+      #if ONE_BUTTON_INVERTING
+        pin_state = 0; // equivalent to target = LOW
+      #else
+        pin_state = 1;
       #endif
-    }
-
+    #else
+      if (code_seen('P')) {
+        char nextChar = *(seen_pointer + 1);
+        if (nextChar == 'A') {
+          pin_number = X_MIN_PIN;
+        }
+        else if (nextChar == 'B') {
+          pin_number = Y_MAX_PIN;
+        }
+        else if (nextChar == 'C') {
+          pin_number = Z_MIN_PIN;
+        }
+        else {
+          pin_number = code_value();
+        }
+      }
+    #endif
 
     if (pin_state >= -1 && pin_state <= 1) {
 
@@ -7273,7 +7271,7 @@ inline void gcode_M503() {
       //     break;
       //   }
       // }
-      
+
       if (pin_number > -1) {
         target = LOW;
 
@@ -7346,7 +7344,7 @@ inline void gcode_M503() {
     bool exit_pause_asked = false;
     bool can_exit_pause = false;
     bool need_to_go_first = true;
-    
+
     //
     // PAUSE LOOPs
     do {
@@ -7382,7 +7380,7 @@ inline void gcode_M503() {
           destination[X_AXIS] = x_heat_from;
           destination[Y_AXIS] = y_heat_from;
           destination[Z_AXIS] = z_heat_from;
-          
+
           prepare_move();
           st_synchronize();
           set_current_to_destination();
@@ -7474,7 +7472,7 @@ inline void gcode_M503() {
         }
         else {
           SERIAL_ECHOLNPGM( "pause: filament insertion aborted: no more filament" );
-          
+
           filament_direction = FILAMENT_NEED_TO_BE_EXPULSED;
         }
 
@@ -7502,7 +7500,7 @@ inline void gcode_M503() {
 
         float destination_to_reach;
         destination_to_reach = destination[E_AXIS] + FILAMENTCHANGE_FINALRETRACT;
-        
+
         float destination_at_least_to_reach;
         destination_at_least_to_reach = destination[E_AXIS] - FILAMENTCHANGE_AUTO_INSERTION_CONFIRMATION_LENGTH;
 
@@ -7705,7 +7703,7 @@ inline void gcode_M503() {
         can_exit_pause = true;
         // Unless that we have to wait above heat/re-heat case is triggered
       }
-      
+
       if (
         exit_pause_asked
         && previous_activity_state != ACTIVITY_PRINTING
@@ -7736,7 +7734,7 @@ inline void gcode_M503() {
     destination[Y_AXIS] = previous_position[Y_AXIS];
     if (previous_activity_state == ACTIVITY_PRINTING) {
       // We have to go just a bit higher on top of the last print position
-      
+
       float z_destination = previous_position[Z_AXIS];
       z_destination += FILAMENTCHANGE_Z_HOP_MM;
 
@@ -7771,7 +7769,7 @@ inline void gcode_M503() {
     // Restore retract if needed
     if (previous_activity_state == ACTIVITY_PRINTING) {
       destination[E_AXIS] -= FILAMENTCHANGE_FIRSTRETRACT;
-      
+
       SET_FEEDRATE_FOR_EXTRUDER_MOVE;
       prepare_move();
       st_synchronize();
@@ -7889,7 +7887,7 @@ inline void gcode_M503() {
         //     break;
         //   }
         // }
-        
+
         if (pin_number > -1) {
           target = LOW;
 
@@ -7927,7 +7925,7 @@ inline void gcode_M503() {
     #endif
     KEEPALIVE_STATE(PAUSED_FOR_USER);
     #if HAS_FILRUNOUT
-  
+
     bool can_exit_pause;
     millis_t pause_ms = millis();
     uint8_t previous_target_temperature;
@@ -8018,9 +8016,9 @@ inline void gcode_M503() {
                 }
               }
               else{
-              #endif 
+              #endif
               gcode_D601(true);
-              #if ENABLED(HEATING_STOP) 
+              #if ENABLED(HEATING_STOP)
               }
               heating_stopped = false;
               pause_ms = millis();
@@ -8556,7 +8554,7 @@ inline void gcode_D999() {
 }
 
 inline void gcode_D851() {
-  
+
   printer_states.activity_state = ACTIVITY_STARTUP_CALIBRATION;
 
   SERIAL_ECHOLNPGM( "Starting full Delta calibration" );
@@ -8583,7 +8581,7 @@ inline void gcode_D851() {
   SERIAL_ECHOLN(sw_endstop_max[Z_AXIS]);
   SERIAL_ECHOPGM("home_offset current:");
   SERIAL_ECHOLN(home_offset[Z_AXIS]);
-  
+
   float z_home_offset;
   destination[X_AXIS] = 0;
   destination[Y_AXIS] = 0;
@@ -8888,7 +8886,7 @@ inline void gcode_D851() {
   #endif
 
   gcode_G28();
-  
+
   printer_states.activity_state = ACTIVITY_IDLE;
 }
 
@@ -8906,7 +8904,7 @@ inline void gcode_D852() {
   if (code_seen('T')) {
     short seconds = code_value_short();
     monitoring_timeout = millis() + seconds * 1000UL;
-    
+
     SERIAL_ECHO( seconds );
     SERIAL_ECHOLNPGM("s");
   }
@@ -9871,7 +9869,7 @@ void clamp_to_software_endstops(float target[3]) {
 
     inline float triangle_get_point_offset( const float x, const float y, const short t ) {
       // z = - (d + b.y + a.x) / c ;
-      return - ( 
+      return - (
         probed_tri_postcompute_d[t] +
         probed_tri_postcompute_b[t] * y +
         probed_tri_postcompute_a[t] * x
@@ -9940,11 +9938,11 @@ void clamp_to_software_endstops(float target[3]) {
         delta[Z_AXIS] += zprobe_zoffset;
 
         // Bed support smoothness
-        
+
         delta[X_AXIS] += 0.05;
         delta[Y_AXIS] += 0.05;
         delta[Z_AXIS] += 0.05;
-        
+
 
       #endif // End DELTA_EXTRA
     }
@@ -10585,7 +10583,7 @@ void disable_all_steppers() {
       printer_states.pause_asked = true;
       enqueue_and_echo_commands_P(PSTR(SUMMON_PRINT_PAUSE_SCRIPT));
     }
-    
+
   }
 
 #endif // SUMMON_PRINT_PAUSE
@@ -10621,7 +10619,7 @@ void disable_all_steppers() {
           #endif
           printer_states.print_asked = false;
           has_to_print_timeout = 0;
-        } 
+        }
       }
     }
     else { //!printer_states.print_asked
@@ -10728,7 +10726,7 @@ inline void manage_filament_auto_insertion() {
 #endif
 
 inline void manage_printer_states() {
-  
+
   //
   // Every time stuff
   // ----------------
@@ -10784,7 +10782,7 @@ inline void manage_printer_states() {
 
   if (printer_states.activity_state == ACTIVITY_PRINTING) {
     #if ENABLED(SUMMON_PRINT_PAUSE)
-      manage_pause_summoner(); 
+      manage_pause_summoner();
     #endif
 
     // We can go back to IDLE state only if we were PRINTING
@@ -10932,7 +10930,7 @@ void idle(
       if (tt_state == DISABLE_DUE_TO_SCRATCH) {
         z_magic_internal_tap_count = 0;
         z_magic_tap_count = 0;
-        
+
         if (ELAPSED(now, z_magic_need_to_timeout)) {
           tt_state = WAITING_HIT_START;
         }
