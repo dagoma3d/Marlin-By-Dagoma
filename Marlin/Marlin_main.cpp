@@ -10752,12 +10752,13 @@ inline void manage_printer_states() {
     #if ENABLED(FILAMENT_RUNOUT_SENSOR)
       manage_filament_auto_insertion();
     #endif
-    #if ENABLED(Z_MIN_MAGIC)
-      manage_tap_tap();
-    #endif
-    // Alternatively to tap_tap, we can:
+
     #if ENABLED(LONG_PRESS_SUPPORT)
+      // Long press support
       manage_long_press_filament_expulsion();
+    #elif ENABLED(Z_MIN_MAGIC)
+      // Alternatively to long press support, we can tap-tap
+      manage_tap_tap();
     #endif
 
     #if HAS_FILRUNOUT
