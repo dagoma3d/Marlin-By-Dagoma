@@ -7073,6 +7073,7 @@ inline void gcode_M503() {
           if (ELAPSED(now, long_press_timeout)) {
             SERIAL_ECHOLNPGM("Pause : Asked by long press");
             printer_states.pause_asked = true;
+            printer_states.print_asked = false;
 
             if (!printer_states.homed) {
               char tmp[16]; // tmp will be freed exiting this scope.
@@ -7536,7 +7537,7 @@ inline void gcode_M503() {
       #endif // AUTO_FILAMENT_CHANGE
 
       // Tap-tap case
-      #if ENABLED(Z_MIN_MAGIC)
+      #if ENABLED(Z_MIN_MAGIC) && DISABLED(LONG_PRESS_SUPPORT)
         if (z_magic_tap_count == 2) {
           /* FIX: We need to try extracting filament at least a bit
              in case we have go to far away from detector
