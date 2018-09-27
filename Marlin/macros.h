@@ -55,6 +55,15 @@
 #define NUMERIC_SIGNED(a) (NUMERIC(a) || (a) == '-')
 #define COUNT(a) (sizeof(a)/sizeof(*a))
 
+// Macros for initializing arrays
+#define ARRAY_4(v1, v2, v3, v4, ...)         { v1, v2, v3, v4 }
+#define ARRAY_3(v1, v2, v3, ...)             { v1, v2, v3 }
+#define ARRAY_2(v1, v2, ...)                 { v1, v2 }
+#define ARRAY_1(v1, ...)                     { v1 }
+
+#define _ARRAY_N(N, ...) ARRAY_ ##N(__VA_ARGS__)
+#define ARRAY_N(N, ...) _ARRAY_N(N, __VA_ARGS__)
+
 #define PIN_EXISTS(PN) (defined(PN ##_PIN) && PN ##_PIN >= 0)
 
 #define PENDING(NOW,SOON) ((long)(NOW-(SOON))<0)

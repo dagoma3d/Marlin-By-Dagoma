@@ -422,7 +422,7 @@
   #elif !PIN_EXISTS(E2_STEP) || !PIN_EXISTS(E2_DIR) || !PIN_EXISTS(E2_ENABLE)
     #error E2_STEP_PIN, E2_DIR_PIN, or E2_ENABLE_PIN not defined for this board.
   #endif
-#elif EXTRUDERS > 1
+#elif HOTENDS > 1
   #if TEMP_SENSOR_1 == 0
     #error TEMP_SENSOR_1 is required with 2 or more EXTRUDERS.
   #elif !PIN_EXISTS(TEMP_1)
@@ -432,7 +432,7 @@
   #endif
 #endif
 
-#if EXTRUDERS > 1 || ENABLED(HEATERS_PARALLEL)
+#if HOTENDS > 1 || ENABLED(HEATERS_PARALLEL)
   #if !HAS_HEATER_1
     #error HEATER_1_PIN not defined for this board.
   #endif

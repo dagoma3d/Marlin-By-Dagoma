@@ -118,22 +118,22 @@ static volatile bool temp_meas_ready = false;
 
 #if ENABLED(PIDTEMP)
   //static cannot be external:
-  static float temp_iState[EXTRUDERS] = { 0 };
-  static float temp_dState[EXTRUDERS] = { 0 };
-  static float pTerm[EXTRUDERS];
-  static float iTerm[EXTRUDERS];
-  static float dTerm[EXTRUDERS];
+  static float temp_iState[HOTENDS] = { 0 };
+  static float temp_dState[HOTENDS] = { 0 };
+  static float pTerm[HOTENDS];
+  static float iTerm[HOTENDS];
+  static float dTerm[HOTENDS];
   #if ENABLED(PID_ADD_EXTRUSION_RATE)
-    static float cTerm[EXTRUDERS];
-    static long last_position[EXTRUDERS];
+    static float cTerm[HOTENDS];
+    static long last_position[HOTENDS];
     static long lpq[LPQ_MAX_LEN];
     static int lpq_ptr = 0;
   #endif
   //int output;
-  static float pid_error[EXTRUDERS];
-  static float temp_iState_min[EXTRUDERS];
-  static float temp_iState_max[EXTRUDERS];
-  static bool pid_reset[EXTRUDERS];
+  static float pid_error[HOTENDS];
+  static float temp_iState_min[HOTENDS];
+  static float temp_iState_max[HOTENDS];
+  static bool pid_reset[HOTENDS];
 #endif //PIDTEMP
 #if ENABLED(PIDTEMPBED)
   //static cannot be external:
@@ -149,7 +149,7 @@ static volatile bool temp_meas_ready = false;
 #else //PIDTEMPBED
   static millis_t  next_bed_check_ms;
 #endif //PIDTEMPBED
-static unsigned char soft_pwm[EXTRUDERS];
+static unsigned char soft_pwm[HOTENDS];
 
 #if ENABLED(FAN_SOFT_PWM)
   static unsigned char soft_pwm_fan[FAN_COUNT];
@@ -160,11 +160,11 @@ static unsigned char soft_pwm[EXTRUDERS];
 
 #if ENABLED(PIDTEMP)
   #if ENABLED(PID_PARAMS_PER_EXTRUDER)
-    float Kp[EXTRUDERS] = ARRAY_BY_EXTRUDERS1(DEFAULT_Kp);
-    float Ki[EXTRUDERS] = ARRAY_BY_EXTRUDERS1((DEFAULT_Ki) * (PID_dT));
-    float Kd[EXTRUDERS] = ARRAY_BY_EXTRUDERS1((DEFAULT_Kd) / (PID_dT));
+    float Kp[HOTENDS] = ARRAY_BY_HOTENDS1(DEFAULT_Kp);
+    float Ki[HOTENDS] = ARRAY_BY_HOTENDS1((DEFAULT_Ki) * (PID_dT));
+    float Kd[HOTENDS] = ARRAY_BY_HOTENDS1((DEFAULT_Kd) / (PID_dT));
     #if ENABLED(PID_ADD_EXTRUSION_RATE)
-      float Kc[EXTRUDERS] = ARRAY_BY_EXTRUDERS1(DEFAULT_Kc);
+      float Kc[HOTENDS] = ARRAY_BY_HOTENDS1(DEFAULT_Kc);
     #endif // PID_ADD_EXTRUSION_RATE
   #else //PID_PARAMS_PER_EXTRUDER
     float Kp = DEFAULT_Kp;
@@ -177,10 +177,10 @@ static unsigned char soft_pwm[EXTRUDERS];
 #endif //PIDTEMP
 
 // Init min and max temp with extreme values to prevent false errors during startup
-static int minttemp_raw[EXTRUDERS] = ARRAY_BY_EXTRUDERS(HEATER_0_RAW_LO_TEMP , HEATER_1_RAW_LO_TEMP , HEATER_2_RAW_LO_TEMP, HEATER_3_RAW_LO_TEMP);
-static int maxttemp_raw[EXTRUDERS] = ARRAY_BY_EXTRUDERS(HEATER_0_RAW_HI_TEMP , HEATER_1_RAW_HI_TEMP , HEATER_2_RAW_HI_TEMP, HEATER_3_RAW_HI_TEMP);
-static int minttemp[EXTRUDERS] = { 0 };
-static int maxttemp[EXTRUDERS] = ARRAY_BY_EXTRUDERS1(16383);
+static int minttemp_raw[HOTENDS] = ARRAY_BY_HOTENDS(HEATER_0_RAW_LO_TEMP , HEATER_1_RAW_LO_TEMP , HEATER_2_RAW_LO_TEMP, HEATER_3_RAW_LO_TEMP);
+static int maxttemp_raw[HOTENDS] = ARRAY_BY_HOTENDS(HEATER_0_RAW_HI_TEMP , HEATER_1_RAW_HI_TEMP , HEATER_2_RAW_HI_TEMP, HEATER_3_RAW_HI_TEMP);
+static int minttemp[HOTENDS] = { 0 };
+static int maxttemp[HOTENDS] = ARRAY_BY_HOTENDS1(16383);
 #ifdef BED_MINTEMP
   static int bed_minttemp_raw = HEATER_BED_RAW_LO_TEMP;
 #endif
@@ -192,8 +192,8 @@ static int maxttemp[EXTRUDERS] = ARRAY_BY_EXTRUDERS1(16383);
   static void* heater_ttbl_map[2] = {(void*)HEATER_0_TEMPTABLE, (void*)HEATER_1_TEMPTABLE };
   static uint8_t heater_ttbllen_map[2] = { HEATER_0_TEMPTABLE_LEN, HEATER_1_TEMPTABLE_LEN };
 #else
-  static void* heater_ttbl_map[EXTRUDERS] = ARRAY_BY_EXTRUDERS((void*)HEATER_0_TEMPTABLE, (void*)HEATER_1_TEMPTABLE, (void*)HEATER_2_TEMPTABLE, (void*)HEATER_3_TEMPTABLE);
-  static uint8_t heater_ttbllen_map[EXTRUDERS] = ARRAY_BY_EXTRUDERS(HEATER_0_TEMPTABLE_LEN, HEATER_1_TEMPTABLE_LEN, HEATER_2_TEMPTABLE_LEN, HEATER_3_TEMPTABLE_LEN);
+  static void* heater_ttbl_map[HOTENDS] = ARRAY_BY_HOTENDS((void*)HEATER_0_TEMPTABLE, (void*)HEATER_1_TEMPTABLE, (void*)HEATER_2_TEMPTABLE, (void*)HEATER_3_TEMPTABLE);
+  static uint8_t heater_ttbllen_map[HOTENDS] = ARRAY_BY_HOTENDS(HEATER_0_TEMPTABLE_LEN, HEATER_1_TEMPTABLE_LEN, HEATER_2_TEMPTABLE_LEN, HEATER_3_TEMPTABLE_LEN);
 #endif
 
 static float analog2temp(int raw, uint8_t e);
@@ -201,8 +201,8 @@ static float analog2tempBed(int raw);
 static void updateTemperaturesFromRawValues();
 
 #if ENABLED(THERMAL_PROTECTION_HOTENDS)
-  int watch_target_temp[EXTRUDERS] = { 0 };
-  millis_t watch_heater_next_ms[EXTRUDERS] = { 0 };
+  int watch_target_temp[HOTENDS] = { 0 };
+  millis_t watch_heater_next_ms[HOTENDS] = { 0 };
 #endif
 
 #ifndef SOFT_PWM_SCALE
@@ -242,7 +242,7 @@ static void updateTemperaturesFromRawValues();
 
     if (false
       #if ENABLED(PIDTEMP)
-         || extruder >= EXTRUDERS
+         || extruder >= HOTENDS
       #else
          || extruder >= 0
       #endif
@@ -468,7 +468,7 @@ static void updateTemperaturesFromRawValues();
 
 void updatePID() {
   #if ENABLED(PIDTEMP)
-    for (int e = 0; e < EXTRUDERS; e++) {
+    for (int e = 0; e < HOTENDS; e++) {
       temp_iState_max[e] = (PID_INTEGRAL_DRIVE_MAX) / PID_PARAM(Ki, e);
       #if ENABLED(PID_ADD_EXTRUSION_RATE)
         last_position[e] = 0;
@@ -733,7 +733,7 @@ void manage_heater() {
   #endif
 
   // Loop through all extruders
-  for (int e = 0; e < EXTRUDERS; e++) {
+  for (int e = 0; e < HOTENDS; e++) {
 
     #if ENABLED(THERMAL_PROTECTION_HOTENDS)
       thermal_runaway_protection(&thermal_runaway_state_machine[e], &thermal_runaway_timer[e], current_temperature[e], target_temperature[e], e, THERMAL_PROTECTION_PERIOD, THERMAL_PROTECTION_HYSTERESIS);
@@ -838,9 +838,9 @@ void manage_heater() {
 // For hot end temperature measurement.
 static float analog2temp(int raw, uint8_t e) {
   #if ENABLED(TEMP_SENSOR_1_AS_REDUNDANT)
-    if (e > EXTRUDERS)
+    if (e > HOTENDS)
   #else
-    if (e >= EXTRUDERS)
+    if (e >= HOTENDS)
   #endif
     {
       SERIAL_ERROR_START;
@@ -917,7 +917,7 @@ static void updateTemperaturesFromRawValues() {
   #if ENABLED(HEATER_0_USES_MAX6675)
     current_temperature_raw[0] = read_max6675();
   #endif
-  for (uint8_t e = 0; e < EXTRUDERS; e++) {
+  for (uint8_t e = 0; e < HOTENDS; e++) {
     current_temperature[e] = analog2temp(current_temperature_raw[e], e);
   }
   current_temperature_bed = analog2tempBed(current_temperature_bed_raw);
@@ -970,7 +970,7 @@ void tp_init() {
   #endif
 
   // Finish init of mult extruder arrays
-  for (int e = 0; e < EXTRUDERS; e++) {
+  for (int e = 0; e < HOTENDS; e++) {
     // populate with the first value
     maxttemp[e] = maxttemp[0];
     #if ENABLED(PIDTEMP)
@@ -1129,30 +1129,30 @@ void tp_init() {
   #ifdef HEATER_0_MAXTEMP
     TEMP_MAX_ROUTINE(0);
   #endif
-  #if EXTRUDERS > 1
+  #if HOTENDS > 1
     #ifdef HEATER_1_MINTEMP
       TEMP_MIN_ROUTINE(1);
     #endif
     #ifdef HEATER_1_MAXTEMP
       TEMP_MAX_ROUTINE(1);
     #endif
-    #if EXTRUDERS > 2
+    #if HOTENDS > 2
       #ifdef HEATER_2_MINTEMP
         TEMP_MIN_ROUTINE(2);
       #endif
       #ifdef HEATER_2_MAXTEMP
         TEMP_MAX_ROUTINE(2);
       #endif
-      #if EXTRUDERS > 3
+      #if HOTENDS > 3
         #ifdef HEATER_3_MINTEMP
           TEMP_MIN_ROUTINE(3);
         #endif
         #ifdef HEATER_3_MAXTEMP
           TEMP_MAX_ROUTINE(3);
         #endif
-      #endif // EXTRUDERS > 3
-    #endif // EXTRUDERS > 2
-  #endif // EXTRUDERS > 1
+      #endif // HOTENDS > 3
+    #endif // HOTENDS > 2
+  #endif // HOTENDS > 1
 
   #ifdef BED_MINTEMP
     while(analog2tempBed(bed_minttemp_raw) < BED_MINTEMP) {
@@ -1194,7 +1194,7 @@ void tp_init() {
 
   void thermal_runaway_protection(TRState* state, millis_t* timer, float temperature, float target_temperature, int heater_id, int period_seconds, int hysteresis_degc) {
 
-    static float tr_target_temperature[EXTRUDERS + 1] = { 0.0 };
+    static float tr_target_temperature[HOTENDS + 1] = { 0.0 };
 
     /**
         SERIAL_ECHO_START;
@@ -1211,7 +1211,7 @@ void tp_init() {
         SERIAL_EOL;
     */
 
-    int heater_index = heater_id >= 0 ? heater_id : EXTRUDERS;
+    int heater_index = heater_id >= 0 ? heater_id : HOTENDS;
 
     // If the target temperature changes, restart
     if (tr_target_temperature[heater_index] != target_temperature)
@@ -1249,7 +1249,7 @@ void tp_init() {
 #endif // THERMAL_PROTECTION_HOTENDS || THERMAL_PROTECTION_BED
 
 void disable_all_heaters() {
-  for (int i = 0; i < EXTRUDERS; i++) setTargetHotend(0, i);
+  for (int i = 0; i < HOTENDS; i++) setTargetHotend(0, i);
   setTargetBed(0);
 
   // If all heaters go down then for sure our print job has stopped
@@ -1267,15 +1267,15 @@ void disable_all_heaters() {
     WRITE_HEATER_0P(LOW); // Should HEATERS_PARALLEL apply here? Then change to DISABLE_HEATER(0)
   #endif
 
-  #if EXTRUDERS > 1 && HAS_TEMP_1
+  #if HOTENDS > 1 && HAS_TEMP_1
     DISABLE_HEATER(1);
   #endif
 
-  #if EXTRUDERS > 2 && HAS_TEMP_2
+  #if HOTENDS > 2 && HAS_TEMP_2
     DISABLE_HEATER(2);
   #endif
 
-  #if EXTRUDERS > 3 && HAS_TEMP_3
+  #if HOTENDS > 3 && HAS_TEMP_3
     DISABLE_HEATER(3);
   #endif
 
@@ -1412,7 +1412,7 @@ static void set_current_temp_raw() {
   }
 
   inline void update_z_magic( ) {
-    
+
     millis_t now = millis();
 
     z_magic_raw_value = float(ADC);
@@ -1429,11 +1429,11 @@ static void set_current_temp_raw() {
         z_magic_hit_flag = true;
       }
       */
-      
+
       // FIX: Should work on both Magis and old Neva
       if (!z_magic_hit_flag && (z_magic_bias < -8.0 || z_magic_bias_delta < -15.0 || z_magic_bias_delta > 15.0)) {
         z_magic_hit_flag = true;
-      } 
+      }
 
       if (z_magic_bias < -4.0 || z_magic_bias > 4.0) {
         z_magic_calibration_timeout = now + 250UL;
@@ -1475,11 +1475,11 @@ ISR(TIMER0_COMPB_vect) {
 
   // Statics per heater
   ISR_STATICS(0);
-  #if (EXTRUDERS > 1) || ENABLED(HEATERS_PARALLEL)
+  #if (HOTENDS > 1) || ENABLED(HEATERS_PARALLEL)
     ISR_STATICS(1);
-    #if EXTRUDERS > 2
+    #if HOTENDS > 2
       ISR_STATICS(2);
-      #if EXTRUDERS > 3
+      #if HOTENDS > 3
         ISR_STATICS(3);
       #endif
     #endif
@@ -1503,13 +1503,13 @@ ISR(TIMER0_COMPB_vect) {
       }
       else WRITE_HEATER_0P(0); // If HEATERS_PARALLEL should apply, change to WRITE_HEATER_0
 
-      #if EXTRUDERS > 1
+      #if HOTENDS > 1
         soft_pwm_1 = soft_pwm[1];
         WRITE_HEATER_1(soft_pwm_1 > 0 ? 1 : 0);
-        #if EXTRUDERS > 2
+        #if HOTENDS > 2
           soft_pwm_2 = soft_pwm[2];
           WRITE_HEATER_2(soft_pwm_2 > 0 ? 1 : 0);
-          #if EXTRUDERS > 3
+          #if HOTENDS > 3
             soft_pwm_3 = soft_pwm[3];
             WRITE_HEATER_3(soft_pwm_3 > 0 ? 1 : 0);
           #endif
@@ -1538,11 +1538,11 @@ ISR(TIMER0_COMPB_vect) {
     }
 
     if (soft_pwm_0 < pwm_count) WRITE_HEATER_0(0);
-    #if EXTRUDERS > 1
+    #if HOTENDS > 1
       if (soft_pwm_1 < pwm_count) WRITE_HEATER_1(0);
-      #if EXTRUDERS > 2
+      #if HOTENDS > 2
         if (soft_pwm_2 < pwm_count) WRITE_HEATER_2(0);
-        #if EXTRUDERS > 3
+        #if HOTENDS > 3
           if (soft_pwm_3 < pwm_count) WRITE_HEATER_3(0);
         #endif
       #endif
@@ -1609,11 +1609,11 @@ ISR(TIMER0_COMPB_vect) {
     if (slow_pwm_count == 0) {
 
       SLOW_PWM_ROUTINE(0); // EXTRUDER 0
-      #if EXTRUDERS > 1
+      #if HOTENDS > 1
         SLOW_PWM_ROUTINE(1); // EXTRUDER 1
-        #if EXTRUDERS > 2
+        #if HOTENDS > 2
           SLOW_PWM_ROUTINE(2); // EXTRUDER 2
-          #if EXTRUDERS > 3
+          #if HOTENDS > 3
             SLOW_PWM_ROUTINE(3); // EXTRUDER 3
           #endif
         #endif
@@ -1625,11 +1625,11 @@ ISR(TIMER0_COMPB_vect) {
     } // slow_pwm_count == 0
 
     PWM_OFF_ROUTINE(0); // EXTRUDER 0
-    #if EXTRUDERS > 1
+    #if HOTENDS > 1
       PWM_OFF_ROUTINE(1); // EXTRUDER 1
-      #if EXTRUDERS > 2
+      #if HOTENDS > 2
         PWM_OFF_ROUTINE(2); // EXTRUDER 2
-        #if EXTRUDERS > 3
+        #if HOTENDS > 3
           PWM_OFF_ROUTINE(3); // EXTRUDER 3
         #endif
       #endif
@@ -1674,11 +1674,11 @@ ISR(TIMER0_COMPB_vect) {
 
       // EXTRUDER 0
       if (state_timer_heater_0 > 0) state_timer_heater_0--;
-      #if EXTRUDERS > 1    // EXTRUDER 1
+      #if HOTENDS > 1    // EXTRUDER 1
         if (state_timer_heater_1 > 0) state_timer_heater_1--;
-        #if EXTRUDERS > 2    // EXTRUDER 2
+        #if HOTENDS > 2    // EXTRUDER 2
           if (state_timer_heater_2 > 0) state_timer_heater_2--;
-          #if EXTRUDERS > 3    // EXTRUDER 3
+          #if HOTENDS > 3    // EXTRUDER 3
             if (state_timer_heater_3 > 0) state_timer_heater_3--;
           #endif
         #endif
@@ -1851,7 +1851,7 @@ ISR(TIMER0_COMPB_vect) {
       if (minttemp_raw[0] GE0 current_temperature_raw[0]) min_temp_error(0);
     #endif
 
-    #if HAS_TEMP_1 && EXTRUDERS > 1
+    #if HAS_TEMP_1 && HOTENDS > 1
       #if HEATER_1_RAW_LO_TEMP > HEATER_1_RAW_HI_TEMP
         #define GE1 <=
       #else
@@ -1861,7 +1861,7 @@ ISR(TIMER0_COMPB_vect) {
       if (minttemp_raw[1] GE1 current_temperature_raw[1]) min_temp_error(1);
     #endif // TEMP_SENSOR_1
 
-    #if HAS_TEMP_2 && EXTRUDERS > 2
+    #if HAS_TEMP_2 && HOTENDS > 2
       #if HEATER_2_RAW_LO_TEMP > HEATER_2_RAW_HI_TEMP
         #define GE2 <=
       #else
@@ -1871,7 +1871,7 @@ ISR(TIMER0_COMPB_vect) {
       if (minttemp_raw[2] GE2 current_temperature_raw[2]) min_temp_error(2);
     #endif // TEMP_SENSOR_2
 
-    #if HAS_TEMP_3 && EXTRUDERS > 3
+    #if HAS_TEMP_3 && HOTENDS > 3
       #if HEATER_3_RAW_LO_TEMP > HEATER_3_RAW_HI_TEMP
         #define GE3 <=
       #else

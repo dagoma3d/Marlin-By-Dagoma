@@ -82,9 +82,9 @@ extern float current_temperature_bed;
 #if ENABLED(PIDTEMP)
 
   #if ENABLED(PID_PARAMS_PER_EXTRUDER)
-    extern float Kp[EXTRUDERS], Ki[EXTRUDERS], Kd[EXTRUDERS];  // one param per extruder
+    extern float Kp[HOTENDS], Ki[HOTENDS], Kd[HOTENDS];  // one param per extruder
     #if ENABLED(PID_ADD_EXTRUSION_RATE)
-      extern float Kc[EXTRUDERS];
+      extern float Kc[HOTENDS];
     #endif
     #define PID_PARAM(param, e) param[e] // use macro to point to array value
   #else
@@ -149,17 +149,17 @@ FORCE_INLINE bool isCoolingBed() { return target_temperature_bed < current_tempe
   FORCE_INLINE bool isHeatingHotend##NR() { return isHeatingHotend(NR); } \
   FORCE_INLINE bool isCoolingHotend##NR() { return isCoolingHotend(NR); }
 HOTEND_ROUTINES(0);
-#if EXTRUDERS > 1
+#if HOTENDS > 1
   HOTEND_ROUTINES(1);
 #else
   #define setTargetHotend1(c) do{}while(0)
 #endif
-#if EXTRUDERS > 2
+#if HOTENDS > 2
   HOTEND_ROUTINES(2);
 #else
   #define setTargetHotend2(c) do{}while(0)
 #endif
-#if EXTRUDERS > 3
+#if HOTENDS > 3
   HOTEND_ROUTINES(3);
 #else
   #define setTargetHotend3(c) do{}while(0)

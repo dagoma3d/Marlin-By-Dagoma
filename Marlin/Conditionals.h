@@ -534,17 +534,14 @@
   /**
    * ARRAY_BY_EXTRUDERS based on EXTRUDERS
    */
-  #if EXTRUDERS > 3
-    #define ARRAY_BY_EXTRUDERS(v1, v2, v3, v4) { v1, v2, v3, v4 }
-  #elif EXTRUDERS > 2
-    #define ARRAY_BY_EXTRUDERS(v1, v2, v3, v4) { v1, v2, v3 }
-  #elif EXTRUDERS > 1
-    #define ARRAY_BY_EXTRUDERS(v1, v2, v3, v4) { v1, v2 }
-  #else
-    #define ARRAY_BY_EXTRUDERS(v1, v2, v3, v4) { v1 }
-  #endif
-
+  #define ARRAY_BY_EXTRUDERS(...) ARRAY_N(EXTRUDERS, __VA_ARGS__)
   #define ARRAY_BY_EXTRUDERS1(v1) ARRAY_BY_EXTRUDERS(v1, v1, v1, v1)
+
+  /**
+   * ARRAY_BY_HOTENDS based on HOTENDS
+   */
+  #define ARRAY_BY_HOTENDS(...) ARRAY_N(HOTENDS, __VA_ARGS__)
+  #define ARRAY_BY_HOTENDS1(v1) ARRAY_BY_HOTENDS(v1, v1, v1, v1)
 
   /**
    * Z_DUAL_ENDSTOPS endstop reassignment
@@ -601,9 +598,9 @@
   #define HAS_HEATER_3 (PIN_EXISTS(HEATER_3))
   #define HAS_HEATER_BED (PIN_EXISTS(HEATER_BED))
   #define HAS_AUTO_FAN_0 (PIN_EXISTS(EXTRUDER_0_AUTO_FAN))
-  #define HAS_AUTO_FAN_1 (PIN_EXISTS(EXTRUDER_1_AUTO_FAN))
-  #define HAS_AUTO_FAN_2 (PIN_EXISTS(EXTRUDER_2_AUTO_FAN))
-  #define HAS_AUTO_FAN_3 (PIN_EXISTS(EXTRUDER_3_AUTO_FAN))
+  #define HAS_AUTO_FAN_1 (HOTENDS > 1 && PIN_EXISTS(EXTRUDER_1_AUTO_FAN))
+  #define HAS_AUTO_FAN_2 (HOTENDS > 2 && PIN_EXISTS(EXTRUDER_2_AUTO_FAN))
+  #define HAS_AUTO_FAN_3 (HOTENDS > 3 && PIN_EXISTS(EXTRUDER_3_AUTO_FAN))
   #define HAS_AUTO_FAN (HAS_AUTO_FAN_0 || HAS_AUTO_FAN_1 || HAS_AUTO_FAN_2 || HAS_AUTO_FAN_3)
   #define HAS_FAN0 (PIN_EXISTS(FAN))
   #define HAS_FAN1 (PIN_EXISTS(FAN1) && CONTROLLERFAN_PIN != FAN1_PIN && EXTRUDER_0_AUTO_FAN_PIN != FAN1_PIN && EXTRUDER_1_AUTO_FAN_PIN != FAN1_PIN && EXTRUDER_2_AUTO_FAN_PIN != FAN1_PIN)
@@ -679,11 +676,11 @@
    * Helper Macros for heaters and extruder fan
    */
   #define WRITE_HEATER_0P(v) WRITE(HEATER_0_PIN, v)
-  #if EXTRUDERS > 1 || ENABLED(HEATERS_PARALLEL)
+  #if HOTENDS > 1 || ENABLED(HEATERS_PARALLEL)
     #define WRITE_HEATER_1(v) WRITE(HEATER_1_PIN, v)
-    #if EXTRUDERS > 2
+    #if HOTENDS > 2
       #define WRITE_HEATER_2(v) WRITE(HEATER_2_PIN, v)
-      #if EXTRUDERS > 3
+      #if HOTENDS > 3
         #define WRITE_HEATER_3(v) WRITE(HEATER_3_PIN, v)
       #endif
     #endif
