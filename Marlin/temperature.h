@@ -61,6 +61,12 @@ void manage_heater(); //it is critical that this is called periodically.
   int widthFil_to_size_ratio();
 #endif
 
+#if HOTENDS == 1
+  #define HOTEND_INDEX  0
+#else
+  #define HOTEND_INDEX  e
+#endif
+
 // low level conversion routines
 // do not use these routines and variables outside of temperature.cpp
 extern int target_temperature[4];
@@ -81,19 +87,19 @@ extern float current_temperature_bed;
 
 #if ENABLED(PIDTEMP)
 
-  #if ENABLED(PID_PARAMS_PER_EXTRUDER)
-    extern float Kp[HOTENDS], Ki[HOTENDS], Kd[HOTENDS];  // one param per extruder
+  #if ENABLED(PID_PARAMS_PER_HOTEND)
+    extern float Kp[HOTENDS], Ki[HOTENDS], Kd[HOTENDS];  // one param per hotend
     #if ENABLED(PID_ADD_EXTRUSION_RATE)
       extern float Kc[HOTENDS];
     #endif
     #define PID_PARAM(param, e) param[e] // use macro to point to array value
   #else
-    extern float Kp, Ki, Kd;  // one param per extruder - saves 20 or 36 bytes of ram (inc array pointer)
+    extern float Kp, Ki, Kd;  // one param per hotend - saves 20 or 36 bytes of ram (inc array pointer)
     #if ENABLED(PID_ADD_EXTRUSION_RATE)
       extern float Kc;
     #endif
     #define PID_PARAM(param, e) param // use macro to point directly to value
-  #endif // PID_PARAMS_PER_EXTRUDER
+  #endif // PID_PARAMS_PER_HOTEND
   float scalePID_i(float i);
   float scalePID_d(float d);
   float unscalePID_i(float i);
@@ -113,33 +119,37 @@ extern float current_temperature_bed;
 //inline so that there is no performance decrease.
 //deg=degreeCelsius
 
-FORCE_INLINE float degHotend(uint8_t extruder) { return current_temperature[extruder]; }
+FORCE_INLINE float degHotend(uint8_t e) { return current_temperature[HOTEND_INDEX]; }
 FORCE_INLINE float degBed() { return current_temperature_bed; }
 
 #if ENABLED(SHOW_TEMP_ADC_VALUES)
-FORCE_INLINE float rawHotendTemp(uint8_t extruder) { return current_temperature_raw[extruder]; }
+FORCE_INLINE float rawHotendTemp(uint8_t e) { return current_temperature_raw[HOTEND_INDEX]; }
 FORCE_INLINE float rawBedTemp() { return current_temperature_bed_raw; }
 #endif
 
-FORCE_INLINE float degTargetHotend(uint8_t extruder) { return target_temperature[extruder]; }
+FORCE_INLINE float degTargetHotend(uint8_t e) { return target_temperature[HOTEND_INDEX]; }
 FORCE_INLINE float degTargetBed() { return target_temperature_bed; }
 
 #if ENABLED(THERMAL_PROTECTION_HOTENDS)
   void start_watching_heater(int e = 0);
 #endif
 
-FORCE_INLINE void setTargetHotend(const float& celsius, uint8_t extruder) {
-  target_temperature[extruder] = celsius;
+FORCE_INLINE void setTargetHotend(const float& celsius, uint8_t e) {
+  target_temperature[HOTEND_INDEX] = celsius;
   #if ENABLED(THERMAL_PROTECTION_HOTENDS)
-    start_watching_heater(extruder);
+    start_watching_heater(HOTEND_INDEX);
   #endif
 }
 FORCE_INLINE void setTargetBed(const float& celsius) { target_temperature_bed = celsius; }
 
-FORCE_INLINE bool isHeatingHotend(uint8_t extruder) { return target_temperature[extruder] > current_temperature[extruder]; }
+FORCE_INLINE bool isHeatingHotend(uint8_t e) {
+  return target_temperature[HOTEND_INDEX] > current_temperature[HOTEND_INDEX];
+}
 FORCE_INLINE bool isHeatingBed() { return target_temperature_bed > current_temperature_bed; }
 
-FORCE_INLINE bool isCoolingHotend(uint8_t extruder) { return target_temperature[extruder] < current_temperature[extruder]; }
+FORCE_INLINE bool isCoolingHotend(uint8_t e) {
+  return target_temperature[HOTEND_INDEX] < current_temperature[HOTEND_INDEX];
+}
 FORCE_INLINE bool isCoolingBed() { return target_temperature_bed < current_temperature_bed; }
 
 #define HOTEND_ROUTINES(NR) \
@@ -170,7 +180,7 @@ void disable_all_heaters();
 void updatePID();
 
 #if ENABLED(PIDTEMP)
-  void PID_autotune(float temp, int extruder, int ncycles, bool set_result=false);
+  void PID_autotune(float temp, int hotend, int ncycles, bool set_result=false);
 #endif
 
 void setExtruderAutoFanState(int pin, bool state);

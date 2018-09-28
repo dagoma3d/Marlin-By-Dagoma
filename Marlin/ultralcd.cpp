@@ -1679,14 +1679,14 @@ static void lcd_control_menu() {
   // Helpers for editing PID Ki & Kd values
   // grab the PID value out of the temp variable; scale it; then update the PID driver
   void copy_and_scalePID_i(int e) {
-    #if DISABLED(PID_PARAMS_PER_EXTRUDER)
+    #if DISABLED(PID_PARAMS_PER_HOTEND)
       UNUSED(e);
     #endif
     PID_PARAM(Ki, e) = scalePID_i(raw_Ki);
     updatePID();
   }
   void copy_and_scalePID_d(int e) {
-    #if DISABLED(PID_PARAMS_PER_EXTRUDER)
+    #if DISABLED(PID_PARAMS_PER_HOTEND)
       UNUSED(e);
     #endif
     PID_PARAM(Kd, e) = scalePID_d(raw_Kd);
@@ -1705,7 +1705,7 @@ static void lcd_control_menu() {
   #endif
 
   _PIDTEMP_FUNCTIONS(0);
-  #if ENABLED(PID_PARAMS_PER_EXTRUDER)
+  #if ENABLED(PID_PARAMS_PER_HOTEND)
     #if HOTENDS > 1
       _PIDTEMP_FUNCTIONS(1);
       #if HOTENDS > 2
@@ -1715,7 +1715,7 @@ static void lcd_control_menu() {
         #endif //HOTENDS > 3
       #endif //HOTENDS > 2
     #endif //HOTENDS > 1
-  #endif //PID_PARAMS_PER_EXTRUDER
+  #endif //PID_PARAMS_PER_HOTEND
 
 #endif //PIDTEMP
 
@@ -1828,7 +1828,7 @@ static void lcd_control_temperature_menu() {
       #define PID_MENU_ITEMS(ELABEL, eindex) _PID_MENU_ITEMS(ELABEL, eindex)
     #endif
 
-    #if ENABLED(PID_PARAMS_PER_EXTRUDER) && HOTENDS > 1
+    #if ENABLED(PID_PARAMS_PER_HOTEND) && HOTENDS > 1
       PID_MENU_ITEMS(MSG_E1, 0);
       PID_MENU_ITEMS(MSG_E2, 1);
       #if HOTENDS > 2
@@ -1837,9 +1837,9 @@ static void lcd_control_temperature_menu() {
           PID_MENU_ITEMS(MSG_E4, 3);
         #endif //HOTENDS > 3
       #endif //HOTENDS > 2
-    #else //!PID_PARAMS_PER_EXTRUDER || HOTENDS == 1
+    #else //!PID_PARAMS_PER_HOTEND || HOTENDS == 1
       PID_MENU_ITEMS("", 0);
-    #endif //!PID_PARAMS_PER_EXTRUDER || HOTENDS == 1
+    #endif //!PID_PARAMS_PER_HOTEND || HOTENDS == 1
 
   #endif //PIDTEMP
 

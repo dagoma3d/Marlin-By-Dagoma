@@ -585,7 +585,7 @@ void Config_ResetDefault() {
   #endif
 
   #if ENABLED(PIDTEMP)
-    #if ENABLED(PID_PARAMS_PER_EXTRUDER)
+    #if ENABLED(PID_PARAMS_PER_HOTEND)
       for (uint8_t e = 0; e < EXTRUDERS; e++)
     #else
       int e = 0; UNUSED(e); // only need to write once

@@ -159,21 +159,21 @@ static unsigned char soft_pwm[HOTENDS];
 #endif
 
 #if ENABLED(PIDTEMP)
-  #if ENABLED(PID_PARAMS_PER_EXTRUDER)
+  #if ENABLED(PID_PARAMS_PER_HOTEND)
     float Kp[HOTENDS] = ARRAY_BY_HOTENDS1(DEFAULT_Kp);
     float Ki[HOTENDS] = ARRAY_BY_HOTENDS1((DEFAULT_Ki) * (PID_dT));
     float Kd[HOTENDS] = ARRAY_BY_HOTENDS1((DEFAULT_Kd) / (PID_dT));
     #if ENABLED(PID_ADD_EXTRUSION_RATE)
       float Kc[HOTENDS] = ARRAY_BY_HOTENDS1(DEFAULT_Kc);
     #endif // PID_ADD_EXTRUSION_RATE
-  #else //PID_PARAMS_PER_EXTRUDER
+  #else //PID_PARAMS_PER_HOTEND
     float Kp = DEFAULT_Kp;
     float Ki = (DEFAULT_Ki) * (PID_dT);
     float Kd = (DEFAULT_Kd) / (PID_dT);
     #if ENABLED(PID_ADD_EXTRUSION_RATE)
       float Kc = DEFAULT_Kc;
     #endif // PID_ADD_EXTRUSION_RATE
-  #endif // PID_PARAMS_PER_EXTRUDER
+  #endif // PID_PARAMS_PER_HOTEND
 #endif //PIDTEMP
 
 // Init min and max temp with extreme values to prevent false errors during startup
@@ -223,7 +223,7 @@ static void updateTemperaturesFromRawValues();
 
 #if HAS_PID_HEATING
 
-  void PID_autotune(float temp, int extruder, int ncycles, bool set_result/*=false*/) {
+  void PID_autotune(float temp, int hotend, int ncycles, bool set_result/*=false*/) {
     float input = 0.0;
     int cycles = 0;
     bool heating = true;
@@ -242,12 +242,12 @@ static void updateTemperaturesFromRawValues();
 
     if (false
       #if ENABLED(PIDTEMP)
-         || extruder >= HOTENDS
+         || hotend >= HOTENDS
       #else
-         || extruder >= 0
+         || hotend >= 0
       #endif
       #if DISABLED(PIDTEMPBED)
-         || extruder < 0
+         || hotend < 0
       #endif
     ) {
       SERIAL_ECHOLN(MSG_PID_BAD_EXTRUDER_NUM);
@@ -259,12 +259,12 @@ static void updateTemperaturesFromRawValues();
     disable_all_heaters(); // switch off all heaters.
 
     #if HAS_PID_FOR_BOTH
-      if (extruder < 0)
+      if (hotend < 0)
         soft_pwm_bed = bias = d = (MAX_BED_POWER) / 2;
       else
-        soft_pwm[extruder] = bias = d = (PID_MAX) / 2;
+        soft_pwm[hotend] = bias = d = (PID_MAX) / 2;
     #elif ENABLED(PIDTEMP)
-      soft_pwm[extruder] = bias = d = (PID_MAX) / 2;
+      soft_pwm[hotend] = bias = d = (PID_MAX) / 2;
     #else
       soft_pwm_bed = bias = d = (MAX_BED_POWER) / 2;
     #endif
@@ -279,9 +279,9 @@ static void updateTemperaturesFromRawValues();
 
         input =
           #if HAS_PID_FOR_BOTH
-            extruder < 0 ? current_temperature_bed : current_temperature[extruder]
+            hotend < 0 ? current_temperature_bed : current_temperature[hotend]
           #elif ENABLED(PIDTEMP)
-            current_temperature[extruder]
+            current_temperature[hotend]
           #else
             current_temperature_bed
           #endif
@@ -311,12 +311,12 @@ static void updateTemperaturesFromRawValues();
           if (ELAPSED(ms, t2 + 5000UL)) {
             heating = false;
             #if HAS_PID_FOR_BOTH
-              if (extruder < 0)
+              if (hotend < 0)
                 soft_pwm_bed = (bias - d) >> 1;
               else
-                soft_pwm[extruder] = (bias - d) >> 1;
+                soft_pwm[hotend] = (bias - d) >> 1;
             #elif ENABLED(PIDTEMP)
-              soft_pwm[extruder] = (bias - d) >> 1;
+              soft_pwm[hotend] = (bias - d) >> 1;
             #elif ENABLED(PIDTEMPBED)
               soft_pwm_bed = (bias - d) >> 1;
             #endif
@@ -334,7 +334,7 @@ static void updateTemperaturesFromRawValues();
             if (cycles > 0) {
               long max_pow =
                 #if HAS_PID_FOR_BOTH
-                  extruder < 0 ? MAX_BED_POWER : PID_MAX
+                  hotend < 0 ? MAX_BED_POWER : PID_MAX
                 #elif ENABLED(PIDTEMP)
                   PID_MAX
                 #else
@@ -380,12 +380,12 @@ static void updateTemperaturesFromRawValues();
               }
             }
             #if HAS_PID_FOR_BOTH
-              if (extruder < 0)
+              if (hotend < 0)
                 soft_pwm_bed = (bias + d) >> 1;
               else
-                soft_pwm[extruder] = (bias + d) >> 1;
+                soft_pwm[hotend] = (bias + d) >> 1;
             #elif ENABLED(PIDTEMP)
-              soft_pwm[extruder] = (bias + d) >> 1;
+              soft_pwm[hotend] = (bias + d) >> 1;
             #else
               soft_pwm_bed = (bias + d) >> 1;
             #endif
@@ -417,7 +417,7 @@ static void updateTemperaturesFromRawValues();
         SERIAL_PROTOCOLLNPGM(MSG_PID_AUTOTUNE_FINISHED);
 
         #if HAS_PID_FOR_BOTH
-          const char* estring = extruder < 0 ? "bed" : "";
+          const char* estring = hotend < 0 ? "bed" : "";
           SERIAL_PROTOCOLPGM("#define  DEFAULT_"); SERIAL_PROTOCOL(estring); SERIAL_PROTOCOLPGM("Kp "); SERIAL_PROTOCOLLN(workKp);
           SERIAL_PROTOCOLPGM("#define  DEFAULT_"); SERIAL_PROTOCOL(estring); SERIAL_PROTOCOLPGM("Ki "); SERIAL_PROTOCOLLN(workKi);
           SERIAL_PROTOCOLPGM("#define  DEFAULT_"); SERIAL_PROTOCOL(estring); SERIAL_PROTOCOLPGM("Kd "); SERIAL_PROTOCOLLN(workKd);
@@ -438,15 +438,15 @@ static void updateTemperaturesFromRawValues();
           updatePID()
 
         #define _SET_EXTRUDER_PID() \
-          PID_PARAM(Kp, extruder) = workKp; \
-          PID_PARAM(Ki, extruder) = scalePID_i(workKi); \
-          PID_PARAM(Kd, extruder) = scalePID_d(workKd); \
+          PID_PARAM(Kp, hotend) = workKp; \
+          PID_PARAM(Ki, hotend) = scalePID_i(workKi); \
+          PID_PARAM(Kd, hotend) = scalePID_d(workKd); \
           updatePID()
 
         // Use the result? (As with "M303 U1")
         if (set_result) {
           #if HAS_PID_FOR_BOTH
-            if (extruder < 0) {
+            if (hotend < 0) {
               _SET_BED_PID();
             }
             else {
@@ -589,75 +589,75 @@ float get_pid_output(int e) {
   float pid_output;
   #if ENABLED(PIDTEMP)
     #if DISABLED(PID_OPENLOOP)
-      pid_error[e] = target_temperature[e] - current_temperature[e];
-      dTerm[e] = K2 * PID_PARAM(Kd, e) * (current_temperature[e] - temp_dState[e]) + K1 * dTerm[e];
-      temp_dState[e] = current_temperature[e];
-      if (pid_error[e] > PID_FUNCTIONAL_RANGE) {
+      pid_error[HOTEND_INDEX] = target_temperature[HOTEND_INDEX] - current_temperature[HOTEND_INDEX];
+      dTerm[HOTEND_INDEX] = K2 * PID_PARAM(Kd, HOTEND_INDEX) * (current_temperature[HOTEND_INDEX] - temp_dState[HOTEND_INDEX]) + K1 * dTerm[HOTEND_INDEX];
+      temp_dState[HOTEND_INDEX] = current_temperature[HOTEND_INDEX];
+      if (pid_error[HOTEND_INDEX] > PID_FUNCTIONAL_RANGE) {
         pid_output = BANG_MAX;
-        pid_reset[e] = true;
+        pid_reset[HOTEND_INDEX] = true;
       }
-      else if (pid_error[e] < -(PID_FUNCTIONAL_RANGE) || target_temperature[e] == 0) {
+      else if (pid_error[HOTEND_INDEX] < -(PID_FUNCTIONAL_RANGE) || target_temperature[HOTEND_INDEX] == 0) {
         pid_output = 0;
-        pid_reset[e] = true;
+        pid_reset[HOTEND_INDEX] = true;
       }
       else {
-        if (pid_reset[e]) {
-          temp_iState[e] = 0.0;
-          pid_reset[e] = false;
+        if (pid_reset[HOTEND_INDEX]) {
+          temp_iState[HOTEND_INDEX] = 0.0;
+          pid_reset[HOTEND_INDEX] = false;
         }
-        pTerm[e] = PID_PARAM(Kp, e) * pid_error[e];
-        temp_iState[e] += pid_error[e];
-        temp_iState[e] = constrain(temp_iState[e], temp_iState_min[e], temp_iState_max[e]);
-        iTerm[e] = PID_PARAM(Ki, e) * temp_iState[e];
+        pTerm[HOTEND_INDEX] = PID_PARAM(Kp, HOTEND_INDEX) * pid_error[HOTEND_INDEX];
+        temp_iState[HOTEND_INDEX] += pid_error[HOTEND_INDEX];
+        temp_iState[HOTEND_INDEX] = constrain(temp_iState[HOTEND_INDEX], temp_iState_min[HOTEND_INDEX], temp_iState_max[HOTEND_INDEX]);
+        iTerm[HOTEND_INDEX] = PID_PARAM(Ki, HOTEND_INDEX) * temp_iState[HOTEND_INDEX];
 
-        pid_output = pTerm[e] + iTerm[e] - dTerm[e];
+        pid_output = pTerm[HOTEND_INDEX] + iTerm[HOTEND_INDEX] - dTerm[HOTEND_INDEX];
 
         #if ENABLED(PID_ADD_EXTRUSION_RATE)
-          cTerm[e] = 0;
+          cTerm[HOTEND_INDEX] = 0;
           if (e == active_extruder) {
             long e_position = st_get_position(E_AXIS);
-            if (e_position > last_position[e]) {
-              lpq[lpq_ptr++] = e_position - last_position[e];
-              last_position[e] = e_position;
+            if (e_position > last_position[HOTEND_INDEX]) {
+              lpq[lpq_ptr++] = e_position - last_position[HOTEND_INDEX];
+              last_position[HOTEND_INDEX] = e_position;
             }
             else {
               lpq[lpq_ptr++] = 0;
             }
             if (lpq_ptr >= lpq_len) lpq_ptr = 0;
-            cTerm[e] = (lpq[lpq_ptr] / axis_steps_per_unit[E_AXIS]) * PID_PARAM(Kc, e);
-            pid_output += cTerm[e];
+            cTerm[HOTEND_INDEX] = (lpq[lpq_ptr] / axis_steps_per_unit[E_AXIS]) * PID_PARAM(Kc, HOTEND_INDEX);
+            pid_output += cTerm[HOTEND_INDEX];
           }
         #endif //PID_ADD_EXTRUSION_RATE
 
         if (pid_output > PID_MAX) {
-          if (pid_error[e] > 0) temp_iState[e] -= pid_error[e]; // conditional un-integration
+          if (pid_error[HOTEND_INDEX] > 0) temp_iState[HOTEND_INDEX] -= pid_error[HOTEND_INDEX]; // conditional un-integration
           pid_output = PID_MAX;
         }
         else if (pid_output < 0) {
-          if (pid_error[e] < 0) temp_iState[e] -= pid_error[e]; // conditional un-integration
+          if (pid_error[HOTEND_INDEX] < 0) temp_iState[HOTEND_INDEX] -= pid_error[HOTEND_INDEX]; // conditional un-integration
           pid_output = 0;
         }
       }
     #else
-      pid_output = constrain(target_temperature[e], 0, PID_MAX);
+      pid_output = constrain(target_temperature[HOTEND_INDEX], 0, PID_MAX);
     #endif //PID_OPENLOOP
 
     #if ENABLED(PID_DEBUG)
       SERIAL_ECHO_START;
       SERIAL_ECHOPAIR(MSG_PID_DEBUG, e);
-      SERIAL_ECHOPAIR(MSG_PID_DEBUG_INPUT, current_temperature[e]);
+      SERIAL_ECHOPAIR(MSG_PID_DEBUG_INPUT, current_temperature[HOTEND_INDEX]);
       SERIAL_ECHOPAIR(MSG_PID_DEBUG_OUTPUT, pid_output);
-      SERIAL_ECHOPAIR(MSG_PID_DEBUG_PTERM, pTerm[e]);
-      SERIAL_ECHOPAIR(MSG_PID_DEBUG_ITERM, iTerm[e]);
-      SERIAL_ECHOPAIR(MSG_PID_DEBUG_DTERM, dTerm[e]);
+      SERIAL_ECHOPAIR(MSG_PID_DEBUG_PTERM, pTerm[HOTEND_INDEX]);
+      SERIAL_ECHOPAIR(MSG_PID_DEBUG_ITERM, iTerm[HOTEND_INDEX]);
+      SERIAL_ECHOPAIR(MSG_PID_DEBUG_DTERM, dTerm[HOTEND_INDEX]);
       #if ENABLED(PID_ADD_EXTRUSION_RATE)
-        SERIAL_ECHOPAIR(MSG_PID_DEBUG_CTERM, cTerm[e]);
+        SERIAL_ECHOPAIR(MSG_PID_DEBUG_CTERM, cTerm[HOTEND_INDEX]);
       #endif
       SERIAL_EOL;
     #endif //PID_DEBUG
 
   #else /* PID off */
-    pid_output = (current_temperature[e] < target_temperature[e]) ? PID_MAX : 0;
+    pid_output = (current_temperature[HOTEND_INDEX] < target_temperature[HOTEND_INDEX]) ? PID_MAX : 0;
   #endif
 
   return pid_output;
@@ -969,7 +969,7 @@ void tp_init() {
     MCUCR = _BV(JTD);
   #endif
 
-  // Finish init of mult extruder arrays
+  // Finish init of mult hotends arrays
   for (int e = 0; e < HOTENDS; e++) {
     // populate with the first value
     maxttemp[e] = maxttemp[0];
