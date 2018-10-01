@@ -504,7 +504,12 @@ static uint8_t target_extruder;
 #endif
 
 //#define CURRENT_FILAMENT_PRESENT (active_extruder == 0) ? FILAMENT_PRESENT : FILAMENT2_PRESENT
-#define CURRENT_FILAMENT_PRESENT FILAMENT_PRESENT
+//#define CURRENT_FILAMENT_PRESENT(e) ((e == 0) ? FILAMENT_PRESENT : FILAMENT2_PRESENT)
+//#define CURRENT_FILAMENT_PRESENT FILAMENT_PRESENT
+
+inline bool current_filament_present(uint8_t e) {
+  return (e == 0) ? FILAMENT_PRESENT : FILAMENT2_PRESENT;
+}
 
 #if ENABLED(SUMMON_PRINT_PAUSE)
   static bool print_pause_summoned = false;
@@ -7481,13 +7486,13 @@ inline void gcode_M503() {
           //destination[E_AXIS] += FILAMENTCHANGE_AUTO_INSERTION_VERIFICATION_LENGTH_MM;
           //prepare_move();
           RUNPLAN;
-        } while( destination[E_AXIS] < destination_to_reach && CURRENT_FILAMENT_PRESENT);
+        } while( destination[E_AXIS] < destination_to_reach && current_filament_present(active_extruder));
         st_synchronize();
         printer_states.in_critical_section = false;
 
         // Purge part
         // But, can we continue to slowly purge ?
-        if (CURRENT_FILAMENT_PRESENT) {
+        if (current_filament_present(active_extruder)) {
           SET_FEEDRATE_FOR_PURGE;         ;
           destination_to_reach = destination[E_AXIS] + 2.5*FILAMENTCHANGE_AUTO_INSERTION_PURGE_LENGTH;
 
@@ -7496,13 +7501,13 @@ inline void gcode_M503() {
             current_position[E_AXIS] += FILAMENTCHANGE_AUTO_INSERTION_VERIFICATION_LENGTH_MM;
             destination[E_AXIS] = current_position[E_AXIS];
             RUNPLAN;
-          } while( destination[E_AXIS] < destination_to_reach && CURRENT_FILAMENT_PRESENT);
+          } while( destination[E_AXIS] < destination_to_reach && current_filament_present(active_extruder));
           st_synchronize();
           printer_states.in_critical_section = false;
         }
 
         // Finally, Do we reached end of filament insertion WITH FILAMENT ?
-        if (CURRENT_FILAMENT_PRESENT) {
+        if (current_filament_present(active_extruder)) {
 
           // Wait
           int i=30; do{ delay(100); idle(true); } while(i--);
@@ -7516,9 +7521,9 @@ inline void gcode_M503() {
 
           if(active_extruder == 0) {
             printer_states.filament_state = FILAMENT_IN;
-          }/* else {
+          } else {
             printer_states.filament2_state = FILAMENT_IN;
-          }*/
+          }
           filament_direction = 0;
         }
         else {
@@ -7533,7 +7538,7 @@ inline void gcode_M503() {
         RESCHEDULE_HOTEND_AUTO_SHUTDOWN;
 
         // Auto-exit, when: we were not printing and we have inserted a filament successfuly
-        if (CURRENT_FILAMENT_PRESENT && previous_activity_state != ACTIVITY_PRINTING) {
+        if (current_filament_present(active_extruder) && previous_activity_state != ACTIVITY_PRINTING) {
           SERIAL_ECHOLNPGM( "pause: resuming printing after filament insertion success" );
           exit_pause_asked = true;
         }
@@ -7565,7 +7570,7 @@ inline void gcode_M503() {
         } while(
           destination[E_AXIS] > destination_to_reach
           && (
-            CURRENT_FILAMENT_PRESENT || destination[E_AXIS] > destination_at_least_to_reach
+            current_filament_present(active_extruder) || destination[E_AXIS] > destination_at_least_to_reach
           )
         );
         st_synchronize();
@@ -7576,13 +7581,13 @@ inline void gcode_M503() {
 
         if(active_extruder == 0) {
           printer_states.filament_state = FILAMENT_OUT;
-        }/* else {
+        } else {
           printer_states.filament2_state = FILAMENT_OUT;
-        }*/
+        }
         filament_direction = 0;
 
         // We need to wait the user pulling-out the filament
-        while(CURRENT_FILAMENT_PRESENT) {
+        while(current_filament_present(active_extruder)) {
           idle(true);
 
           RESCHEDULE_HOTEND_AUTO_SHUTDOWN;
@@ -7614,8 +7619,8 @@ inline void gcode_M503() {
         // Filament insertion preamble case
         if (
           (printer_states.filament_state == FILAMENT_OUT && FILAMENT_PRESENT)
-          /*||
-          (printer_states.filament2_state == FILAMENT_OUT && FILAMENT2_PRESENT)*/
+          ||
+          (printer_states.filament2_state == FILAMENT_OUT && FILAMENT2_PRESENT)
         ) {
           SERIAL_ECHOLNPGM( "pause: filament insertion detected" );
 
@@ -7625,9 +7630,9 @@ inline void gcode_M503() {
 
           if(active_extruder == 0) {
             printer_states.filament_state = FILAMENT_PRE_INSERTING;
-          }/* else {
+          } else {
             printer_states.filament2_state = FILAMENT_PRE_INSERTING;
-          }*/
+          }
           float previous_e_pos = current_position[E_AXIS];
           destination[E_AXIS] = current_position[E_AXIS];
           destination[E_AXIS] += FILAMENTCHANGE_AUTO_INSERTION_CONFIRMATION_LENGTH;
@@ -7635,16 +7640,16 @@ inline void gcode_M503() {
 
           prepare_move();
           st_synchronize();
-          if (CURRENT_FILAMENT_PRESENT) {
+          if (current_filament_present(active_extruder)) {
             filament_direction = FILAMENT_NEED_TO_BE_INSERTED;
           }
           else {
             // The user removed the filament before filament change procedure launch
             if(active_extruder == 0) {
               printer_states.filament_state = FILAMENT_OUT;
-            }/* else {
+            } else {
               printer_states.filament2_state = FILAMENT_OUT;
-            }*/
+            }
           }
           // Restore things
           current_position[E_AXIS] = destination[E_AXIS] = previous_e_pos;
@@ -7765,7 +7770,7 @@ inline void gcode_M503() {
       if (
         exit_pause_asked
         && previous_activity_state == ACTIVITY_PRINTING
-        && (printer_states.filament_state != FILAMENT_IN/* || printer_states.filament2_state != FILAMENT_IN*/)
+        && (printer_states.filament_state != FILAMENT_IN || printer_states.filament2_state != FILAMENT_IN)
       ) {
         SERIAL_ECHOLNPGM( "exit_pause_asked: no filament" );
         exit_pause_asked = false;
@@ -9071,7 +9076,7 @@ inline void gcode_D853() {
     }
     destination[E_AXIS] = current_position[E_AXIS];
     RUNPLAN;
-  } while( fabsf(destination[E_AXIS] - destination_e_to_reach) > step && CURRENT_FILAMENT_PRESENT);
+  } while( fabsf(destination[E_AXIS] - destination_e_to_reach) > step && current_filament_present(active_extruder));
   st_synchronize();
 
   feedrate = previous_feedrate;
@@ -10731,8 +10736,8 @@ inline void manage_filament_auto_insertion() {
   if (!printer_states.pause_asked) {
     if (
       (printer_states.filament_state == FILAMENT_OUT && FILAMENT_PRESENT)
-      /*||
-      (printer_states.filament2_state == FILAMENT_OUT && FILAMENT2_PRESENT)*/
+      ||
+      (printer_states.filament2_state == FILAMENT_OUT && FILAMENT2_PRESENT)
     ) {
       #if ENABLED(DELTA_EXTRA)
         if (NOT_YET_CALIBRATED) {
@@ -10745,9 +10750,9 @@ inline void manage_filament_auto_insertion() {
 
       if(active_extruder == 0) {
         printer_states.filament_state = FILAMENT_PRE_INSERTING;
-      }/* else {
+      } else {
         printer_states.filament2_state = FILAMENT_PRE_INSERTING;
-      }*/
+      }
       float previous_feedrate = feedrate;
       SET_FEEDRATE_FOR_PREAMBLE_EXTRUDER_MOVE;
 
@@ -10773,7 +10778,7 @@ inline void manage_filament_auto_insertion() {
         current_position[E_AXIS] += FILAMENTCHANGE_AUTO_INSERTION_VERIFICATION_LENGTH_MM;
         destination[E_AXIS] = current_position[E_AXIS];
         RUNPLAN;
-      } while( destination[E_AXIS] < destination_to_reach && CURRENT_FILAMENT_PRESENT);
+      } while( destination[E_AXIS] < destination_to_reach && current_filament_present(active_extruder));
       st_synchronize();
       printer_states.in_critical_section = false;
 
@@ -10785,7 +10790,7 @@ inline void manage_filament_auto_insertion() {
       #endif
       feedrate = previous_feedrate;
 
-      if (CURRENT_FILAMENT_PRESENT) {
+      if (current_filament_present(active_extruder)) {
         SERIAL_ECHOLNPGM("Pause : Filament auto-insertion");
 
         printer_states.pause_asked = true;
@@ -10811,9 +10816,9 @@ inline void manage_filament_auto_insertion() {
         // The user removed the filament before filament change procedure launch
         if(active_extruder == 0) {
           printer_states.filament_state = FILAMENT_OUT;
-        }/* else {
+        } else {
           printer_states.filament2_state = FILAMENT_OUT;
-        }*/
+        }
       }
     }
   }
