@@ -503,10 +503,6 @@ static uint8_t target_extruder;
   #define FILAMENT2_NOT_PRESENT (false)
 #endif
 
-//#define CURRENT_FILAMENT_PRESENT (active_extruder == 0) ? FILAMENT_PRESENT : FILAMENT2_PRESENT
-//#define CURRENT_FILAMENT_PRESENT(e) ((e == 0) ? FILAMENT_PRESENT : FILAMENT2_PRESENT)
-//#define CURRENT_FILAMENT_PRESENT FILAMENT_PRESENT
-
 inline bool current_filament_present(uint8_t e) {
   return (e == 0) ? FILAMENT_PRESENT : FILAMENT2_PRESENT;
 }
@@ -7186,6 +7182,15 @@ inline void gcode_M503() {
       LCD_ALERTMESSAGEPGM(MSG_FILAMENTCHANGE);
     #endif
 
+    if (get_target_extruder_from_command(600)) return;
+
+    #if EXTRUDERS > 1
+      // Change toolhead if specified
+      uint8_t active_extruder_before_filament_change = active_extruder;
+      if (active_extruder != target_extruder)
+        active_extruder = target_extruder;
+    #endif
+
     //
     // Previous state gathering
     float previous_position[NUM_AXIS];
@@ -8246,6 +8251,11 @@ inline void gcode_M503() {
       enable_z_magic_measurement = false;
     #endif
     */
+    #if EXTRUDERS > 1
+      // Restore toolhead if it was changed
+      if (active_extruder_before_filament_change != active_extruder)
+        active_extruder = active_extruder_before_filament_change;
+    #endif
   }
 
 #endif // FILAMENTCHANGEENABLE
@@ -10731,13 +10741,13 @@ void disable_all_steppers() {
 #endif
 
 #if ENABLED(FILAMENT_RUNOUT_SENSOR)
-inline void manage_filament_auto_insertion() {
+#if HAS_FILRUNOUT
+inline void manage_filament1_auto_insertion() {
 
   if (!printer_states.pause_asked) {
     if (
-      (printer_states.filament_state == FILAMENT_OUT && FILAMENT_PRESENT)
-      ||
-      (printer_states.filament2_state == FILAMENT_OUT && FILAMENT2_PRESENT)
+      printer_states.filament_state == FILAMENT_OUT
+      && FILAMENT_PRESENT
     ) {
       #if ENABLED(DELTA_EXTRA)
         if (NOT_YET_CALIBRATED) {
@@ -10746,13 +10756,9 @@ inline void manage_filament_auto_insertion() {
           return;
         }
       #endif
-      SERIAL_ECHOLNPGM("Filament auto-insertion preamble");
+      SERIAL_ECHOLNPGM("Filament 1 auto-insertion preamble");
 
-      if(active_extruder == 0) {
-        printer_states.filament_state = FILAMENT_PRE_INSERTING;
-      } else {
-        printer_states.filament2_state = FILAMENT_PRE_INSERTING;
-      }
+      printer_states.filament_state = FILAMENT_PRE_INSERTING;
       float previous_feedrate = feedrate;
       SET_FEEDRATE_FOR_PREAMBLE_EXTRUDER_MOVE;
 
@@ -10762,9 +10768,7 @@ inline void manage_filament_auto_insertion() {
       }
       */
 
-      #if ENABLED(PREVENT_DANGEROUS_EXTRUDE)
-        extrude_min_temp = 0;
-      #endif
+      extrude_min_temp = 0;
 
       float previous_e_pos = current_position[E_AXIS];
       destination[E_AXIS] = current_position[E_AXIS];
@@ -10778,20 +10782,18 @@ inline void manage_filament_auto_insertion() {
         current_position[E_AXIS] += FILAMENTCHANGE_AUTO_INSERTION_VERIFICATION_LENGTH_MM;
         destination[E_AXIS] = current_position[E_AXIS];
         RUNPLAN;
-      } while( destination[E_AXIS] < destination_to_reach && current_filament_present(active_extruder));
+      } while( destination[E_AXIS] < destination_to_reach && FILAMENT_PRESENT);
       st_synchronize();
       printer_states.in_critical_section = false;
 
       // Restore things
       current_position[E_AXIS] = destination[E_AXIS] = previous_e_pos;
       sync_plan_position_e();
-      #if ENABLED(PREVENT_DANGEROUS_EXTRUDE)
-        extrude_min_temp = EXTRUDE_MINTEMP;
-      #endif
+      extrude_min_temp = EXTRUDE_MINTEMP;
       feedrate = previous_feedrate;
 
-      if (current_filament_present(active_extruder)) {
-        SERIAL_ECHOLNPGM("Pause : Filament auto-insertion");
+      if (FILAMENT_PRESENT) {
+        SERIAL_ECHOLNPGM("Pause : Filament 1 auto-insertion");
 
         printer_states.pause_asked = true;
 
@@ -10809,20 +10811,99 @@ inline void manage_filament_auto_insertion() {
           //enqueue_and_echo_commands_P(PSTR("G28"));
         }
 
-        enqueue_and_echo_commands_P(PSTR(FILAMENTCHANGE_INSERTION_SCRIPT));
+        enqueue_and_echo_commands_P(PSTR(FILAMENT1CHANGE_INSERTION_SCRIPT));
       }
       else {
-        SERIAL_ECHOLNPGM("Filament auto-insertion aborted");
+        SERIAL_ECHOLNPGM("Filament 1 auto-insertion aborted");
         // The user removed the filament before filament change procedure launch
-        if(active_extruder == 0) {
-          printer_states.filament_state = FILAMENT_OUT;
-        } else {
-          printer_states.filament2_state = FILAMENT_OUT;
-        }
+        printer_states.filament_state = FILAMENT_OUT;
       }
     }
   }
 }
+#endif
+
+#if HAS_FILRUNOUT2
+inline void manage_filament2_auto_insertion() {
+
+  if (!printer_states.pause_asked) {
+    if (
+      printer_states.filament2_state == FILAMENT_OUT
+      && FILAMENT2_PRESENT
+    ) {
+      #if ENABLED(DELTA_EXTRA)
+        if (NOT_YET_CALIBRATED) {
+          SERIAL_ERRORLNPGM("Printer not yet calibrated. Please calibrate.");
+          set_notify_not_calibrated();
+          return;
+        }
+      #endif
+      SERIAL_ECHOLNPGM("Filament 2 auto-insertion preamble");
+
+      printer_states.filament2_state = FILAMENT_PRE_INSERTING;
+      float previous_feedrate = feedrate;
+      SET_FEEDRATE_FOR_PREAMBLE_EXTRUDER_MOVE;
+
+      /*
+      if (!printer_states.homed) {
+        gcode_G28();
+      }
+      */
+
+      extrude_min_temp = 0;
+
+      float previous_e_pos = current_position[E_AXIS];
+      destination[E_AXIS] = current_position[E_AXIS];
+
+
+      float destination_to_reach;
+      destination_to_reach = destination[E_AXIS] + FILAMENTCHANGE_AUTO_INSERTION_CONFIRMATION_LENGTH;
+
+      printer_states.in_critical_section = true;
+      do {
+        current_position[E_AXIS] += FILAMENTCHANGE_AUTO_INSERTION_VERIFICATION_LENGTH_MM;
+        destination[E_AXIS] = current_position[E_AXIS];
+        RUNPLAN;
+      } while( destination[E_AXIS] < destination_to_reach && FILAMENT2_PRESENT);
+      st_synchronize();
+      printer_states.in_critical_section = false;
+
+      // Restore things
+      current_position[E_AXIS] = destination[E_AXIS] = previous_e_pos;
+      sync_plan_position_e();
+      extrude_min_temp = EXTRUDE_MINTEMP;
+      feedrate = previous_feedrate;
+
+      if (FILAMENT2_PRESENT) {
+        SERIAL_ECHOLNPGM("Pause : Filament 2 auto-insertion");
+
+        printer_states.pause_asked = true;
+
+        if (!printer_states.homed) {
+          #if ENABLED(DELTA_EXTRA)
+            // Home all axis
+          #else
+            // Home only X, Y axis
+            char tmp[16]; // tmp will be freed exiting this scope.
+            memset(tmp, '\0', sizeof(tmp));
+            strcpy(tmp, "X Y\0");
+            current_command_args = tmp;
+          #endif
+          gcode_G28();
+          //enqueue_and_echo_commands_P(PSTR("G28"));
+        }
+
+        enqueue_and_echo_commands_P(PSTR(FILAMENT2CHANGE_INSERTION_SCRIPT));
+      }
+      else {
+        SERIAL_ECHOLNPGM("Filament 2 auto-insertion aborted");
+        // The user removed the filament before filament change procedure launch
+        printer_states.filament2_state = FILAMENT_OUT;
+      }
+    }
+  }
+}
+#endif
 #endif
 
 inline void manage_printer_states() {
@@ -10850,7 +10931,12 @@ inline void manage_printer_states() {
       manage_one_button_start_print();
     #endif
     #if ENABLED(FILAMENT_RUNOUT_SENSOR)
-      manage_filament_auto_insertion();
+      #if HAS_FILRUNOUT
+        manage_filament1_auto_insertion();
+      #endif
+      #if HAS_FILRUNOUT2
+        manage_filament2_auto_insertion();
+      #endif
     #endif
 
     #if ENABLED(LONG_PRESS_SUPPORT)
