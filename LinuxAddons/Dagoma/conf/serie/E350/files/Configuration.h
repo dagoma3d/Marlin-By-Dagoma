@@ -120,6 +120,7 @@
 // This defines the number of extruders
 // :[1,2,3,4]
 #define EXTRUDERS 1
+#define HOTENDS 1
 
 #define PARALLEL_X_FEATURE
 

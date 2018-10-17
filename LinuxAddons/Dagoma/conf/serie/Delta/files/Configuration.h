@@ -119,6 +119,7 @@
 // This defines the number of extruders
 // :[1,2,3,4]
 #define EXTRUDERS 1
+#define HOTENDS 1
 
 // Offset of the extruders (uncomment if using more than one and relying on firmware to position when changing).
 // The offset has to be X=0, Y=0 for the extruder 0 hotend (default extruder).
@@ -389,7 +390,7 @@
   //#define DELTA_EFFECTOR_OFFSET 32.1
   //#define DELTA_EFFECTOR_OFFSET 31.83 // Ju
   //#define DELTA_EFFECTOR_OFFSET 31.98 // Ju - Measured FreeCad 07-12-2016
-  #define DELTA_EFFECTOR_OFFSET 32.11 // Ju - 28-02-2017 
+  #define DELTA_EFFECTOR_OFFSET 32.11 // Ju - 28-02-2017
 
   // Horizontal offset of the universal joints on the carriages.
   //#define DELTA_CARRIAGE_OFFSET 21.18 // 21.18 // mm

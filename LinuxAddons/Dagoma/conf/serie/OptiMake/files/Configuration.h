@@ -119,6 +119,7 @@
 // This defines the number of extruders
 // :[1,2,3,4]
 #define EXTRUDERS 1
+#define HOTENDS 1
 
 // Offset of the extruders (uncomment if using more than one and relying on firmware to position when changing).
 // The offset has to be X=0, Y=0 for the extruder 0 hotend (default extruder).
@@ -276,7 +277,7 @@
   // #define  DEFAULT_Kp 10.66
   // #define  DEFAULT_Ki 1.66
   // #define  DEFAULT_Kd 14.41
-    
+
   // find our own PID extruder : M303 E0 C8 S210 (or E1 E2 E3)
 
 #endif // PIDTEMP
@@ -344,7 +345,7 @@
   //#define  DEFAULT_bedKp 97.1
   //#define  DEFAULT_bedKi 1.41
   //#define  DEFAULT_bedKd 1675.16
-  
+
   //200v 700W silicone heater into 4mm borosilicate (MendelMax 1.5+)
   //from pidautotune
   #define  DEFAULT_bedKp 97.1
@@ -655,12 +656,12 @@ const bool Z_MIN_PROBE_ENDSTOP_INVERTING = false; // set to true to invert the l
   //#define Y_PROBE_OFFSET_FROM_EXTRUDER 10  // Y offset: -front +behind [the nozzle]
   //#define Z_PROBE_OFFSET_FROM_EXTRUDER 0   // Z offset: -below +above  [the nozzle]
 
-  // DUAL E3D v6 
+  // DUAL E3D v6
   //#define X_PROBE_OFFSET_FROM_EXTRUDER 22     // Z probe to nozzle X offset: -left  +right
   //#define Y_PROBE_OFFSET_FROM_EXTRUDER 15     // Z probe to nozzle Y offset: -front +behind
   //#define Z_PROBE_OFFSET_FROM_EXTRUDER 0  // Z probe to nozzle Z offset: -below (always!)
-  
-  // Chimera v7 triple ventilo 
+
+  // Chimera v7 triple ventilo
   #define X_PROBE_OFFSET_FROM_EXTRUDER 9     // Z probe to nozzle X offset: -left  +right
   #define Y_PROBE_OFFSET_FROM_EXTRUDER -41     // Z probe to nozzle Y offset: -front +behind
   #define Z_PROBE_OFFSET_FROM_EXTRUDER 0  // Z probe to nozzle Z offset: -below (always!)

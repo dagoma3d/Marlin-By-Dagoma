@@ -121,6 +121,7 @@
 // This defines the number of extruders
 // :[1,2,3,4]
 #define EXTRUDERS 1
+#define HOTENDS 1
 
 // Offset of the extruders (uncomment if using more than one and relying on firmware to position when changing).
 // The offset has to be X=0, Y=0 for the extruder 0 hotend (default extruder).
