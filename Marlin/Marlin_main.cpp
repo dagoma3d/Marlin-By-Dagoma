@@ -11083,11 +11083,7 @@ void manage_inactivity(bool ignore_stepper_queue/*=false*/) {
   #if HAS_FILRUNOUT
     if (
       printer_states.activity_state == ACTIVITY_PRINTING
-      && (FILAMENT_NOT_PRESENT
-      #if HAS_FILRUNOUT2
-        || FILAMENT2_NOT_PRESENT
-      #endif
-      )
+      && (FILAMENT_NOT_PRESENT || FILAMENT2_NOT_PRESENT)
       && axis_homed[X_AXIS]
       && axis_homed[Y_AXIS]
       && axis_homed[Z_AXIS]
