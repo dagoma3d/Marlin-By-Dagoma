@@ -944,7 +944,7 @@ void setup() {
   #endif
 
   MYSERIAL.begin(BAUDRATE);
-  SERIAL_PROTOCOLLNPGM("start");
+  SERIAL_PROTOCOLLNPGM("Start");
   SERIAL_ECHO_START;
 
   // Check startup - does nothing if bootloader sets MCUSR to 0
