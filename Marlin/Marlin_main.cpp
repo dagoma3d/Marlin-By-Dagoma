@@ -7054,6 +7054,7 @@ inline void gcode_M503() {
     #define SET_FEEDRATE_FOR_MOVE                   feedrate = homing_feedrate[X_AXIS];
     #define SET_FEEDRATE_FOR_EXTRUDER_MOVE          feedrate = (FILAMENT_CHANGE_E_FEEDRATE * 60.0);
     #define SET_FEEDRATE_FOR_FIRST_RETRACT          feedrate = (max_feedrate[E_AXIS] * 60.0);
+    #define SET_FEEDRATE_FOR_FINAL_RETRACT          feedrate = 10000.0;
     #define SET_FEEDRATE_FOR_PREAMBLE_EXTRUDER_MOVE feedrate = (FILAMENT_CHANGE_E_FEEDRATE * 60.0 * FILAMENTCHANGE_AUTO_INSERTION_PREAMBLE_FEEDRATE_FACTOR);
     #define SET_FEEDRATE_FOR_PURGE                  feedrate = (FILAMENT_CHANGE_E_FEEDRATE * 60.0 * FILAMENTCHANGE_AUTO_INSERTION_PURGE_FEEDRATE_FACTOR);
     // The following plan method use feedrate expressed in mm/s
@@ -7063,6 +7064,7 @@ inline void gcode_M503() {
     #define SET_FEEDRATE_FOR_MOVE                   feedrate = homing_feedrate[X_AXIS];
     #define SET_FEEDRATE_FOR_EXTRUDER_MOVE          feedrate = (FILAMENT_CHANGE_E_FEEDRATE * 60.0);
     #define SET_FEEDRATE_FOR_FIRST_RETRACT          feedrate = (max_feedrate[E_AXIS] * 60.0);
+    #define SET_FEEDRATE_FOR_FINAL_RETRACT          feedrate = 10000.0;
     #define SET_FEEDRATE_FOR_PREAMBLE_EXTRUDER_MOVE feedrate = (FILAMENT_CHANGE_E_FEEDRATE * 60.0 * FILAMENTCHANGE_AUTO_INSERTION_PREAMBLE_FEEDRATE_FACTOR);
     #define SET_FEEDRATE_FOR_PURGE                  feedrate = (FILAMENT_CHANGE_E_FEEDRATE * 60.0 * FILAMENTCHANGE_AUTO_INSERTION_PURGE_FEEDRATE_FACTOR);
     // The following plan method use feedrate expressed in mm/min
@@ -7190,10 +7192,14 @@ inline void gcode_M503() {
     if (get_target_extruder_from_command(600)) return;
 
     #if EXTRUDERS > 1
+      bool set_additional_retract = false;
       // Change toolhead if specified
       uint8_t active_extruder_before_filament_change = active_extruder;
       if (active_extruder != target_extruder)
+      {
         active_extruder = target_extruder;
+        set_additional_retract = true;
+      }
     #endif
 
     //
@@ -7503,7 +7509,7 @@ inline void gcode_M503() {
         // Purge part
         // But, can we continue to slowly purge ?
         if (current_filament_present(active_extruder)) {
-          SET_FEEDRATE_FOR_PURGE;         ;
+          SET_FEEDRATE_FOR_PURGE;
           destination_to_reach = destination[E_AXIS] + 2.5*FILAMENTCHANGE_AUTO_INSERTION_PURGE_LENGTH;
 
           printer_states.in_critical_section = true;
@@ -7515,6 +7521,18 @@ inline void gcode_M503() {
           st_synchronize();
           printer_states.in_critical_section = false;
         }
+
+        #if EXTRUDERS > 1
+        // Additional retract part
+        // But, can we continue to slowly purge ?
+        if (current_filament_present(active_extruder) && set_additional_retract) {
+          current_position[E_AXIS] -= 60;
+          destination[E_AXIS] = current_position[E_AXIS];
+          SET_FEEDRATE_FOR_FINAL_RETRACT;
+          RUNPLAN;
+          st_synchronize();
+        }
+        #endif
 
         // Finally, Do we reached end of filament insertion WITH FILAMENT ?
         if (current_filament_present(active_extruder)) {
@@ -8259,7 +8277,10 @@ inline void gcode_M503() {
     #if EXTRUDERS > 1
       // Restore toolhead if it was changed
       if (active_extruder_before_filament_change != active_extruder)
+      {
         active_extruder = active_extruder_before_filament_change;
+        set_additional_retract = false;
+      }
     #endif
   }
 
