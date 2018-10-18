@@ -10762,7 +10762,10 @@ inline void manage_filament1_auto_insertion() {
         }
       #endif
       SERIAL_ECHOLNPGM("Filament 1 auto-insertion preamble");
-
+      #if EXTRUDERS > 1
+        uint8_t active_extruder_before_filament_change = active_extruder;
+        active_extruder = 0;
+      #endif
       printer_states.filament_state = FILAMENT_PRE_INSERTING;
       float previous_feedrate = feedrate;
       SET_FEEDRATE_FOR_PREAMBLE_EXTRUDER_MOVE;
@@ -10796,6 +10799,9 @@ inline void manage_filament1_auto_insertion() {
       sync_plan_position_e();
       extrude_min_temp = EXTRUDE_MINTEMP;
       feedrate = previous_feedrate;
+      #if EXTRUDERS > 1
+        active_extruder = active_extruder_before_filament_change;
+      #endif
 
       if (FILAMENT_PRESENT) {
         SERIAL_ECHOLNPGM("Pause : Filament 1 auto-insertion");
@@ -10844,7 +10850,10 @@ inline void manage_filament2_auto_insertion() {
         }
       #endif
       SERIAL_ECHOLNPGM("Filament 2 auto-insertion preamble");
-
+      #if EXTRUDERS > 1
+        uint8_t active_extruder_before_filament_change = active_extruder;
+        active_extruder = 1;
+      #endif
       printer_states.filament2_state = FILAMENT_PRE_INSERTING;
       float previous_feedrate = feedrate;
       SET_FEEDRATE_FOR_PREAMBLE_EXTRUDER_MOVE;
@@ -10878,6 +10887,9 @@ inline void manage_filament2_auto_insertion() {
       sync_plan_position_e();
       extrude_min_temp = EXTRUDE_MINTEMP;
       feedrate = previous_feedrate;
+      #if EXTRUDERS > 1
+        active_extruder = active_extruder_before_filament_change;
+      #endif
 
       if (FILAMENT2_PRESENT) {
         SERIAL_ECHOLNPGM("Pause : Filament 2 auto-insertion");
