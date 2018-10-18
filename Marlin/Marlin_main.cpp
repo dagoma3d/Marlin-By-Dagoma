@@ -7189,16 +7189,17 @@ inline void gcode_M503() {
       LCD_ALERTMESSAGEPGM(MSG_FILAMENTCHANGE);
     #endif
 
-    if (get_target_extruder_from_command(600)) return;
-
     #if EXTRUDERS > 1
-      bool set_additional_retract = false;
-      // Change toolhead if specified
       uint8_t active_extruder_before_filament_change = active_extruder;
-      if (active_extruder != target_extruder)
+      bool set_additional_retract = false;
+      if (code_seen('T'))
       {
-        active_extruder = target_extruder;
-        set_additional_retract = true;
+        target_extruder = code_value_short();
+        if (active_extruder != target_extruder)
+        {
+          active_extruder = target_extruder;
+          set_additional_retract = true;
+        }
       }
     #endif
 
@@ -7212,7 +7213,7 @@ inline void gcode_M503() {
     previous_feedrate = feedrate;
 
     float previous_target_temperature;
-    previous_target_temperature = target_temperature[target_extruder];
+    previous_target_temperature = target_temperature[HOTEND_INDEX];
 
     int previous_fan_speed;
     previous_fan_speed = fanSpeeds[0];
@@ -7432,8 +7433,8 @@ inline void gcode_M503() {
         SERIAL_ECHOLNPGM( "pause: go to heat position" );
 
         // We have to re-heat or heat
-        if ( target_temperature[target_extruder] < working_filament_change_temperature ) {
-          target_temperature[target_extruder] = working_filament_change_temperature;
+        if ( target_temperature[HOTEND_INDEX] < working_filament_change_temperature ) {
+          target_temperature[HOTEND_INDEX] = working_filament_change_temperature;
         }
 
         // Maybe heat, but where
@@ -7747,7 +7748,7 @@ inline void gcode_M503() {
       ) {
         SERIAL_ECHOLNPGM( "pause: auto hotend shutdown" );
 
-        target_temperature[target_extruder] = 0;
+        target_temperature[HOTEND_INDEX] = 0;
         SET_FEEDRATE_FOR_MOVE;
         destination[X_AXIS] = x_heat_from;
         destination[Y_AXIS] = y_heat_from;
@@ -7894,7 +7895,7 @@ inline void gcode_M503() {
     sync_plan_position_e();
 
     // Restore previous temperature
-    target_temperature[target_extruder] = previous_target_temperature;
+    target_temperature[HOTEND_INDEX] = previous_target_temperature;
 
     // Restore previous fan
     fanSpeeds[0] = previous_fan_speed;
@@ -7911,369 +7912,7 @@ inline void gcode_M503() {
         enqueue_and_echo_commands_P(PSTR(SD_FINISHED_RELEASECOMMAND));
       }
     #endif
-    /*
-    //finish moves
-    // st_synchronize();
 
-    //retract by E
-    if (code_seen('E')) destination[E_AXIS] += code_value();
-    #ifdef FILAMENTCHANGE_FIRSTRETRACT
-      else destination[E_AXIS] += FILAMENTCHANGE_FIRSTRETRACT;
-    #endif
-
-    SET_FEEDRATE_FOR_EXTRUDER_MOVE;
-    RUNPLAN;
-
-    //lift Z
-    #if ENABLED(DELTA_EXTRA)
-      float z_destination = destination[Z_AXIS];
-      if (code_seen('Z')) z_destination += code_value();
-      #ifdef FILAMENTCHANGE_ZADD
-        else z_destination += FILAMENTCHANGE_ZADD;
-      #endif
-      NOMORE(z_destination, (sw_endstop_max[Z_AXIS]-25.0));
-      if (z_destination > destination[Z_AXIS]) {
-        destination[Z_AXIS] = z_destination;
-      }
-    #else
-      if (code_seen('Z')) destination[Z_AXIS] += code_value();
-      #ifdef FILAMENTCHANGE_ZADD
-        else destination[Z_AXIS] += FILAMENTCHANGE_ZADD;
-      #endif
-    #endif
-
-    SET_FEEDRATE_FOR_MOVE;
-    RUNPLAN;
-
-    //move xy
-    if (code_seen('X')) destination[X_AXIS] = code_value();
-    #ifdef FILAMENTCHANGE_XPOS
-      else destination[X_AXIS] = FILAMENTCHANGE_XPOS;
-    #endif
-
-    if (code_seen('Y')) destination[Y_AXIS] = code_value();
-    #ifdef FILAMENTCHANGE_YPOS
-      else destination[Y_AXIS] = FILAMENTCHANGE_YPOS;
-    #endif
-
-    SET_FEEDRATE_FOR_MOVE;
-    RUNPLAN;
-
-    if (code_seen('L')) destination[E_AXIS] += code_value();
-    #ifdef FILAMENTCHANGE_FINALRETRACT
-      else destination[E_AXIS] += FILAMENTCHANGE_FINALRETRACT;
-    #endif
-
-    SET_FEEDRATE_FOR_EXTRUDER_MOVE;
-    RUNPLAN;
-
-    // validate planned all moves
-    st_synchronize();
-
-    // DAGOMA added
-    // Determine exit/pin state after moving away
-    int pin_number = -1;
-    int target = -1;
-    if (code_seen('P')) {
-      char nextChar = *(seen_pointer + 1);
-      if (nextChar == 'A') {
-        pin_number = X_MIN_PIN;
-      }
-      else if (nextChar == 'B') {
-        pin_number = Y_MAX_PIN;
-      }
-      else if (nextChar == 'C') {
-        pin_number = Z_MIN_PIN;
-      }
-      else {
-        pin_number = code_value();
-      }
-
-      int pin_state = code_seen('S') ? code_value() : -1; // required pin state - default is inverted
-
-      if (pin_state >= -1 && pin_state <= 1) {
-
-        // DAGOMA - byPass sensitive pin
-        // for (uint8_t i = 0; i < COUNT(sensitive_pins); i++) {
-        //   if (sensitive_pins[i] == pin_number) {
-        //     pin_number = -1;
-        //     break;
-        //   }
-        // }
-
-        if (pin_number > -1) {
-          target = LOW;
-
-          //pinMode(pin_number, INPUT);
-
-          switch (pin_state) {
-            case 1:
-              target = HIGH;
-              break;
-
-            case 0:
-              target = LOW;
-              break;
-
-            case -1:
-              target = !digitalRead(pin_number);
-              break;
-          }
-        } // pin_number > -1
-      } // pin_state -1 0 1
-    } // code_seen('P')
-    // END DAGOMA added
-
-    // disable extruder steppers so filament can be removed
-    disable_e0();
-    disable_e1();
-    disable_e2();
-    disable_e3();
-    delay(100);
-    #if DISABLED(NO_LCD_FOR_FILAMENTCHANGEABLE)
-    LCD_ALERTMESSAGEPGM(MSG_FILAMENTCHANGE);
-    #endif
-    #if DISABLED(AUTO_FILAMENT_CHANGE)
-      millis_t next_tick = 0;
-    #endif
-    KEEPALIVE_STATE(PAUSED_FOR_USER);
-    #if HAS_FILRUNOUT
-
-    bool can_exit_pause;
-    millis_t pause_ms = millis();
-    uint8_t previous_target_temperature;
-    bool heating_stopped = false;
-    do { // Loop while no filament
-      can_exit_pause = true;
-    #endif
-
-      #if DISABLED(NO_LCD_FOR_FILAMENTCHANGEABLE)
-      while ( ! ( lcd_clicked() || (pin_number != -1 && digitalRead(pin_number) == target) ) ) {
-      #else
-      while (pin_number != -1 && digitalRead(pin_number) != target) {
-      #endif
-        #if DISABLED(AUTO_FILAMENT_CHANGE)
-          millis_t ms = millis();
-          if (ELAPSED(ms, next_tick)) {
-            #if DISABLED(NO_LCD_FOR_FILAMENTCHANGEABLE)
-            lcd_quick_feedback();
-            #endif
-            next_tick = ms + 2500UL; // feedback every 2.5s while waiting
-
-            // Ensure steppers stay enabled
-            enable_x();
-            enable_y();
-            enable_z();
-
-
-            #if ENABLED( DELTA_EXTRA )
-              // Only checked every 2.5s
-              // Detected if sd is out
-              if ( IS_SD_PRINTING && !card.stillPluggedIn() ) {
-                // Abort current print
-                while( true ) {
-                  #if ENABLED(ONE_LED)
-                    one_led_on();
-                    delay(150);
-                    one_led_off();
-                  #endif
-                  delay(150);
-                }
-                //abort_sd_printing();
-                //enqueue_and_echo_commands_P( PSTR("G28") );
-                return;
-              }
-            #endif
-          }
-
-          #if ENABLED(DELTA_EXTRA) && ENABLED(Z_MIN_MAGIC)
-            // Must be check quicker than 2.5s
-            if ( z_magic_tap_count == 2 ) {
-              // Chauffer si la temperature est froide;
-              #if ENABLED(HEATING_STOP)
-              if(heating_stopped){
-                target_temperature[target_extruder] = previous_target_temperature;
-                while(current_temperature[target_extruder] < target_temperature[target_extruder]) {
-                  enable_x();
-                  enable_y();
-                  enable_z();
-                  one_led_on();
-                  idle(true);
-                }
-              }
-              #endif
-              // Manage heating stop
-              gcode_D600();
-              #if ENABLED(HEATING_STOP)
-              heating_stopped = false;
-              pause_ms = millis();
-              #endif
-            }
-          #endif
-            if( (READ(FILRUNOUT_PIN) ^ FIL_RUNOUT_INVERTING) && !filament_present ){
-              // Chauffer si la temperature est froide;
-              #if ENABLED(HEATING_STOP)
-              if(heating_stopped){
-                target_temperature[target_extruder] = previous_target_temperature;
-                // aspiration du filament début
-                gcode_D601(true, 1);
-                if(READ(FILRUNOUT_PIN) ^ FIL_RUNOUT_INVERTING){
-                  while(current_temperature[target_extruder] < target_temperature[target_extruder]) {
-                    enable_x();
-                    enable_y();
-                    enable_z();
-                    one_led_on();
-                    idle(true);
-                  }
-                  gcode_D601(true, 2);
-                }
-              }
-              else{
-              #endif
-              gcode_D601(true);
-              #if ENABLED(HEATING_STOP)
-              }
-              heating_stopped = false;
-              pause_ms = millis();
-              #endif
-            }
-            #if ENABLED(HEATING_STOP)
-            if(ELAPSED(ms,pause_ms + HEATING_STOP_TIME) && !heating_stopped){
-              SERIAL_ECHOLNPGM("Heating Stopped");
-              heating_stopped = true;
-              previous_target_temperature = target_temperature[target_extruder];
-              target_temperature[target_extruder] = 0;
-              #if ENABLED(THERMAL_PROTECTION_HOTENDS)
-                start_watching_heater(target_extruder);
-              #endif
-            }
-            #endif
-
-          idle(true);
-        #else
-          current_position[E_AXIS] += AUTO_FILAMENT_CHANGE_LENGTH;
-          destination[E_AXIS] = current_position[E_AXIS];
-          line_to_destination(AUTO_FILAMENT_CHANGE_FEEDRATE);
-          st_synchronize();
-        #endif
-      } // while(!lcd_clicked)
-      #if ENABLED( NO_LCD_FOR_FILAMENTCHANGEABLE ) && ENABLED( FILAMENT_RUNOUT_SENSOR )
-        // Wait a bit more to see if we want to disable filrunout sensor
-        millis_t now = millis();
-        millis_t long_push = now + 2000UL;
-        delay( 200 );
-        while (pin_number != -1 && digitalRead(pin_number) == target && PENDING(now, long_push)) {
-          enable_x();
-          enable_y();
-          enable_z();
-          idle(true);
-          now = millis();
-        }
-        if ( ELAPSED(now,long_push) ) {
-          filrunout_bypassed = true;
-          SERIAL_ECHOLN( "Filament sensor bypassed" );
-        }
-      #endif
-
-    #if HAS_FILRUNOUT
-        if( !(READ(FILRUNOUT_PIN) ^ FIL_RUNOUT_INVERTING) ) {
-          #if ENABLED(SUMMON_PRINT_PAUSE) && ENABLED( NO_LCD_FOR_FILAMENTCHANGEABLE ) && ENABLED( FILAMENT_RUNOUT_SENSOR )
-          if ( !filrunout_bypassed ) {
-          #endif
-            #if ENABLED(ONE_LED)
-              set_notify_warning();
-            #endif
-            can_exit_pause = false;
-          #if ENABLED(SUMMON_PRINT_PAUSE) && ENABLED( NO_LCD_FOR_FILAMENTCHANGEABLE ) && ENABLED( FILAMENT_RUNOUT_SENSOR )
-          }
-          #endif
-        }
-
-      } while( !can_exit_pause );
-      #if ENABLED(HEATING_STOP)
-      if(heating_stopped){
-        heating_stopped = false;
-        target_temperature[target_extruder] = previous_target_temperature;
-        while(current_temperature[target_extruder] < target_temperature[target_extruder]) {
-          enable_x();
-          enable_y();
-          enable_z();
-          one_led_on();
-          idle(true);
-        }
-      }
-      #endif
-    #endif
-
-    KEEPALIVE_STATE(IN_HANDLER);
-    #if DISABLED(NO_LCD_FOR_FILAMENTCHANGEABLE)
-    lcd_quick_feedback(); // click sound feedback
-    #endif
-
-    #if ENABLED(AUTO_FILAMENT_CHANGE)
-      current_position[E_AXIS] = 0;
-      st_synchronize();
-    #endif
-
-    // Return to normal
-    if (code_seen('L')) destination[E_AXIS] -= code_value();
-    #ifdef FILAMENTCHANGE_FINALRETRACT
-      else destination[E_AXIS] -= FILAMENTCHANGE_FINALRETRACT;
-    #endif
-
-    current_position[E_AXIS] = destination[E_AXIS]; //the long retract of L is compensated by manual filament feeding
-    sync_plan_position_e();
-
-    SET_FEEDRATE_FOR_EXTRUDER_MOVE;
-    RUNPLAN; //should do nothing
-
-    #if DISABLED(NO_LCD_FOR_FILAMENTCHANGEABLE)
-    lcd_reset_alert_level();
-    #endif
-
-    #if ENABLED(DELTA)
-      // Move XYZ to starting position, then E
-      calculate_delta(lastpos);
-
-      SET_FEEDRATE_FOR_MOVE;
-      plan_buffer_line(delta[X_AXIS], delta[Y_AXIS], delta[Z_AXIS], destination[E_AXIS], feedrate, active_extruder);
-
-      SET_FEEDRATE_FOR_EXTRUDER_MOVE;
-      plan_buffer_line(delta[X_AXIS], delta[Y_AXIS], delta[Z_AXIS], lastpos[E_AXIS], feedrate, active_extruder);
-    #else
-      // Move XY to starting position, then Z, then E
-      destination[X_AXIS] = lastpos[X_AXIS];
-      destination[Y_AXIS] = lastpos[Y_AXIS];
-
-      SET_FEEDRATE_FOR_MOVE;
-      line_to_destination();
-      destination[Z_AXIS] = lastpos[Z_AXIS];
-      line_to_destination();
-
-      destination[E_AXIS] = lastpos[E_AXIS];
-
-      SET_FEEDRATE_FOR_EXTRUDER_MOVE;
-      line_to_destination();
-    #endif
-
-    // Validates all planned moves
-    st_synchronize();
-
-    #if ENABLED(FILAMENT_RUNOUT_SENSOR)
-      filament_ran_out = false;
-    #endif
-
-    #if ENABLED(SUMMON_PRINT_PAUSE)
-      print_pause_summoned = false;
-    #endif
-
-    // Restore previous feedrate
-    feedrate = previous_feedrate;
-
-    #if ENABLED(Z_MIN_MAGIC)
-      enable_z_magic_measurement = false;
-    #endif
-    */
     #if EXTRUDERS > 1
       // Restore toolhead if it was changed
       if (active_extruder_before_filament_change != active_extruder)
