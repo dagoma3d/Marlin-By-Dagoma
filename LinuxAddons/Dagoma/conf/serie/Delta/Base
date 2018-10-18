@@ -65,6 +65,7 @@ Set FILAMENTCHANGE_FEEDRATE_MULTIPLICATOR 5.0
 
 # L0 is added to avoid using final retract value (we need to find a way to remove melted filament before final retract)
 Set FILAMENT_RUNOUT_SCRIPT '"M600 L0 P18"'
+Set FILAMENT_CHANGE_E_FEEDRATE 66
 
 # D18 is Z-
 # Button PIN : D18

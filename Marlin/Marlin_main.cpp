@@ -7049,17 +7049,19 @@ inline void gcode_M503() {
   //   max_feedrate is expressed in mm/s
   #if ENABLED(DELTA)
     #define SET_FEEDRATE_FOR_MOVE                   feedrate = homing_feedrate[X_AXIS];
-    #define SET_FEEDRATE_FOR_EXTRUDER_MOVE          feedrate = (max_feedrate[E_AXIS] * 60.0);
-    #define SET_FEEDRATE_FOR_PREAMBLE_EXTRUDER_MOVE feedrate = (max_feedrate[E_AXIS] * 60.0 * FILAMENTCHANGE_AUTO_INSERTION_PREAMBLE_FEEDRATE_FACTOR);
-    #define SET_FEEDRATE_FOR_PURGE                  feedrate = (max_feedrate[E_AXIS] * 60.0 * FILAMENTCHANGE_AUTO_INSERTION_PURGE_FEEDRATE_FACTOR);
+    #define SET_FEEDRATE_FOR_EXTRUDER_MOVE          feedrate = (FILAMENT_CHANGE_E_FEEDRATE * 60.0);
+    #define SET_FEEDRATE_FOR_FIRST_RETRACT          feedrate = (max_feedrate[E_AXIS] * 60.0);
+    #define SET_FEEDRATE_FOR_PREAMBLE_EXTRUDER_MOVE feedrate = (FILAMENT_CHANGE_E_FEEDRATE * 60.0 * FILAMENTCHANGE_AUTO_INSERTION_PREAMBLE_FEEDRATE_FACTOR);
+    #define SET_FEEDRATE_FOR_PURGE                  feedrate = (FILAMENT_CHANGE_E_FEEDRATE * 60.0 * FILAMENTCHANGE_AUTO_INSERTION_PURGE_FEEDRATE_FACTOR);
     // The following plan method use feedrate expressed in mm/s
     #define RUNPLAN calculate_delta(destination); \
                     plan_buffer_line(delta[X_AXIS], delta[Y_AXIS], delta[Z_AXIS], destination[E_AXIS], feedrate/60.0, active_extruder);
   #else
     #define SET_FEEDRATE_FOR_MOVE                   feedrate = homing_feedrate[X_AXIS];
-    #define SET_FEEDRATE_FOR_EXTRUDER_MOVE          feedrate = (max_feedrate[E_AXIS] * 60.0);
-    #define SET_FEEDRATE_FOR_PREAMBLE_EXTRUDER_MOVE feedrate = (max_feedrate[E_AXIS] * 60.0 * FILAMENTCHANGE_AUTO_INSERTION_PREAMBLE_FEEDRATE_FACTOR);
-    #define SET_FEEDRATE_FOR_PURGE                  feedrate = (max_feedrate[E_AXIS] * 60.0 * FILAMENTCHANGE_AUTO_INSERTION_PURGE_FEEDRATE_FACTOR);
+    #define SET_FEEDRATE_FOR_EXTRUDER_MOVE          feedrate = (FILAMENT_CHANGE_E_FEEDRATE * 60.0);
+    #define SET_FEEDRATE_FOR_FIRST_RETRACT          feedrate = (max_feedrate[E_AXIS] * 60.0);
+    #define SET_FEEDRATE_FOR_PREAMBLE_EXTRUDER_MOVE feedrate = (FILAMENT_CHANGE_E_FEEDRATE * 60.0 * FILAMENTCHANGE_AUTO_INSERTION_PREAMBLE_FEEDRATE_FACTOR);
+    #define SET_FEEDRATE_FOR_PURGE                  feedrate = (FILAMENT_CHANGE_E_FEEDRATE * 60.0 * FILAMENTCHANGE_AUTO_INSERTION_PURGE_FEEDRATE_FACTOR);
     // The following plan method use feedrate expressed in mm/min
     #define RUNPLAN line_to_destination(feedrate);
   #endif
@@ -7355,7 +7357,7 @@ inline void gcode_M503() {
       SERIAL_ECHOLNPGM ( "pause_summoned_from_printing" );
 
       // Retract
-      SET_FEEDRATE_FOR_EXTRUDER_MOVE;
+      SET_FEEDRATE_FOR_FIRST_RETRACT;
       destination[E_AXIS] += FILAMENTCHANGE_FIRSTRETRACT;
       prepare_move();
       st_synchronize();
