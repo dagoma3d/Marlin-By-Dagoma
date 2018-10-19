@@ -7098,7 +7098,7 @@ inline void gcode_M503() {
               gcode_G28();
             }
 
-            enqueue_and_echo_commands_P(PSTR(FILAMENTCHANGE_EXTRACTION_SCRIPT));
+            enqueue_and_echo_commands_P(PSTR(FILAMENT1CHANGE_EXTRACTION_SCRIPT));
             //enqueue_and_echo_commands_P(PSTR("G28\nM104 S180\nG0 F150 X0 Y0 Z100\nM109 S180\nD600\nM106 S255\nM104 S0\nG28"));
           /*
           }
@@ -7137,7 +7137,13 @@ inline void gcode_M503() {
               gcode_G28();
             }
 
-            enqueue_and_echo_commands_P(PSTR(FILAMENTCHANGE_EXTRACTION_SCRIPT));
+            char extraction_script[80];
+            #if EXTRUDERS > 1
+              sprintf_P(extraction_script, PSTR("%s\n%s"), FILAMENT1CHANGE_EXTRACTION_SCRIPT, FILAMENT2CHANGE_EXTRACTION_SCRIPT);
+            #else
+              sprintf_P(extraction_script, PSTR("%s"), FILAMENT1CHANGE_EXTRACTION_SCRIPT);
+            #endif
+            enqueue_and_echo_commands_P(extraction_script);
           }
         }
         else {
@@ -7167,6 +7173,9 @@ inline void gcode_M503() {
    *  W[from]        - move progressively from this Z position
    *                   If W presents, converts Z meaning to Z 'to' value
    *
+   * T[index]        - Extruder choice
+   * R[value]        - Final retract value
+   *
    *  Default values are used for omitted arguments.
    *
    */
@@ -7191,16 +7200,15 @@ inline void gcode_M503() {
 
     #if EXTRUDERS > 1
       uint8_t active_extruder_before_filament_change = active_extruder;
-      bool set_additional_retract = false;
+      float final_retract = 0.0;
       if (code_seen('T'))
       {
         target_extruder = code_value_short();
         if (active_extruder != target_extruder)
-        {
           active_extruder = target_extruder;
-          set_additional_retract = true;
-        }
       }
+      if (code_seen('R'))
+        final_retract = code_value();
     #endif
 
     //
@@ -7523,30 +7531,35 @@ inline void gcode_M503() {
           printer_states.in_critical_section = false;
         }
 
-        #if EXTRUDERS > 1
-        // Additional retract part
-        // But, can we continue to slowly purge ?
-        if (current_filament_present(active_extruder) && set_additional_retract) {
-          current_position[E_AXIS] -= 60;
-          destination[E_AXIS] = current_position[E_AXIS];
-          SET_FEEDRATE_FOR_FINAL_RETRACT;
-          RUNPLAN;
-          st_synchronize();
-        }
-        #endif
-
         // Finally, Do we reached end of filament insertion WITH FILAMENT ?
         if (current_filament_present(active_extruder)) {
 
           // Wait
           int i=30; do{ delay(100); idle(true); } while(i--);
 
-          // Retract
-          current_position[E_AXIS] += FILAMENTCHANGE_FIRSTRETRACT;
-          destination[E_AXIS] = current_position[E_AXIS];
-          SET_FEEDRATE_FOR_EXTRUDER_MOVE;
-          RUNPLAN;
-          st_synchronize();
+          #if EXTRUDERS > 1
+            // Retract
+            if(final_retract != 0.0) {
+              current_position[E_AXIS] -= final_retract;
+              destination[E_AXIS] = current_position[E_AXIS];
+              SET_FEEDRATE_FOR_FINAL_RETRACT;
+              RUNPLAN;
+              st_synchronize();
+            }
+            else {
+              current_position[E_AXIS] += FILAMENTCHANGE_FIRSTRETRACT;
+              destination[E_AXIS] = current_position[E_AXIS];
+              SET_FEEDRATE_FOR_EXTRUDER_MOVE;
+              RUNPLAN;
+              st_synchronize();
+            }
+          #else
+            current_position[E_AXIS] += FILAMENTCHANGE_FIRSTRETRACT;
+            destination[E_AXIS] = current_position[E_AXIS];
+            SET_FEEDRATE_FOR_EXTRUDER_MOVE;
+            RUNPLAN;
+            st_synchronize();
+          #endif
 
           if(active_extruder == 0) {
             printer_states.filament_state = FILAMENT_IN;
@@ -7918,7 +7931,7 @@ inline void gcode_M503() {
       if (active_extruder_before_filament_change != active_extruder)
       {
         active_extruder = active_extruder_before_filament_change;
-        set_additional_retract = false;
+        final_retract = 0.0;
       }
     #endif
   }
