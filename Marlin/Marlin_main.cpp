@@ -475,11 +475,13 @@ static uint8_t target_extruder;
   int meas_delay_cm = MEASUREMENT_DELAY_CM;  //distance delay setting
 #endif
 
-#if ENABLED(FILAMENT_RUNOUT_SENSOR)
+#if ENABLED(FILAMENT_RUNOUT_SENSOR) || ENABLED(FILAMENT2_RUNOUT_SENSOR)
   static bool filament_ran_out = false;
   const millis_t FRS_DEBOUNCE_DELAY = 250UL; // filament runout sensor delay
   static millis_t frs_debounce_time = 0UL; // filament runout sensor debouncing count
+#endif
 
+#if ENABLED(FILAMENT_RUNOUT_SENSOR)
   #if HAS_FILRUNOUT
     #define FILAMENT_PRESENT     (READ(FILRUNOUT_PIN) ^ FIL_RUNOUT_INVERTING)
     #define FILAMENT_NOT_PRESENT (!FILAMENT_PRESENT)
@@ -487,18 +489,20 @@ static uint8_t target_extruder;
     #define FILAMENT_PRESENT     (true)
     #define FILAMENT_NOT_PRESENT (false)
   #endif
+#else
+  #define FILAMENT_PRESENT     (true)
+  #define FILAMENT_NOT_PRESENT (false)
+#endif
 
+#if ENABLED(FILAMENT2_RUNOUT_SENSOR)
   #if HAS_FILRUNOUT2
-    #define FILAMENT2_PRESENT     (READ(FILRUNOUT2_PIN) ^ FIL_RUNOUT_INVERTING)
+    #define FILAMENT2_PRESENT     (READ(FILRUNOUT2_PIN) ^ FIL_RUNOUT2_INVERTING)
     #define FILAMENT2_NOT_PRESENT (!FILAMENT2_PRESENT)
   #else
     #define FILAMENT2_PRESENT     (true)
     #define FILAMENT2_NOT_PRESENT (false)
   #endif
 #else
-  #define FILAMENT_PRESENT     (true)
-  #define FILAMENT_NOT_PRESENT (false)
-
   #define FILAMENT2_PRESENT     (true)
   #define FILAMENT2_NOT_PRESENT (false)
 #endif
@@ -7098,7 +7102,7 @@ inline void gcode_M503() {
               gcode_G28();
             }
 
-            enqueue_and_echo_commands_P(PSTR(FILAMENT1CHANGE_EXTRACTION_SCRIPT));
+            enqueue_and_echo_commands_P(PSTR(FILAMENTCHANGE_EXTRACTION_SCRIPT));
             //enqueue_and_echo_commands_P(PSTR("G28\nM104 S180\nG0 F150 X0 Y0 Z100\nM109 S180\nD600\nM106 S255\nM104 S0\nG28"));
           /*
           }
@@ -7139,9 +7143,9 @@ inline void gcode_M503() {
 
             char extraction_script[80];
             #if EXTRUDERS > 1
-              sprintf_P(extraction_script, PSTR("%s\n%s"), FILAMENT1CHANGE_EXTRACTION_SCRIPT, FILAMENT2CHANGE_EXTRACTION_SCRIPT);
+              sprintf_P(extraction_script, PSTR("%s\n%s"), FILAMENTCHANGE_EXTRACTION_SCRIPT, FILAMENT2CHANGE_EXTRACTION_SCRIPT);
             #else
-              sprintf_P(extraction_script, PSTR("%s"), FILAMENT1CHANGE_EXTRACTION_SCRIPT);
+              sprintf_P(extraction_script, PSTR("%s"), FILAMENTCHANGE_EXTRACTION_SCRIPT);
             #endif
             enqueue_and_echo_commands_P(extraction_script);
           }
@@ -10418,8 +10422,7 @@ void disable_all_steppers() {
   }
 #endif
 
-#if ENABLED(FILAMENT_RUNOUT_SENSOR)
-#if HAS_FILRUNOUT
+#if ENABLED(FILAMENT_RUNOUT_SENSOR) && HAS_FILRUNOUT
 inline void manage_filament1_auto_insertion() {
 
   if (!printer_states.pause_asked) {
@@ -10495,7 +10498,7 @@ inline void manage_filament1_auto_insertion() {
           //enqueue_and_echo_commands_P(PSTR("G28"));
         }
 
-        enqueue_and_echo_commands_P(PSTR(FILAMENT1CHANGE_INSERTION_SCRIPT));
+        enqueue_and_echo_commands_P(PSTR(FILAMENTCHANGE_INSERTION_SCRIPT));
       }
       else {
         SERIAL_ECHOLNPGM("Filament 1 auto-insertion aborted");
@@ -10507,7 +10510,7 @@ inline void manage_filament1_auto_insertion() {
 }
 #endif
 
-#if HAS_FILRUNOUT2
+#if ENABLED(FILAMENT2_RUNOUT_SENSOR) && HAS_FILRUNOUT2
 inline void manage_filament2_auto_insertion() {
 
   if (!printer_states.pause_asked) {
@@ -10594,7 +10597,6 @@ inline void manage_filament2_auto_insertion() {
   }
 }
 #endif
-#endif
 
 inline void manage_printer_states() {
 
@@ -10620,13 +10622,11 @@ inline void manage_printer_states() {
     #if ENABLED(ONE_BUTTON) && ENABLED(DELTA_EXTRA)
       manage_one_button_start_print();
     #endif
-    #if ENABLED(FILAMENT_RUNOUT_SENSOR)
-      #if HAS_FILRUNOUT
-        manage_filament1_auto_insertion();
-      #endif
-      #if HAS_FILRUNOUT2
-        manage_filament2_auto_insertion();
-      #endif
+    #if ENABLED(FILAMENT_RUNOUT_SENSOR) && HAS_FILRUNOUT
+      manage_filament1_auto_insertion();
+    #endif
+    #if ENABLED(FILAMENT2_RUNOUT_SENSOR) && HAS_FILRUNOUT2
+      manage_filament2_auto_insertion();
     #endif
 
     #if ENABLED(LONG_PRESS_SUPPORT)
@@ -10856,7 +10856,7 @@ void idle(
 void manage_inactivity(bool ignore_stepper_queue/*=false*/) {
   millis_t ms = millis();
 
-  #if HAS_FILRUNOUT
+  #if HAS_FILRUNOUT || HAS_FILRUNOUT2
     if (
       printer_states.activity_state == ACTIVITY_PRINTING
       && (FILAMENT_NOT_PRESENT || FILAMENT2_NOT_PRESENT)
@@ -11146,12 +11146,34 @@ void kill(const char* lcd_msg) {
   } // Wait for reset
 }
 
-#if ENABLED(FILAMENT_RUNOUT_SENSOR)
+#if ENABLED(FILAMENT_RUNOUT_SENSOR) || ENABLED(FILAMENT2_RUNOUT_SENSOR)
   void handle_filament_runout() {
     if (!printer_states.pause_asked) {
-      SERIAL_ECHOLNPGM("Pause : No more filament detected");
+      #if EXTRUDERS > 1
+        if(FILAMENT_NOT_PRESENT) {
+          SERIAL_ECHOLNPGM("Pause : No more filament 1 detected");
+        } else if(FILAMENT2_NOT_PRESENT) {
+          SERIAL_ECHOLNPGM("Pause : No more filament 2 detected");
+        }
+      #else
+        SERIAL_ECHOLNPGM("Pause : No more filament detected");
+      #endif
       printer_states.pause_asked = true;
-      enqueue_and_echo_commands_P(PSTR(FILAMENT_RUNOUT_SCRIPT));
+      #if EXTRUDERS > 1
+        if(FILAMENT_NOT_PRESENT) {
+          #if ENABLED(FILAMENT_RUNOUT_SENSOR)
+            enqueue_and_echo_commands_P(PSTR(FILAMENT_RUNOUT_SCRIPT));
+          #endif
+          return;
+        }else if(FILAMENT2_NOT_PRESENT) {
+          #if ENABLED(FILAMENT_RUNOUT_SENSOR)
+            enqueue_and_echo_commands_P(PSTR(FILAMENT2_RUNOUT_SCRIPT));
+          #endif
+          return;
+        }
+      #else
+        enqueue_and_echo_commands_P(PSTR(FILAMENT_RUNOUT_SCRIPT));
+      #endif
     }
   }
 

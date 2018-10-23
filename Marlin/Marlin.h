@@ -224,7 +224,7 @@ void reset_bed_level();
 void prepare_move();
 void kill(const char*);
 
-#if ENABLED(FILAMENT_RUNOUT_SENSOR)
+#if ENABLED(FILAMENT_RUNOUT_SENSOR) || ENABLED(FILAMENT2_RUNOUT_SENSOR)
   void handle_filament_runout();
 #endif
 
