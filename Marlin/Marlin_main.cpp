@@ -985,6 +985,16 @@ void setup() {
     digipot_i2c_init();
   #endif
 
+  #if ENABLED(DAC_STEPPER_CURRENT)
+    dac_init();
+
+    //TODO: Store these values to eeprom
+    dac_current_raw(0, 1200);
+    dac_current_raw(1, 1200);
+    dac_current_raw(2, 1200);
+    dac_current_raw(3, 1200);
+  #endif
+
   #if ENABLED(Z_PROBE_SLED)
     pinMode(SLED_PIN, OUTPUT);
     digitalWrite(SLED_PIN, LOW); // turn it off

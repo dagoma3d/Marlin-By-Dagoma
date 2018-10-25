@@ -31,7 +31,6 @@
 #include "Configuration_adv.h"
 
 #if ENABLED(DAC_STEPPER_CURRENT)
-#include "WProgram.h"
 #include "Wire.h"
 //#include <Wire.h>
 
@@ -63,4 +62,3 @@ uint8_t mcp4728_simpleCommand(byte simpleCommand);
 
 #endif
 #endif
-
