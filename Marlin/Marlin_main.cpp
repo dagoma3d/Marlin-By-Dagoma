@@ -1026,7 +1026,7 @@ void setup() {
     //TODO: Store these values to eeprom
     dac_current_raw(0, 1200);
     dac_current_raw(1, 1200);
-    dac_current_raw(2, 1200);
+    dac_current_raw(2, 800);
     dac_current_raw(3, 1200);
   #endif
 
