@@ -7141,13 +7141,19 @@ inline void gcode_M503() {
               gcode_G28();
             }
 
-            char extraction_script[80];
             #if EXTRUDERS > 1
-              sprintf_P(extraction_script, PSTR("%s\n%s"), FILAMENTCHANGE_EXTRACTION_SCRIPT, FILAMENT2CHANGE_EXTRACTION_SCRIPT);
+            /*
+              if (FILAMENT_PRESENT) {
+                enqueue_and_echo_commands_P(PSTR(FILAMENTCHANGE_EXTRACTION_SCRIPT));
+              } else if (FILAMENT2_PRESENT) {
+                enqueue_and_echo_commands_P(PSTR(FILAMENT2CHANGE_EXTRACTION_SCRIPT));
+              }
+            */
+              //enqueue_and_echo_commands_P(PSTR("M600 T0 I-1 U5 V195 X195 Y195\nM600 T1 I-1 U5 V195 X195 Y195"));
+              enqueue_and_echo_commands_P(PSTR(FILAMENTCHANGE_EXTRACTION_SCRIPT));
             #else
-              sprintf_P(extraction_script, PSTR("%s"), FILAMENTCHANGE_EXTRACTION_SCRIPT);
+              enqueue_and_echo_commands_P(PSTR(FILAMENTCHANGE_EXTRACTION_SCRIPT));
             #endif
-            enqueue_and_echo_commands_P(extraction_script);
           }
         }
         else {
