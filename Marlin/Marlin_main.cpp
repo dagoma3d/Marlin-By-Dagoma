@@ -7142,15 +7142,7 @@ inline void gcode_M503() {
             }
 
             #if EXTRUDERS > 1
-            /*
-              if (FILAMENT_PRESENT) {
-                enqueue_and_echo_commands_P(PSTR(FILAMENTCHANGE_EXTRACTION_SCRIPT));
-              } else if (FILAMENT2_PRESENT) {
-                enqueue_and_echo_commands_P(PSTR(FILAMENT2CHANGE_EXTRACTION_SCRIPT));
-              }
-            */
-              //enqueue_and_echo_commands_P(PSTR("M600 T0 I-1 U5 V195 X195 Y195\nM600 T1 I-1 U5 V195 X195 Y195"));
-              enqueue_and_echo_commands_P(PSTR(FILAMENTCHANGE_EXTRACTION_SCRIPT));
+              enqueue_and_echo_commands_P(PSTR(FILAMENTSCHANGE_EXTRACTION_SCRIPT));
             #else
               enqueue_and_echo_commands_P(PSTR(FILAMENTCHANGE_EXTRACTION_SCRIPT));
             #endif
@@ -7302,6 +7294,8 @@ inline void gcode_M503() {
       z_heat_from += read_z;
       z_heat_to += read_z;
     }
+
+    bool extract_both = code_seen('B') ? true : false; // Extract_both filaments
 
     // Security: Clamp Z height
     // We need to not go higher than max height ...
@@ -7636,6 +7630,48 @@ inline void gcode_M503() {
         } else {
           printer_states.filament2_state = FILAMENT_OUT;
         }
+
+        if(extract_both) {
+          if(active_extruder == 0) {
+            active_extruder = 1;
+          } else {
+            active_extruder = 0;
+          }
+          current_position[E_AXIS] = destination[E_AXIS];
+          sync_plan_position_e();
+
+          float destination_to_reach;
+          destination_to_reach = destination[E_AXIS] + FILAMENTCHANGE_FINALRETRACT;
+
+          float destination_at_least_to_reach;
+          destination_at_least_to_reach = destination[E_AXIS] - FILAMENTCHANGE_AUTO_INSERTION_CONFIRMATION_LENGTH;
+
+          SET_FEEDRATE_FOR_EXTRUDER_MOVE;
+
+          printer_states.in_critical_section = true;
+          do {
+            current_position[E_AXIS] -= FILAMENTCHANGE_AUTO_INSERTION_VERIFICATION_LENGTH_MM;
+            destination[E_AXIS] = current_position[E_AXIS];
+            RUNPLAN;
+          } while(
+            destination[E_AXIS] > destination_to_reach
+            && (
+              current_filament_present(active_extruder) || destination[E_AXIS] > destination_at_least_to_reach
+            )
+          );
+          st_synchronize();
+          printer_states.in_critical_section = false;
+
+          current_position[E_AXIS] = destination[E_AXIS];
+          sync_plan_position_e();
+
+          if(active_extruder == 0) {
+            printer_states.filament_state = FILAMENT_OUT;
+          } else {
+            printer_states.filament2_state = FILAMENT_OUT;
+          }
+        }
+
         filament_direction = 0;
 
         // We need to wait the user pulling-out the filament
