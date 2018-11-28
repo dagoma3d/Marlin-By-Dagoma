@@ -321,6 +321,9 @@ uint8_t active_extruder = 0;
 // Relative Mode. Enable with G91, disable with G90.
 static bool relative_mode = false;
 
+static bool enable_filrunout1 = true;
+static bool enable_filrunout2 = true;
+
 bool cancel_heatup = false;
 
 const char errormagic[] PROGMEM = "Error:";
@@ -483,7 +486,7 @@ static uint8_t target_extruder;
 
 #if ENABLED(FILAMENT_RUNOUT_SENSOR)
   #if HAS_FILRUNOUT
-    #define FILAMENT_PRESENT     (READ(FILRUNOUT_PIN) ^ FIL_RUNOUT_INVERTING)
+    #define FILAMENT_PRESENT     (READ(FILRUNOUT_PIN) ^ FIL_RUNOUT_INVERTING) || !enable_filrunout1
     #define FILAMENT_NOT_PRESENT (!FILAMENT_PRESENT)
   #else
     #define FILAMENT_PRESENT     (true)
@@ -496,7 +499,7 @@ static uint8_t target_extruder;
 
 #if ENABLED(FILAMENT2_RUNOUT_SENSOR)
   #if HAS_FILRUNOUT2
-    #define FILAMENT2_PRESENT     (READ(FILRUNOUT2_PIN) ^ FIL_RUNOUT2_INVERTING)
+    #define FILAMENT2_PRESENT     (READ(FILRUNOUT2_PIN) ^ FIL_RUNOUT2_INVERTING) || !enable_filrunout2
     #define FILAMENT2_NOT_PRESENT (!FILAMENT2_PRESENT)
   #else
     #define FILAMENT2_PRESENT     (true)
@@ -8033,6 +8036,35 @@ inline void gcode_M503() {
 /*****************************************************************************
  * DAGOMA.FR Specific
  *****************************************************************************/
+#if EXTRUDERS > 1
+/**
+ * D130: Enable filrunout sensors
+ */
+inline void gcode_D130() {
+  if (code_seen('E')) {
+    uint8_t filrunout_index = code_value_short();
+    if (filrunout_index == 0) enable_filrunout1 = true;
+    if (filrunout_index == 1) enable_filrunout2 = true;
+  } else {
+    enable_filrunout1 = true;
+    enable_filrunout2 = true;
+  }
+}
+
+/**
+ * D131: Disable filrunout sensors
+ */
+inline void gcode_D131() {
+  if (code_seen('E')) {
+    uint8_t filrunout_index = code_value_short();
+    if (filrunout_index == 0) enable_filrunout1 = false;
+    if (filrunout_index == 1) enable_filrunout2 = false;
+  } else {
+    enable_filrunout1 = false;
+    enable_filrunout2 = false;
+  }
+}
+#endif
 #if ENABLED(WIFI_PRINT)
 inline void gcode_D700() {
   SECOND_SERIAL.print("SSID:");
@@ -9450,6 +9482,13 @@ void process_next_command() {
       break;
 
     case 'D': switch (codenum) {
+      #if EXTRUDERS > 1
+        case 130:
+          gcode_D130();
+          break;
+        case 131:
+          gcode_D131();
+      #endif
       // DAGOMA.FR Specific
       #if ENABLED(WIFI_PRINT)
         case 700:
