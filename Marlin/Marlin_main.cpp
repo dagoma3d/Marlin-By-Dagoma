@@ -486,7 +486,7 @@ static uint8_t target_extruder;
 
 #if ENABLED(FILAMENT_RUNOUT_SENSOR)
   #if HAS_FILRUNOUT
-    #define FILAMENT_PRESENT     (READ(FILRUNOUT_PIN) ^ FIL_RUNOUT_INVERTING) || !enable_filrunout1
+    #define FILAMENT_PRESENT     ((READ(FILRUNOUT_PIN) ^ FIL_RUNOUT_INVERTING) || !enable_filrunout1)
     #define FILAMENT_NOT_PRESENT (!FILAMENT_PRESENT)
   #else
     #define FILAMENT_PRESENT     (true)
@@ -499,7 +499,7 @@ static uint8_t target_extruder;
 
 #if ENABLED(FILAMENT2_RUNOUT_SENSOR)
   #if HAS_FILRUNOUT2
-    #define FILAMENT2_PRESENT     (READ(FILRUNOUT2_PIN) ^ FIL_RUNOUT2_INVERTING) || !enable_filrunout2
+    #define FILAMENT2_PRESENT     ((READ(FILRUNOUT2_PIN) ^ FIL_RUNOUT2_INVERTING) || !enable_filrunout2)
     #define FILAMENT2_NOT_PRESENT (!FILAMENT2_PRESENT)
   #else
     #define FILAMENT2_PRESENT     (true)
