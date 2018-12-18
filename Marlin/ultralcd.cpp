@@ -487,13 +487,13 @@ inline void line_to_current(AxisEnum axis) {
 
   static void lcd_sdcard_resume() { card.startFileprint(); }
 
+  bool abort_sd_printing; // =false
+
   static void lcd_sdcard_stop() {
-    quickStop();
-    card.sdprinting = false;
-    card.closefile();
-    autotempShutdown();
     cancel_heatup = true;
-    lcd_setstatus(MSG_PRINT_ABORTED, true);
+    abort_sd_printing = true;
+    LCD_MESSAGEPGM(MSG_PRINT_ABORTED);
+    lcd_return_to_status();
   }
 
 #endif //SDSUPPORT

@@ -778,6 +778,10 @@ bool enqueue_and_echo_command(const char* cmd, bool say_ok/*=false*/) {
   return false;
 }
 
+void clear_command_queue() {
+  cmd_queue_index_r = cmd_queue_index_w = commands_in_queue = 0;
+}
+
 void setup_killpin() {
   #if HAS_KILL
     SET_INPUT(KILL_PIN);
@@ -1166,6 +1170,23 @@ void setup() {
  *  - Call LCD update
  */
 void loop() {
+  #if ENABLED(SDSUPPORT)
+    #if ENABLED(ULTIPANEL)
+      if (abort_sd_printing) {
+        abort_sd_printing = false;
+        card.sdprinting = false;
+        card.closefile();
+        clear_command_queue();
+        quickStop();
+        print_job_timer.stop();
+        disable_all_heaters();
+        #if FAN_COUNT > 0
+          for (uint8_t i = 0; i < FAN_COUNT; i++) fanSpeeds[i] = 0;
+        #endif
+        cancel_heatup = true;
+      }
+    #endif
+  #endif // SDSUPPORT
 
   #if ENABLED( WIFI_PRINT )
     manage_second_serial_status();
@@ -8049,6 +8070,9 @@ inline void gcode_D130() {
     enable_filrunout1 = true;
     enable_filrunout2 = true;
   }
+
+  printer_states.filament_state = FILAMENT_PRESENT ? FILAMENT_IN : FILAMENT_OUT;
+  printer_states.filament2_state = FILAMENT2_PRESENT ? FILAMENT_IN : FILAMENT_OUT;
 }
 
 /**
@@ -8063,6 +8087,9 @@ inline void gcode_D131() {
     enable_filrunout1 = false;
     enable_filrunout2 = false;
   }
+
+  printer_states.filament_state = FILAMENT_PRESENT ? FILAMENT_IN : FILAMENT_OUT;
+  printer_states.filament2_state = FILAMENT2_PRESENT ? FILAMENT_IN : FILAMENT_OUT;
 }
 #endif
 #if ENABLED(WIFI_PRINT)

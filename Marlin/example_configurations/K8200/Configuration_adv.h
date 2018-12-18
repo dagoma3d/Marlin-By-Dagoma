@@ -454,7 +454,7 @@
 #define MM_PER_ARC_SEGMENT 1
 #define N_ARC_CORRECTION 25
 
-const unsigned int dropsegments = 2; //everything with less than this number of steps will be ignored as move and joined with the next movement
+#define MIN_STEPS_PER_SEGMENT 2 //everything with less than this number of steps will be ignored as move and joined with the next movement
 
 // @section temperature
 

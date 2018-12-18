@@ -42,7 +42,7 @@
  * here we define this default string as the date where the latest release
  * version was tagged.
  */
-#define STRING_DISTRIBUTION_DATE "2018-10-18"
+#define STRING_DISTRIBUTION_DATE "2018-12-18"
 
 /**
  * @todo: Missing documentation block

@@ -59,6 +59,12 @@
   #define LCD_MESSAGEPGM(x) lcd_setstatuspgm(PSTR(x))
   #define LCD_ALERTMESSAGEPGM(x) lcd_setalertstatuspgm(PSTR(x))
 
+  #if ENABLED(ULTIPANEL) && ENABLED(SDSUPPORT)
+    extern bool abort_sd_printing;
+  #else
+    constexpr bool abort_sd_printing = false;
+  #endif
+
   #define LCD_UPDATE_INTERVAL 100
   #define LCD_TIMEOUT_TO_STATUS 15000
 
@@ -85,7 +91,7 @@
   bool lcd_clicked();
   void lcd_ignore_click(bool b=true);
   bool lcd_blink();
-  
+
   #if ENABLED(HAS_SERVO_ENDSTOPS) && ENABLED(Z_DUAL_ENDSTOPS)
     extern float z_probed_value_before_z_raise;
   #endif
