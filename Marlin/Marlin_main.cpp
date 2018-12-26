@@ -7083,6 +7083,7 @@ inline void gcode_M503() {
     #define SET_FEEDRATE_FOR_EXTRUDER_MOVE          feedrate = (FILAMENT_CHANGE_E_FEEDRATE * 60.0);
     #define SET_FEEDRATE_FOR_FIRST_RETRACT          feedrate = (max_feedrate[E_AXIS] * 60.0);
     #define SET_FEEDRATE_FOR_FINAL_RETRACT          feedrate = 10000.0;
+    #define SET_FEEDRATE_FOR_QUICK_EXTRUDE          feedrate = 3000.0;
     #define SET_FEEDRATE_FOR_PREAMBLE_EXTRUDER_MOVE feedrate = (FILAMENT_CHANGE_E_FEEDRATE * 60.0 * FILAMENTCHANGE_AUTO_INSERTION_PREAMBLE_FEEDRATE_FACTOR);
     #define SET_FEEDRATE_FOR_PURGE                  feedrate = (FILAMENT_CHANGE_E_FEEDRATE * 60.0 * FILAMENTCHANGE_AUTO_INSERTION_PURGE_FEEDRATE_FACTOR);
     // The following plan method use feedrate expressed in mm/s
@@ -7093,6 +7094,7 @@ inline void gcode_M503() {
     #define SET_FEEDRATE_FOR_EXTRUDER_MOVE          feedrate = (FILAMENT_CHANGE_E_FEEDRATE * 60.0);
     #define SET_FEEDRATE_FOR_FIRST_RETRACT          feedrate = (max_feedrate[E_AXIS] * 60.0);
     #define SET_FEEDRATE_FOR_FINAL_RETRACT          feedrate = 10000.0;
+    #define SET_FEEDRATE_FOR_QUICK_EXTRUDE          feedrate = 3000.0;
     #define SET_FEEDRATE_FOR_PREAMBLE_EXTRUDER_MOVE feedrate = (FILAMENT_CHANGE_E_FEEDRATE * 60.0 * FILAMENTCHANGE_AUTO_INSERTION_PREAMBLE_FEEDRATE_FACTOR);
     #define SET_FEEDRATE_FOR_PURGE                  feedrate = (FILAMENT_CHANGE_E_FEEDRATE * 60.0 * FILAMENTCHANGE_AUTO_INSERTION_PURGE_FEEDRATE_FACTOR);
     // The following plan method use feedrate expressed in mm/min
@@ -7158,10 +7160,12 @@ inline void gcode_M503() {
             printer_states.print_asked = false;
 
             if (!printer_states.homed) {
+              #if DISABLED(DELTA)
               char tmp[16]; // tmp will be freed exiting this scope.
               memset(tmp, '\0', sizeof(tmp));
               strcpy(tmp, "X Y\0");
               current_command_args = tmp;
+              #endif
               gcode_G28();
             }
 
@@ -7624,6 +7628,30 @@ inline void gcode_M503() {
         current_position[E_AXIS] = destination[E_AXIS];
         sync_plan_position_e();
 
+        // Retract a bit
+        destination[E_AXIS] -= RETRACT_BEFORE_EJECTION;
+        SET_FEEDRATE_FOR_FINAL_RETRACT;
+        prepare_move();
+        st_synchronize();
+
+        // Wait for 2 seconds
+        millis_t quick_pause_timeout = QUICK_PAUSE_TIMEOUT;
+        st_synchronize();
+        refresh_cmd_timeout();
+        quick_pause_timeout += previous_cmd_ms;  // keep track of when we started waiting
+        if (!lcd_hasstatus()) LCD_MESSAGEPGM(MSG_DWELL);
+        while (PENDING(millis(), quick_pause_timeout)) idle();
+
+        // Extrude a bit
+        destination[E_AXIS] += EXTRUDE_BEFORE_EJECTION;
+        SET_FEEDRATE_FOR_QUICK_EXTRUDE;
+        prepare_move();
+        st_synchronize();
+
+        // Ejection begins
+        current_position[E_AXIS] = destination[E_AXIS];
+        sync_plan_position_e();
+
         float destination_to_reach;
         destination_to_reach = destination[E_AXIS] + FILAMENTCHANGE_FINALRETRACT;
 
@@ -7661,6 +7689,31 @@ inline void gcode_M503() {
           } else {
             active_extruder = 0;
           }
+
+          current_position[E_AXIS] = destination[E_AXIS];
+          sync_plan_position_e();
+
+          // Retract a bit
+          destination[E_AXIS] -= RETRACT_BEFORE_EJECTION;
+          SET_FEEDRATE_FOR_FINAL_RETRACT;
+          prepare_move();
+          st_synchronize();
+
+          // Wait for 2 seconds
+          millis_t quick_pause_timeout = QUICK_PAUSE_TIMEOUT;
+          st_synchronize();
+          refresh_cmd_timeout();
+          quick_pause_timeout += previous_cmd_ms;  // keep track of when we started waiting
+          if (!lcd_hasstatus()) LCD_MESSAGEPGM(MSG_DWELL);
+          while (PENDING(millis(), quick_pause_timeout)) idle();
+
+          // Extrude a bit
+          destination[E_AXIS] += EXTRUDE_BEFORE_EJECTION;
+          SET_FEEDRATE_FOR_QUICK_EXTRUDE;
+          prepare_move();
+          st_synchronize();
+
+          // Ejection begins
           current_position[E_AXIS] = destination[E_AXIS];
           sync_plan_position_e();
 
