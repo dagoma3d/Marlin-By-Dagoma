@@ -5,6 +5,7 @@ Disable NO_LCD_FOR_FILAMENTCHANGEABLE
 
 Enable BABYSTEPPING
 
-# Increase buffers size
+# Increase buffers size and disable slowdown
 Set BLOCK_BUFFER_SIZE 32
 Set BUFSIZE 8
+Disable SLOWDOWN
