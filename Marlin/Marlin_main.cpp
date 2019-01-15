@@ -10531,6 +10531,7 @@ void disable_all_steppers() {
 #if ENABLED(ONE_BUTTON) && ENABLED(DELTA_EXTRA)
 
   inline void manage_one_button_start_print() {
+    if (printer_states.pause_asked) return;
     // De-Bounce button press
     millis_t now = millis();
     if (PENDING(now, next_one_button_check)) return;
