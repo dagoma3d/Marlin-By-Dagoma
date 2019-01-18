@@ -25,3 +25,4 @@ ArduinoAddons/Arduino_1.6.x/libraries/U8glib_ID7/
 .piolibdeps
 .clang_complete
 .gcc-flags.json
+.vscode
