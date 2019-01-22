@@ -7079,24 +7079,28 @@ inline void gcode_M503() {
   //   homing_feedrate is expressed in mm/min
   //   max_feedrate is expressed in mm/s
   #if ENABLED(DELTA)
-    #define SET_FEEDRATE_FOR_MOVE                   feedrate = homing_feedrate[X_AXIS];
-    #define SET_FEEDRATE_FOR_EXTRUDER_MOVE          feedrate = (FILAMENT_CHANGE_E_FEEDRATE * 60.0);
-    #define SET_FEEDRATE_FOR_FIRST_RETRACT          feedrate = (max_feedrate[E_AXIS] * 60.0);
-    #define SET_FEEDRATE_FOR_FINAL_RETRACT          feedrate = 10000.0;
-    #define SET_FEEDRATE_FOR_QUICK_EXTRUDE          feedrate = 3000.0;
-    #define SET_FEEDRATE_FOR_PREAMBLE_EXTRUDER_MOVE feedrate = (FILAMENT_CHANGE_E_FEEDRATE * 60.0 * FILAMENTCHANGE_AUTO_INSERTION_PREAMBLE_FEEDRATE_FACTOR);
-    #define SET_FEEDRATE_FOR_PURGE                  feedrate = (FILAMENT_CHANGE_E_FEEDRATE * 60.0 * FILAMENTCHANGE_AUTO_INSERTION_PURGE_FEEDRATE_FACTOR);
+    #define SET_FEEDRATE_FOR_MOVE                           feedrate = homing_feedrate[X_AXIS];
+    #define SET_FEEDRATE_FOR_EXTRUDER_MOVE                  feedrate = (FILAMENT_CHANGE_E_FEEDRATE * 60.0);
+    #define SET_FEEDRATE_FOR_FIRST_RETRACT                  feedrate = (max_feedrate[E_AXIS] * 60.0);
+    #define SET_FEEDRATE_FOR_FINAL_RETRACT                  feedrate = 10000.0;
+    #define SET_FEEDRATE_FOR_FIRST_EXTRUDE_BEFORE_EJECTION  feedrate = 200.0;
+    #define SET_FEEDRATE_FOR_MOVE_BEFORE_EJECTION           feedrate = 3600.0;
+    #define SET_FEEDRATE_FOR_LAST_RETRACT_BEFORE_EJECTION   feedrate = 9960.0;
+    #define SET_FEEDRATE_FOR_PREAMBLE_EXTRUDER_MOVE         feedrate = (FILAMENT_CHANGE_E_FEEDRATE * 60.0 * FILAMENTCHANGE_AUTO_INSERTION_PREAMBLE_FEEDRATE_FACTOR);
+    #define SET_FEEDRATE_FOR_PURGE                          feedrate = (FILAMENT_CHANGE_E_FEEDRATE * 60.0 * FILAMENTCHANGE_AUTO_INSERTION_PURGE_FEEDRATE_FACTOR);
     // The following plan method use feedrate expressed in mm/s
     #define RUNPLAN calculate_delta(destination); \
                     plan_buffer_line(delta[X_AXIS], delta[Y_AXIS], delta[Z_AXIS], destination[E_AXIS], feedrate/60.0, active_extruder);
   #else
-    #define SET_FEEDRATE_FOR_MOVE                   feedrate = homing_feedrate[X_AXIS];
-    #define SET_FEEDRATE_FOR_EXTRUDER_MOVE          feedrate = (FILAMENT_CHANGE_E_FEEDRATE * 60.0);
-    #define SET_FEEDRATE_FOR_FIRST_RETRACT          feedrate = (max_feedrate[E_AXIS] * 60.0);
-    #define SET_FEEDRATE_FOR_FINAL_RETRACT          feedrate = 10000.0;
-    #define SET_FEEDRATE_FOR_QUICK_EXTRUDE          feedrate = 3000.0;
-    #define SET_FEEDRATE_FOR_PREAMBLE_EXTRUDER_MOVE feedrate = (FILAMENT_CHANGE_E_FEEDRATE * 60.0 * FILAMENTCHANGE_AUTO_INSERTION_PREAMBLE_FEEDRATE_FACTOR);
-    #define SET_FEEDRATE_FOR_PURGE                  feedrate = (FILAMENT_CHANGE_E_FEEDRATE * 60.0 * FILAMENTCHANGE_AUTO_INSERTION_PURGE_FEEDRATE_FACTOR);
+    #define SET_FEEDRATE_FOR_MOVE                           feedrate = homing_feedrate[X_AXIS];
+    #define SET_FEEDRATE_FOR_EXTRUDER_MOVE                  feedrate = (FILAMENT_CHANGE_E_FEEDRATE * 60.0);
+    #define SET_FEEDRATE_FOR_FIRST_RETRACT                  feedrate = (max_feedrate[E_AXIS] * 60.0);
+    #define SET_FEEDRATE_FOR_FINAL_RETRACT                  feedrate = 10000.0;
+    #define SET_FEEDRATE_FOR_FIRST_EXTRUDE_BEFORE_EJECTION  feedrate = 200.0;
+    #define SET_FEEDRATE_FOR_MOVE_BEFORE_EJECTION           feedrate = 3600.0;
+    #define SET_FEEDRATE_FOR_LAST_RETRACT_BEFORE_EJECTION   feedrate = 9960.0;
+    #define SET_FEEDRATE_FOR_PREAMBLE_EXTRUDER_MOVE         feedrate = (FILAMENT_CHANGE_E_FEEDRATE * 60.0 * FILAMENTCHANGE_AUTO_INSERTION_PREAMBLE_FEEDRATE_FACTOR);
+    #define SET_FEEDRATE_FOR_PURGE                          feedrate = (FILAMENT_CHANGE_E_FEEDRATE * 60.0 * FILAMENTCHANGE_AUTO_INSERTION_PURGE_FEEDRATE_FACTOR);
     // The following plan method use feedrate expressed in mm/min
     #define RUNPLAN line_to_destination(feedrate);
   #endif
@@ -7628,9 +7632,15 @@ inline void gcode_M503() {
         current_position[E_AXIS] = destination[E_AXIS];
         sync_plan_position_e();
 
-        // Retract a bit
-        destination[E_AXIS] -= RETRACT_BEFORE_EJECTION;
-        SET_FEEDRATE_FOR_FINAL_RETRACT;
+        // First extrude before ejection
+        destination[E_AXIS] += FIRST_EXTRUDE_BEFORE_EJECTION;
+        SET_FEEDRATE_FOR_FIRST_EXTRUDE_BEFORE_EJECTION;
+        prepare_move();
+        st_synchronize();
+/*
+        // First retract ejection
+        destination[E_AXIS] -= FIRST_RETRACT_BEFORE_EJECTION;
+        SET_FEEDRATE_FOR_MOVE_BEFORE_EJECTION;
         prepare_move();
         st_synchronize();
 
@@ -7642,9 +7652,15 @@ inline void gcode_M503() {
         if (!lcd_hasstatus()) LCD_MESSAGEPGM(MSG_DWELL);
         while (PENDING(millis(), quick_pause_timeout)) idle();
 
-        // Extrude a bit
-        destination[E_AXIS] += EXTRUDE_BEFORE_EJECTION;
-        SET_FEEDRATE_FOR_QUICK_EXTRUDE;
+        // Second extrude before ejection
+        destination[E_AXIS] += SECOND_EXTRUDE_BEFORE_EJECTION;
+        SET_FEEDRATE_FOR_MOVE_BEFORE_EJECTION;
+        prepare_move();
+        st_synchronize();
+*/
+        // Second retract before ejection
+        destination[E_AXIS] -= SECOND_RETRACT_BEFORE_EJECTION;
+        SET_FEEDRATE_FOR_LAST_RETRACT_BEFORE_EJECTION;
         prepare_move();
         st_synchronize();
 
@@ -7653,7 +7669,7 @@ inline void gcode_M503() {
         sync_plan_position_e();
 
         float destination_to_reach;
-        destination_to_reach = destination[E_AXIS] + FILAMENTCHANGE_FINALRETRACT;
+        destination_to_reach = destination[E_AXIS] + FILAMENTCHANGE_FINALRETRACT + SECOND_RETRACT_BEFORE_EJECTION;
 
         float destination_at_least_to_reach;
         destination_at_least_to_reach = destination[E_AXIS] - FILAMENTCHANGE_AUTO_INSERTION_CONFIRMATION_LENGTH;
@@ -7693,9 +7709,15 @@ inline void gcode_M503() {
           current_position[E_AXIS] = destination[E_AXIS];
           sync_plan_position_e();
 
-          // Retract a bit
-          destination[E_AXIS] -= RETRACT_BEFORE_EJECTION;
-          SET_FEEDRATE_FOR_FINAL_RETRACT;
+          // First extrude before ejection
+          destination[E_AXIS] += FIRST_EXTRUDE_BEFORE_EJECTION;
+          SET_FEEDRATE_FOR_FIRST_EXTRUDE_BEFORE_EJECTION;
+          prepare_move();
+          st_synchronize();
+/*
+          // First retract ejection
+          destination[E_AXIS] -= FIRST_RETRACT_BEFORE_EJECTION;
+          SET_FEEDRATE_FOR_MOVE_BEFORE_EJECTION;
           prepare_move();
           st_synchronize();
 
@@ -7707,9 +7729,15 @@ inline void gcode_M503() {
           if (!lcd_hasstatus()) LCD_MESSAGEPGM(MSG_DWELL);
           while (PENDING(millis(), quick_pause_timeout)) idle();
 
-          // Extrude a bit
-          destination[E_AXIS] += EXTRUDE_BEFORE_EJECTION;
-          SET_FEEDRATE_FOR_QUICK_EXTRUDE;
+          // Second extrude before ejection
+          destination[E_AXIS] += SECOND_EXTRUDE_BEFORE_EJECTION;
+          SET_FEEDRATE_FOR_MOVE_BEFORE_EJECTION;
+          prepare_move();
+          st_synchronize();
+*/
+          // Second retract before ejection
+          destination[E_AXIS] -= SECOND_RETRACT_BEFORE_EJECTION;
+          SET_FEEDRATE_FOR_LAST_RETRACT_BEFORE_EJECTION;
           prepare_move();
           st_synchronize();
 
@@ -7718,7 +7746,7 @@ inline void gcode_M503() {
           sync_plan_position_e();
 
           float destination_to_reach;
-          destination_to_reach = destination[E_AXIS] + FILAMENTCHANGE_FINALRETRACT;
+          destination_to_reach = destination[E_AXIS] + FILAMENTCHANGE_FINALRETRACT + SECOND_RETRACT_BEFORE_EJECTION;
 
           float destination_at_least_to_reach;
           destination_at_least_to_reach = destination[E_AXIS] - FILAMENTCHANGE_AUTO_INSERTION_CONFIRMATION_LENGTH;
