@@ -7085,7 +7085,7 @@ inline void gcode_M503() {
     #define SET_FEEDRATE_FOR_FINAL_RETRACT                  feedrate = 10000.0;
     #define SET_FEEDRATE_FOR_FIRST_EXTRUDE_BEFORE_EJECTION  feedrate = 200.0;
     #define SET_FEEDRATE_FOR_MOVE_BEFORE_EJECTION           feedrate = 3600.0;
-    #define SET_FEEDRATE_FOR_LAST_RETRACT_BEFORE_EJECTION   feedrate = 9960.0;
+    #define SET_FEEDRATE_FOR_LAST_RETRACT_BEFORE_EJECTION   feedrate = 8000.0;
     #define SET_FEEDRATE_FOR_PREAMBLE_EXTRUDER_MOVE         feedrate = (FILAMENT_CHANGE_E_FEEDRATE * 60.0 * FILAMENTCHANGE_AUTO_INSERTION_PREAMBLE_FEEDRATE_FACTOR);
     #define SET_FEEDRATE_FOR_PURGE                          feedrate = (FILAMENT_CHANGE_E_FEEDRATE * 60.0 * FILAMENTCHANGE_AUTO_INSERTION_PURGE_FEEDRATE_FACTOR);
     // The following plan method use feedrate expressed in mm/s
@@ -7098,7 +7098,7 @@ inline void gcode_M503() {
     #define SET_FEEDRATE_FOR_FINAL_RETRACT                  feedrate = 10000.0;
     #define SET_FEEDRATE_FOR_FIRST_EXTRUDE_BEFORE_EJECTION  feedrate = 200.0;
     #define SET_FEEDRATE_FOR_MOVE_BEFORE_EJECTION           feedrate = 3600.0;
-    #define SET_FEEDRATE_FOR_LAST_RETRACT_BEFORE_EJECTION   feedrate = 9960.0;
+    #define SET_FEEDRATE_FOR_LAST_RETRACT_BEFORE_EJECTION   feedrate = 8000.0;
     #define SET_FEEDRATE_FOR_PREAMBLE_EXTRUDER_MOVE         feedrate = (FILAMENT_CHANGE_E_FEEDRATE * 60.0 * FILAMENTCHANGE_AUTO_INSERTION_PREAMBLE_FEEDRATE_FACTOR);
     #define SET_FEEDRATE_FOR_PURGE                          feedrate = (FILAMENT_CHANGE_E_FEEDRATE * 60.0 * FILAMENTCHANGE_AUTO_INSERTION_PURGE_FEEDRATE_FACTOR);
     // The following plan method use feedrate expressed in mm/min
