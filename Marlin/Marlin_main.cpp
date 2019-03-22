@@ -7254,7 +7254,7 @@ inline void gcode_M503() {
     previous_feedrate = feedrate;
 
     float previous_target_temperature;
-    previous_target_temperature = target_temperature[HOTEND_INDEX];
+    previous_target_temperature = degTargetHotend(target_extruder);
 
     int previous_fan_speed;
     previous_fan_speed = fanSpeeds[0];
@@ -7476,8 +7476,8 @@ inline void gcode_M503() {
         SERIAL_ECHOLNPGM( "pause: go to heat position" );
 
         // We have to re-heat or heat
-        if ( target_temperature[HOTEND_INDEX] < working_filament_change_temperature ) {
-          target_temperature[HOTEND_INDEX] = working_filament_change_temperature;
+        if ( degTargetHotend(target_extruder) < working_filament_change_temperature ) {
+          setTargetHotend(working_filament_change_temperature, target_extruder);
         }
 
         // Maybe heat, but where
@@ -7911,7 +7911,7 @@ inline void gcode_M503() {
       ) {
         SERIAL_ECHOLNPGM( "pause: auto hotend shutdown" );
 
-        target_temperature[HOTEND_INDEX] = 0;
+        setTargetHotend(0, target_extruder);
         SET_FEEDRATE_FOR_MOVE;
         destination[X_AXIS] = x_heat_from;
         destination[Y_AXIS] = y_heat_from;
@@ -8058,7 +8058,7 @@ inline void gcode_M503() {
     sync_plan_position_e();
 
     // Restore previous temperature
-    target_temperature[HOTEND_INDEX] = previous_target_temperature;
+    setTargetHotend(previous_target_temperature, target_extruder);
 
     // Restore previous fan
     fanSpeeds[0] = previous_fan_speed;
