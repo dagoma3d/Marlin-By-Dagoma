@@ -10821,7 +10821,7 @@ inline void manage_printer_states() {
     #if ENABLED(LONG_PRESS_SUPPORT)
       // Long press support
       manage_long_press_filament_expulsion();
-    #elif ENABLED(Z_MIN_MAGIC)
+    #elif ENABLED(Z_MIN_MAGIC) && ENABLED(DELTA_EXTRA)
       // Alternatively to long press support, we can tap-tap
       manage_tap_tap();
     #endif
