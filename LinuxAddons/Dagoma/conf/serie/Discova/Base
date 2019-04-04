@@ -232,3 +232,5 @@ Enable USE_ZMAX_PLUG
 Disable Z_MIN_PROBE_REPEATABILITY_TEST
 Disable FIX_MOUNTED_PROBE
 Enable MECHANICAL_PROBE
+
+################################################################################
