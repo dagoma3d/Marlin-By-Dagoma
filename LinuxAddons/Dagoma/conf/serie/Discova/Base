@@ -73,7 +73,7 @@ Disable USE_ZMAX_PLUG
 
 Set INVERT_X_DIR true
 Set INVERT_Y_DIR true
-Set INVERT_Z_DIR true
+Set INVERT_Z_DIR false
 
 Set INVERT_E0_DIR false
 
