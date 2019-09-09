@@ -1392,6 +1392,7 @@ static void set_current_temp_raw() {
 }
 
 #if ENABLED( Z_MIN_MAGIC )
+  float z_magic_threshold = Z_MAGIC_THRESHOLD;
   bool enable_z_magic_probe = false;
   bool enable_z_magic_tap = false;
 
@@ -1430,7 +1431,7 @@ static void set_current_temp_raw() {
       
       #if ENABLED(LONG_PRESS_SUPPORT)
         // FIX: Old Neva does not support bias accumulator detection
-        if (!z_magic_hit_flag && z_magic_bias_delta < -15.0) {
+        if (!z_magic_hit_flag && z_magic_bias_delta < z_magic_threshold) {
           z_magic_hit_flag = true;
         }
       #else

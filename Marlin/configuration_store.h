@@ -25,7 +25,7 @@
 
 #include "Configuration.h"
 
-void Config_ResetDefault();
+void Config_ResetDefault(bool resetZMagicThreshold=true);
 
 #if DISABLED(DISABLE_M503)
   void Config_PrintSettings(bool forReplay=false);

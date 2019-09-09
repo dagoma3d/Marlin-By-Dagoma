@@ -197,6 +197,7 @@ FORCE_INLINE void autotempShutdown() {
 }
 
 #if ENABLED( Z_MIN_MAGIC )
+  extern float z_magic_threshold;
   extern float z_magic_raw_value;
   extern float z_magic_previous;
   extern float z_magic_bias;

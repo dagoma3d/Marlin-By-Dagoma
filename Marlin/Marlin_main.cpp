@@ -6990,8 +6990,8 @@ inline void gcode_M501() {
 /**
  * M502: Revert to default settings
  */
-inline void gcode_M502() {
-  Config_ResetDefault();
+inline void gcode_M502(bool resetZMagicThreshold = true) {
+  Config_ResetDefault(resetZMagicThreshold);
 }
 
 /**
@@ -8532,7 +8532,7 @@ inline void gcode_D851() {
 
   postcompute_tri_ready = false; // Disable tri-delta correction
 
-  gcode_M502(); // Restore factory settings
+  gcode_M502(false); // Restore factory settings
 
   if (code_seen('L')) {
     SERIAL_ECHOPGM( "Overriding L with: " );
@@ -8862,6 +8862,12 @@ inline void gcode_D851() {
 }
 
 #if ENABLED(Z_MIN_MAGIC)
+inline void gcode_D850() {
+  if (code_seen('V')) z_magic_threshold = code_value();
+  SERIAL_ECHOPAIR("z_magic_threshold = ", z_magic_threshold);
+  SERIAL_EOL;
+}
+
 inline void gcode_D852() {
 
   ActivityState previous_state = printer_states.activity_state;
@@ -9635,6 +9641,9 @@ void process_next_command() {
       #if ENABLED( DELTA_EXTRA )
         case 410:
           gcode_D410();
+          break;
+        case 850:
+          gcode_D850();
           break;
         case 851:
           gcode_D851();
