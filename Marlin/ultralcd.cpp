@@ -1164,6 +1164,33 @@ void lcd_parallel_x(){
 
 #endif  // MANUAL_BED_LEVELING
 
+#if ENABLED(FILAMENTCHANGEENABLE)
+  void lcd_eject_filament1(){
+    lcd_return_to_status();
+
+    enqueue_and_echo_commands_P( PSTR("G28 X Y") );
+    enqueue_and_echo_commands_P( PSTR(FILAMENTCHANGE_EXTRACTION_SCRIPT) );
+    wait_all_commands_finished__CALLABLE_FROM_LCD_ONLY();
+  }
+
+  #if EXTRUDERS > 1
+    void lcd_eject_filament2(){
+      lcd_return_to_status();
+
+      enqueue_and_echo_commands_P( PSTR("G28 X Y") );
+      enqueue_and_echo_commands_P( PSTR(FILAMENT2CHANGE_EXTRACTION_SCRIPT) );
+      wait_all_commands_finished__CALLABLE_FROM_LCD_ONLY();
+    }
+
+    void lcd_eject_filaments(){
+      lcd_return_to_status();
+
+      enqueue_and_echo_commands_P( PSTR("G28 X Y") );
+      enqueue_and_echo_commands_P( PSTR(FILAMENTSCHANGE_EXTRACTION_SCRIPT) );
+      wait_all_commands_finished__CALLABLE_FROM_LCD_ONLY();
+    }
+  #endif
+#endif
 /**
  *
  * "Prepare" submenu
@@ -1976,6 +2003,13 @@ static void lcd_control_volumetric_menu() {
     #endif //EXTRUDERS > 1
   }
 
+  #if ENABLED(FILAMENTCHANGEENABLE)
+    MENU_ITEM(function, "Ejecter filament 1", lcd_eject_filament1);
+    #if EXTRUDERS > 1
+      MENU_ITEM(function, "Ejecter filament 2", lcd_eject_filament2);
+      MENU_ITEM(function, "Ejecter les deux", lcd_eject_filaments);
+    #endif
+  #endif
   END_MENU();
 }
 

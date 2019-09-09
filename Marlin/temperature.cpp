@@ -1401,19 +1401,24 @@ static void set_current_temp_raw() {
   float z_magic_bias_delta = 0; // Extern
   bool z_magic_hit_flag = false; // Extern
 
-  millis_t z_magic_calibration_timeout;
+  #if DISABLED(LONG_PRESS_SUPPORT)
+    millis_t z_magic_calibration_timeout;
+  #endif
 
   void reset_z_magic() {
     z_magic_previous = z_magic_raw_value;
     z_magic_bias = 0.0;
     z_magic_bias_delta = 0.0;
-    z_magic_calibration_timeout = millis() + 100UL;
+    #if DISABLED(LONG_PRESS_SUPPORT)
+      z_magic_calibration_timeout = millis() + 100UL;
+    #endif
     z_magic_hit_flag = false;
   }
 
   inline void update_z_magic( ) {
-
-    millis_t now = millis();
+    #if DISABLED(LONG_PRESS_SUPPORT)
+      millis_t now = millis();
+    #endif
 
     z_magic_raw_value = float(ADC);
 
@@ -1422,20 +1427,19 @@ static void set_current_temp_raw() {
       z_magic_bias = z_magic_raw_value - z_magic_previous;
       z_magic_previous = z_magic_raw_value;
       z_magic_bias_delta += z_magic_bias;
+      
+      #if ENABLED(LONG_PRESS_SUPPORT)
+        // FIX: Old Neva does not support bias accumulator detection
+        if (!z_magic_hit_flag && z_magic_bias_delta < -15.0) {
+          z_magic_hit_flag = true;
+        }
+      #else
+        // FIX: Should work on both Magis and old Neva
+        if (!z_magic_hit_flag && (z_magic_bias < -8.0 || abs(z_magic_bias_delta) > 15.0)) {
+          z_magic_hit_flag = true;
+        }
 
-      // FIX: Old Neva does not support bias accumulator detection
-      /*
-      if (!z_magic_hit_flag && z_magic_bias_delta < -10.0) {
-        z_magic_hit_flag = true;
-      }
-      */
-
-      // FIX: Should work on both Magis and old Neva
-      if (!z_magic_hit_flag && (z_magic_bias < -8.0 || z_magic_bias_delta < -15.0 || z_magic_bias_delta > 15.0)) {
-        z_magic_hit_flag = true;
-      }
-
-      if (z_magic_bias < -4.0 || z_magic_bias > 4.0) {
+        if (abs(z_magic_bias) > 4.0) {
         z_magic_calibration_timeout = now + 250UL;
       }
 
@@ -1444,6 +1448,7 @@ static void set_current_temp_raw() {
         z_magic_bias_delta = 0.0;
         z_magic_calibration_timeout = now + 100UL; // Re-Arm anyway
       }
+      #endif
     }
   }
 

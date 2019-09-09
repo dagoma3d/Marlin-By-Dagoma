@@ -3690,7 +3690,7 @@ inline void gcode_G28() {
         else {
           z_avg = ( z_read[0] + z_read[1] + z_read[2] ) / 3.0;
         }
-
+        
         set_destination_to_current();
         destination[ Z_AXIS ] = min( 67.0, destination[ Z_AXIS ] + 5.0 );
         prepare_move();
@@ -7042,7 +7042,7 @@ inline void gcode_M503() {
 
 #endif // CUSTOM_M_CODE_SET_Z_PROBE_OFFSET
 
-#if ENABLED(Z_MIN_MAGIC)
+#if ENABLED(Z_MIN_MAGIC) && DISABLED(LONG_PRESS_SUPPORT)
 
   enum Z_Magic_TapTap_State {
     WAITING_HIT_START = 0,
@@ -7104,7 +7104,7 @@ inline void gcode_M503() {
     #define RUNPLAN line_to_destination(feedrate);
   #endif
 
-  #if ENABLED(DELTA_EXTRA) && ENABLED(Z_MIN_MAGIC)
+  #if ENABLED(DELTA_EXTRA) && ENABLED(Z_MIN_MAGIC) && DISABLED(LONG_PRESS_SUPPORT)
 
     inline void manage_tap_tap() {
       if ( !printer_states.pause_asked ) {
@@ -7173,7 +7173,17 @@ inline void gcode_M503() {
             }
 
             #if EXTRUDERS > 1
-              enqueue_and_echo_commands_P(PSTR(FILAMENTSCHANGE_EXTRACTION_SCRIPT));
+              if(enable_filrunout1) {
+                if(enable_filrunout2) {
+                  enqueue_and_echo_commands_P(PSTR(FILAMENTSCHANGE_EXTRACTION_SCRIPT));
+                } else {
+                  enqueue_and_echo_commands_P(PSTR(FILAMENTCHANGE_EXTRACTION_SCRIPT));
+                }
+              } else {
+                if(enable_filrunout2) {
+                  enqueue_and_echo_commands_P(PSTR(FILAMENT2CHANGE_EXTRACTION_SCRIPT));
+                }
+              }
             #else
               enqueue_and_echo_commands_P(PSTR(FILAMENTCHANGE_EXTRACTION_SCRIPT));
             #endif
@@ -7207,6 +7217,7 @@ inline void gcode_M503() {
    *                   If W presents, converts Z meaning to Z 'to' value
    *
    * T[index]        - Extruder choice
+   * B               - Extracts both filaments
    * R[value]        - Final retract value
    *
    *  Default values are used for omitted arguments.
@@ -7233,15 +7244,12 @@ inline void gcode_M503() {
 
     #if EXTRUDERS > 1
       uint8_t active_extruder_before_filament_change = active_extruder;
-      float final_retract = 0.0;
       if (code_seen('T'))
       {
         target_extruder = code_value_short();
         if (active_extruder != target_extruder)
           active_extruder = target_extruder;
       }
-      if (code_seen('R'))
-        final_retract = code_value();
     #endif
 
     //
@@ -7466,6 +7474,7 @@ inline void gcode_M503() {
       //
       // Goto Heat position
       // and Heat/Re-Heat in case if needed
+      #if DISABLED(COLD_EXTRUDE)
       if (
         need_to_go_first
         || (
@@ -7518,6 +7527,9 @@ inline void gcode_M503() {
         RESCHEDULE_HOTEND_AUTO_SHUTDOWN;
         need_to_go_first = false;
       }
+      #else
+        printer_states.hotend_state = HOTEND_HOT;
+      #endif
 
       #if ENABLED(AUTO_FILAMENT_CHANGE)
       //
@@ -7551,62 +7563,55 @@ inline void gcode_M503() {
         printer_states.in_critical_section = false;
 
         // Purge part
-        // But, can we continue to slowly purge ?
-        if (current_filament_present(active_extruder)) {
-          SET_FEEDRATE_FOR_PURGE;
-          destination_to_reach = destination[E_AXIS] + 2.5*FILAMENTCHANGE_AUTO_INSERTION_PURGE_LENGTH;
+        if(previous_activity_state != ACTIVITY_IDLE || active_extruder == 0) {
+          // But, can we continue to slowly purge ?
+          if (current_filament_present(active_extruder)) {
+            SET_FEEDRATE_FOR_PURGE;
+            destination_to_reach = destination[E_AXIS] + 2.5*FILAMENTCHANGE_AUTO_INSERTION_PURGE_LENGTH;
 
-          printer_states.in_critical_section = true;
-          do {
-            current_position[E_AXIS] += FILAMENTCHANGE_AUTO_INSERTION_VERIFICATION_LENGTH_MM;
-            destination[E_AXIS] = current_position[E_AXIS];
-            RUNPLAN;
-          } while( destination[E_AXIS] < destination_to_reach && current_filament_present(active_extruder));
-          st_synchronize();
-          printer_states.in_critical_section = false;
-        }
+            printer_states.in_critical_section = true;
+            do {
+              current_position[E_AXIS] += FILAMENTCHANGE_AUTO_INSERTION_VERIFICATION_LENGTH_MM;
+              destination[E_AXIS] = current_position[E_AXIS];
+              RUNPLAN;
+            } while( destination[E_AXIS] < destination_to_reach && current_filament_present(active_extruder));
+            st_synchronize();
+            printer_states.in_critical_section = false;
+          }
 
-        // Finally, Do we reached end of filament insertion WITH FILAMENT ?
-        if (current_filament_present(active_extruder)) {
+          // Finally, Do we reached end of filament insertion WITH FILAMENT ?
+          if (current_filament_present(active_extruder)) {
 
-          // Wait
-          int i=30; do{ delay(100); idle(true); } while(i--);
+            // Wait
+            int i=30; do{ delay(100); idle(true); } while(i--);
 
-          #if EXTRUDERS > 1
             // Retract
-            if(final_retract != 0.0) {
-              current_position[E_AXIS] -= final_retract;
+            if(code_seen('R')) {
+              current_position[E_AXIS] -= code_value();
               destination[E_AXIS] = current_position[E_AXIS];
               SET_FEEDRATE_FOR_FINAL_RETRACT;
               RUNPLAN;
               st_synchronize();
-            }
-            else {
+            } else {
               current_position[E_AXIS] += FILAMENTCHANGE_FIRSTRETRACT;
               destination[E_AXIS] = current_position[E_AXIS];
               SET_FEEDRATE_FOR_EXTRUDER_MOVE;
               RUNPLAN;
               st_synchronize();
             }
-          #else
-            current_position[E_AXIS] += FILAMENTCHANGE_FIRSTRETRACT;
-            destination[E_AXIS] = current_position[E_AXIS];
-            SET_FEEDRATE_FOR_EXTRUDER_MOVE;
-            RUNPLAN;
-            st_synchronize();
-          #endif
 
-          if(active_extruder == 0) {
-            printer_states.filament_state = FILAMENT_IN;
-          } else {
-            printer_states.filament2_state = FILAMENT_IN;
+            if(active_extruder == 0) {
+              printer_states.filament_state = FILAMENT_IN;
+            } else {
+              printer_states.filament2_state = FILAMENT_IN;
+            }
+            filament_direction = 0;
           }
-          filament_direction = 0;
-        }
-        else {
-          SERIAL_ECHOLNPGM( "pause: filament insertion aborted: no more filament" );
+          else {
+            SERIAL_ECHOLNPGM( "pause: filament insertion aborted: no more filament" );
 
-          filament_direction = FILAMENT_NEED_TO_BE_EXPULSED;
+            filament_direction = FILAMENT_NEED_TO_BE_EXPULSED;
+          }
         }
 
         current_position[E_AXIS] = destination[E_AXIS];
@@ -7780,10 +7785,17 @@ inline void gcode_M503() {
 
         // We need to wait the user pulling-out the filament
         while(current_filament_present(active_extruder)) {
-          idle(true);
+          if(previous_activity_state != ACTIVITY_IDLE) {
+            idle(true);
+          } else {
+            exit_pause_asked = true;
+            break;
+          }
 
           RESCHEDULE_HOTEND_AUTO_SHUTDOWN;
         }
+
+        if(previous_activity_state == ACTIVITY_IDLE) exit_pause_asked = true;
       }
       #endif // AUTO_FILAMENT_CHANGE
 
@@ -7809,12 +7821,15 @@ inline void gcode_M503() {
 
       #if ENABLED(AUTO_FILAMENT_CHANGE)
         // Filament insertion preamble case
-        if (
+        if ((
           (printer_states.filament_state == FILAMENT_OUT && FILAMENT_PRESENT)
           ||
           (printer_states.filament2_state == FILAMENT_OUT && FILAMENT2_PRESENT)
-        ) {
+        ) && !exit_pause_asked) {
           SERIAL_ECHOLNPGM( "pause: filament insertion detected" );
+
+          if(printer_states.filament_state == FILAMENT_OUT && FILAMENT_PRESENT) active_extruder = 0;
+          if(printer_states.filament2_state == FILAMENT_OUT && FILAMENT2_PRESENT) active_extruder = 1;
 
           #if ENABLED(PREVENT_DANGEROUS_EXTRUDE)
             extrude_min_temp = 0;
@@ -8078,11 +8093,7 @@ inline void gcode_M503() {
 
     #if EXTRUDERS > 1
       // Restore toolhead if it was changed
-      if (active_extruder_before_filament_change != active_extruder)
-      {
-        active_extruder = active_extruder_before_filament_change;
-        final_retract = 0.0;
-      }
+      if (active_extruder_before_filament_change != active_extruder) active_extruder = active_extruder_before_filament_change;
     #endif
   }
 
@@ -8872,44 +8883,45 @@ inline void gcode_D852() {
     SERIAL_ECHOLNPGM("1 hit");
   }
 
+  #if DISABLED(LONG_PRESS_SUPPORT)
+    millis_t now;
+    do {
+      now = millis();
 
-  millis_t now;
-  do {
-    now = millis();
+      SERIAL_ECHOPGM("tstp:");
+      SERIAL_ECHO   (now);
+      SERIAL_ECHOPGM(" ");
 
-    SERIAL_ECHOPGM("tstp:");
-    SERIAL_ECHO   (now);
-    SERIAL_ECHOPGM(" ");
+      SERIAL_ECHOPGM("step:");
+      SERIAL_ECHO   (tt_state);
+      SERIAL_ECHOPGM(" ");
 
-    SERIAL_ECHOPGM("step:");
-    SERIAL_ECHO   (tt_state);
-    SERIAL_ECHOPGM(" ");
+      SERIAL_ECHOPGM("raw:");
+      SERIAL_ECHO   (z_magic_raw_value);
+      SERIAL_ECHOPGM(" ");
 
-    SERIAL_ECHOPGM("raw:");
-    SERIAL_ECHO   (z_magic_raw_value);
-    SERIAL_ECHOPGM(" ");
+      SERIAL_ECHOPGM("prev:");
+      SERIAL_ECHO   (z_magic_previous);
+      SERIAL_ECHOPGM(" ");
 
-    SERIAL_ECHOPGM("prev:");
-    SERIAL_ECHO   (z_magic_previous);
-    SERIAL_ECHOPGM(" ");
+      SERIAL_ECHOPGM("bias:");
+      if (z_magic_bias>=0.0) SERIAL_ECHO(" ");
+      SERIAL_ECHO   (z_magic_bias);
+      SERIAL_ECHOPGM(" ");
 
-    SERIAL_ECHOPGM("bias:");
-    if (z_magic_bias>=0.0) SERIAL_ECHO(" ");
-    SERIAL_ECHO   (z_magic_bias);
-    SERIAL_ECHOPGM(" ");
+      SERIAL_ECHOPGM("delta:");
+      if (z_magic_bias_delta>=0.0) SERIAL_ECHO(" ");
+      SERIAL_ECHO   (z_magic_bias_delta);
+      SERIAL_ECHOPGM(" ");
 
-    SERIAL_ECHOPGM("delta:");
-    if (z_magic_bias_delta>=0.0) SERIAL_ECHO(" ");
-    SERIAL_ECHO   (z_magic_bias_delta);
-    SERIAL_ECHOPGM(" ");
+      SERIAL_ECHOPGM("tap_count:");
+      SERIAL_ECHO( z_magic_tap_count );
 
-    SERIAL_ECHOPGM("tap_count:");
-    SERIAL_ECHO( z_magic_tap_count );
+      SERIAL_ECHOLNPGM("");
 
-    SERIAL_ECHOLNPGM("");
-
-    idle();
-  } while( (monitoring_timeout == 0L && z_magic_tap_count == 0) || PENDING(now, monitoring_timeout));
+      idle();
+    } while( (monitoring_timeout == 0L && z_magic_tap_count == 0) || PENDING(now, monitoring_timeout));
+  #endif
 
   printer_states.activity_state = previous_state;
 }
@@ -10933,7 +10945,7 @@ void idle(
     }
   #endif
 
-  #if ENABLED( Z_MIN_MAGIC )
+  #if ENABLED( Z_MIN_MAGIC ) && DISABLED(LONG_PRESS_SUPPORT)
     if (enable_z_magic_tap) {
       // --------8<---------------------
       if (tt_state == WAITING_HIT_START) {
