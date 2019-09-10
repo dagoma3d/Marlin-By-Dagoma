@@ -7927,6 +7927,9 @@ inline void gcode_M503() {
         SERIAL_ECHOLNPGM( "pause: auto hotend shutdown" );
 
         setTargetHotend(0, target_extruder);
+        #if FAN_COUNT > 0
+          for (uint8_t i = 0; i < FAN_COUNT; i++) fanSpeeds[i] = 0;
+        #endif
         SET_FEEDRATE_FOR_MOVE;
         destination[X_AXIS] = x_heat_from;
         destination[Y_AXIS] = y_heat_from;
