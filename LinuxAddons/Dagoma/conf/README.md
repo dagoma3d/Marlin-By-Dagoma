@@ -1,31 +1,66 @@
-Pour lister les options d'une imprimante (Ex: Delta):
->  LinuxAddons/Dagoma/bin/apply_configuration -gcof Delta -l
+# Configuration
 
-Pour appliquer la bonne config en fonction de la machine et des options (Ex: DiscoEasy avec filrunout et sans écran):
->  LinuxAddons/Dagoma/bin/apply_configuration -gcof E200 filamentRunout:Enabled screen:Disabled
+Avant de compiler le firmware, il est nécessaire de le configurer en fonction des options de l'imprimante cible et de ses éventuelles options. Pour cela, la commande *apply_configuration* est disponible. Voici quelques exemples d'utilisation:
 
-Pour appliquer la bonne config en fonction de la machine et des options (Ex: NEVA):
-> LinuxAddons/Dagoma/bin/apply_configuration -gcof Delta endstops:NO screen:None
+Pour lister les options d'une imprimante (Ex: Neva):
+```console
+username@computername:~/Marlin-By-Dagoma$ ./LinuxAddons/Dagoma/bin/apply_configuration -gcof Neva -l
+Available variants for profile Neva:
+    version:  magis | v1 | v1Mod
+```
 
-Pour restaurer:
-> LinuxAddons/Dagoma/bin/restore_default_configuration
+Pour appliquer la bonne config en fonction de la machine et des options (Ex: DiscoUltimate avec écran et thermistance blanche):
+```console
+username@computername:~/Marlin-By-Dagoma$ ./LinuxAddons/Dagoma/bin/apply_configuration -gcof Ultimate bed:no bicolor:no coldExtrude:no screen:no thermistance:white
+Checking out back some known modified files ...
+Checking out back done.
+Applying base configuration profile: Ultimate
+Applying variant: bicolor=no
+Applying variant: thermistance=white
+Applying variant: coldExtrude=no
+Applying variant: screen=no
+Applying variant: bed=no
+```
 
-Installer platformio core: http://docs.platformio.org/en/stable/installation.html
+Pour appliquer la bonne config en fonction de la machine et des options (Ex: Neva modifiée):
+```console
+username@computername:~/Marlin-By-Dagoma$ ./LinuxAddons/Dagoma/bin/apply_configuration -gcof Neva version:v1Mod
+Checking out back some known modified files ...
+Checking out back done.
+Applying base profile static files: Neva
+Applying base configuration profile: Neva
+Applying variant: version=v1Mod
+```
+
+Pour restaurer la configuration par défaut:
+```console
+username@computername:~/Marlin-By-Dagoma$ ./LinuxAddons/Dagoma/bin/restore_default_configuration
+```
+
+# Compilation
+
+## PlatformIO Core en ligne de commande
+
+Installer [PlatformIO Core](http://docs.platformio.org/en/stable/installation.html).
 
 Pour générer le hex:
-> pio run -d Marlin
+```console
+username@computername:~/Marlin-By-Dagoma$ pio run -d Marlin
+```
 
 Pour générer le hex et flasher directement sur machine branchée:
-> pio run -d Marlin -t upload
+```console
+username@computername:~/Marlin-By-Dagoma$ pio run -d Marlin -t upload
+```
 
-Le fichier hex est par défaut généré dans Marlin/.pioenvs/default/...
+Le fichier hex est par défaut généré dans *./Marlin/.pioenvs/default/...* ou *./.pio/...*
 
-Vérifier que le user courant appartient bien aux groupe dialout et plugdev.
+## Visual Studio Code (méthode recommandée)
 
-Pour démarrer la console dans pio (sur mac):
-> pio device monitor -p /dev/cu.usbserial-AL00DUGA -b 250000 --echo
+PlatformIO peut également être utilisé en tant qu'extension de [Visual Studio Code](https://code.visualstudio.com/).
+Une fois installé, il suffit d'ouvrir le dossier Marlin-By-Dagoma avec Visual Studio Code. Tous les outils de compilation sont alors disponibles graphiquement. Il est également possible d'appliquer la configuration de la machine via le terminal intégré à Visual Studio Code.
 
-TODO:
-- 1ère phase de retract trop lente? Jouer sur la température lors de la première phase de retract? Faire autrement?
-- Si pas de fil au début, ne détecte rien par la suite (fil ajouté, plus de fil,...)
-- Désactiver la détection de filament avant que l'impression démarre (donc pendant le palpage et la chauffe)
+
+## Arduino IDE
+
+Après avoir appliqué la configuration correspondant à votre machine, ouvrez le dossier Marlin-By-Dagoma/Marlin dans ArduinoIDE puis compilez/téléversez selon les besoins.
