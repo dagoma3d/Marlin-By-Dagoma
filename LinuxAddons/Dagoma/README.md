@@ -93,6 +93,7 @@ Une fois installé, il suffit d'ouvrir le dossier Marlin-By-Dagoma avec Visual S
 ![Commandes PlatformIO](/Documentation/vscode/compilation.png)
 
 Il est également possible d'appliquer la configuration de la machine via le terminal intégré à Visual Studio Code.
+Le script de configuration étant un script *bash*, il est nécessaire de choisir un terminal compatible. Sous **Windows**, il faudra donc utiliser *Git bash* ou encore le terminal fourni avec *PlatformIO*.
 ![Terminal](/Documentation/vscode/terminal.png)
 
 ## Arduino IDE
