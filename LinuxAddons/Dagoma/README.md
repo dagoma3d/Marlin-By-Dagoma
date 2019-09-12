@@ -29,7 +29,7 @@ A ce stade les sources sont prêtes à être configurées avant d'être compilé
 
 # Configuration
 
-Avant de compiler le firmware, il est nécessaire de le configurer en fonction des options de l'imprimante cible et de ses éventuelles options. Pour cela, la commande *apply_configuration* est disponible. Voici quelques exemples d'utilisation:
+Avant de compiler le firmware, il est nécessaire de le configurer en fonction de l'imprimante cible et de ses éventuelles options. Pour cela, la commande *apply_configuration* est disponible. Voici quelques exemples d'utilisation:
 
 Pour lister les options d'une imprimante (Ex: Neva):
 ```console
