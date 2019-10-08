@@ -1,6 +1,6 @@
 # Prérequis
 
-Les sources sont téléchargeables en tant qu'[archive zip](https://github.com/dagoma3d/Marlin-By-Dagoma/archive/dev-09-2019.zip).
+Les sources sont téléchargeables en tant qu'[archive zip](https://github.com/dagoma3d/Marlin-By-Dagoma/archive/Dagoma-Development.zip).
 Néanmoins, la méthode recommandée pour récupérer les sources est d'utiliser [Git](https://git-scm.com/). Ce faisant, il est beaucoup plus facile d'avoir accès aux derniers développements.
 
 Pour les utilisateurs sous **Linux/MacOS**, git peut s'utiliser facilement en ligne de commande depuis le terminal.
@@ -18,12 +18,12 @@ Réception d'objets: 100% (31017/31017), 28.60 MiB | 2.48 MiB/s, fait.
 Résolution des deltas: 100% (19805/19805), fait.
 ```
 
-Ensuite, il est nécessaire de basculer vers la branche de développement:
+Ensuite, il est possible de basculer vers un *tag* représentant une release. Exemple avec le tag *build-1554222799*:
 ```console
 username@hostnmane:~$ cd Marlin-By-Dagoma
-username@hostnmane:~/Marlin-By-Dagoma$ git checkout dev-09-2019
-La branche 'dev-09-2019' est paramétrée pour suivre la branche distante 'dev-09-2019' depuis 'origin'.
-Basculement sur la nouvelle branche 'dev-09-2019'
+username@hostnmane:~/Marlin-By-Dagoma$ git checkout build-1554222799
+La branche 'build-1554222799' est paramétrée pour suivre la branche distante 'build-1554222799' depuis 'origin'.
+Basculement sur la nouvelle branche 'build-1554222799'
 ```
 A ce stade les sources sont prêtes à être configurées avant d'être compilées.
 
@@ -40,15 +40,15 @@ Available variants for profile Neva:
 
 Pour appliquer la bonne config en fonction de la machine et des options (Ex: DiscoUltimate avec écran et thermistance blanche):
 ```console
-username@hostnmane:~/Marlin-By-Dagoma$ ./LinuxAddons/Dagoma/bin/apply_configuration -gcof Ultimate bed:no bicolor:no coldExtrude:no screen:no thermistance:white
+username@hostnmane:~/Marlin-By-Dagoma$ ./LinuxAddons/Dagoma/bin/apply_configuration -gcof Ultimate bed:Disabled bicolor:Disabled coldExtrude:No screen:Disabled thermistance:Old_17
 Checking out back some known modified files ...
 Checking out back done.
 Applying base configuration profile: Ultimate
-Applying variant: bicolor=no
-Applying variant: thermistance=white
-Applying variant: coldExtrude=no
-Applying variant: screen=no
-Applying variant: bed=no
+Applying variant: bicolor=Disabled
+Applying variant: thermistance=Old_17
+Applying variant: coldExtrude=Yes
+Applying variant: screen=Disabled
+Applying variant: bed=Disabled
 ```
 
 Pour appliquer la bonne config en fonction de la machine et des options (Ex: Neva modifiée):
