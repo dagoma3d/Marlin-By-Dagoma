@@ -158,6 +158,8 @@
 #define MSG_CONTROL_RETRACT_RECOVERF        "UnRet V"
 #define MSG_AUTORETRACT                     "Rétract. Auto."
 #define MSG_FILAMENTCHANGE                  "Changer filament"
+#define MSG_FILAMENTEJECTION                "Ejection filament"
+#define MSG_FILAMENTINSERTION               "Insertion filament"
 #define MSG_FILAMENTSEJECTION               "Ejection filaments"
 #define MSG_INIT_SDCARD                     "Init. la carte SD"
 #define MSG_CNG_SDCARD                      "Changer de carte"

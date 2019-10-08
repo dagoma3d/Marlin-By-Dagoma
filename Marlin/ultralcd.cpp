@@ -1165,6 +1165,7 @@ void lcd_parallel_x(){
 #endif  // MANUAL_BED_LEVELING
 
 #if ENABLED(FILAMENTCHANGEENABLE)
+  #define FILAMENT_CAN_BE_EJECTED (READ(FILRUNOUT_PIN) ^ FIL_RUNOUT_INVERTING)
   void lcd_eject_filament1(){
     lcd_return_to_status();
 
@@ -1174,6 +1175,7 @@ void lcd_parallel_x(){
   }
 
   #if EXTRUDERS > 1
+    #define FILAMENT2_CAN_BE_EJECTED (READ(FILRUNOUT2_PIN) ^ FIL_RUNOUT2_INVERTING)
     void lcd_eject_filament2(){
       lcd_return_to_status();
 
@@ -2004,10 +2006,17 @@ static void lcd_control_volumetric_menu() {
   }
 
   #if ENABLED(FILAMENTCHANGEENABLE)
-    MENU_ITEM(function, "Ejecter filament 1", lcd_eject_filament1);
+    if(FILAMENT_CAN_BE_EJECTED) {
+      MENU_ITEM(function, "Ejecter filament 1", lcd_eject_filament1);
+    }
+    
     #if EXTRUDERS > 1
-      MENU_ITEM(function, "Ejecter filament 2", lcd_eject_filament2);
-      MENU_ITEM(function, "Ejecter les deux", lcd_eject_filaments);
+      if(FILAMENT2_CAN_BE_EJECTED) {
+        MENU_ITEM(function, "Ejecter filament 2", lcd_eject_filament2);
+      }
+      if(FILAMENT_CAN_BE_EJECTED && FILAMENT2_CAN_BE_EJECTED) {
+        MENU_ITEM(function, "Ejecter les deux", lcd_eject_filaments);
+      }
     #endif
   #endif
   END_MENU();

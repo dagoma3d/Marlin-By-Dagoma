@@ -7173,19 +7173,32 @@ inline void gcode_M503() {
             }
 
             #if EXTRUDERS > 1
-              if(enable_filrunout1) {
-                if(enable_filrunout2) {
+              if(FILAMENT_PRESENT) {
+                if(FILAMENT2_PRESENT) {
                   enqueue_and_echo_commands_P(PSTR(FILAMENTSCHANGE_EXTRACTION_SCRIPT));
                 } else {
                   enqueue_and_echo_commands_P(PSTR(FILAMENTCHANGE_EXTRACTION_SCRIPT));
                 }
               } else {
-                if(enable_filrunout2) {
+                if(FILAMENT2_PRESENT) {
                   enqueue_and_echo_commands_P(PSTR(FILAMENT2CHANGE_EXTRACTION_SCRIPT));
+                }
+                else {
+                  printer_states.pause_asked = false;
+                  #if DISABLED(DELTA_EXTRA) && ENABLED(SDSUPPORT)
+                    enqueue_and_echo_commands_P(PSTR(SD_FINISHED_RELEASECOMMAND));
+                  #endif
                 }
               }
             #else
-              enqueue_and_echo_commands_P(PSTR(FILAMENTCHANGE_EXTRACTION_SCRIPT));
+              if(FILAMENT_PRESENT) {
+                enqueue_and_echo_commands_P(PSTR(FILAMENTCHANGE_EXTRACTION_SCRIPT));
+              } else {
+                printer_states.pause_asked = false;
+                #if DISABLED(DELTA_EXTRA) && ENABLED(SDSUPPORT)
+                  enqueue_and_echo_commands_P(PSTR(SD_FINISHED_RELEASECOMMAND));
+                #endif
+              }
             #endif
           }
         }
@@ -7239,7 +7252,7 @@ inline void gcode_M503() {
     SERIAL_ECHOLNPGM( "pause : In process" );
     KEEPALIVE_STATE(PAUSED_FOR_USER);
     #if ENABLED(ULTRA_LCD) && DISABLED(NO_LCD_FOR_FILAMENTCHANGEABLE)
-      LCD_ALERTMESSAGEPGM(MSG_FILAMENTCHANGE);
+      LCD_MESSAGEPGM(MSG_FILAMENTCHANGE);
     #endif
 
     #if EXTRUDERS > 1
@@ -7539,6 +7552,9 @@ inline void gcode_M503() {
         && printer_states.hotend_state == HOTEND_HOT
       ) {
         SERIAL_ECHOLNPGM( "pause: filament insertion" );
+        #if ENABLED(ULTRA_LCD) && DISABLED(NO_LCD_FOR_FILAMENTCHANGEABLE)
+          LCD_MESSAGEPGM(MSG_FILAMENTINSERTION);
+        #endif
         // FILAMENTCHANGE_FINALRETRACT is a negative length
         // So following extruder move delta is 'inverted' in meaning
         //
@@ -7563,56 +7579,56 @@ inline void gcode_M503() {
         printer_states.in_critical_section = false;
 
         // Purge part
-        if(previous_activity_state != ACTIVITY_IDLE || active_extruder == 0) {
+        //if(previous_activity_state != ACTIVITY_IDLE || active_extruder == 0) {
           // But, can we continue to slowly purge ?
-          if (current_filament_present(active_extruder)) {
-            SET_FEEDRATE_FOR_PURGE;
-            destination_to_reach = destination[E_AXIS] + 2.5*FILAMENTCHANGE_AUTO_INSERTION_PURGE_LENGTH;
+        if (current_filament_present(active_extruder)) {
+          SET_FEEDRATE_FOR_PURGE;
+          destination_to_reach = destination[E_AXIS] + 2.5*FILAMENTCHANGE_AUTO_INSERTION_PURGE_LENGTH;
 
-            printer_states.in_critical_section = true;
-            do {
-              current_position[E_AXIS] += FILAMENTCHANGE_AUTO_INSERTION_VERIFICATION_LENGTH_MM;
-              destination[E_AXIS] = current_position[E_AXIS];
-              RUNPLAN;
-            } while( destination[E_AXIS] < destination_to_reach && current_filament_present(active_extruder));
-            st_synchronize();
-            printer_states.in_critical_section = false;
-          }
-
-          // Finally, Do we reached end of filament insertion WITH FILAMENT ?
-          if (current_filament_present(active_extruder)) {
-
-            // Wait
-            int i=30; do{ delay(100); idle(true); } while(i--);
-
-            // Retract
-            if(code_seen('R')) {
-              current_position[E_AXIS] -= code_value();
-              destination[E_AXIS] = current_position[E_AXIS];
-              SET_FEEDRATE_FOR_FINAL_RETRACT;
-              RUNPLAN;
-              st_synchronize();
-            } else {
-              current_position[E_AXIS] += FILAMENTCHANGE_FIRSTRETRACT;
-              destination[E_AXIS] = current_position[E_AXIS];
-              SET_FEEDRATE_FOR_EXTRUDER_MOVE;
-              RUNPLAN;
-              st_synchronize();
-            }
-
-            if(active_extruder == 0) {
-              printer_states.filament_state = FILAMENT_IN;
-            } else {
-              printer_states.filament2_state = FILAMENT_IN;
-            }
-            filament_direction = 0;
-          }
-          else {
-            SERIAL_ECHOLNPGM( "pause: filament insertion aborted: no more filament" );
-
-            filament_direction = FILAMENT_NEED_TO_BE_EXPULSED;
-          }
+          printer_states.in_critical_section = true;
+          do {
+            current_position[E_AXIS] += FILAMENTCHANGE_AUTO_INSERTION_VERIFICATION_LENGTH_MM;
+            destination[E_AXIS] = current_position[E_AXIS];
+            RUNPLAN;
+          } while( destination[E_AXIS] < destination_to_reach && current_filament_present(active_extruder));
+          st_synchronize();
+          printer_states.in_critical_section = false;
         }
+
+        // Finally, Do we reached end of filament insertion WITH FILAMENT ?
+        if (current_filament_present(active_extruder)) {
+
+          // Wait
+          int i=30; do{ delay(100); idle(true); } while(i--);
+
+          // Retract
+          if(code_seen('R')) {
+            current_position[E_AXIS] -= code_value();
+            destination[E_AXIS] = current_position[E_AXIS];
+            SET_FEEDRATE_FOR_FINAL_RETRACT;
+            RUNPLAN;
+            st_synchronize();
+          } else {
+            current_position[E_AXIS] += FILAMENTCHANGE_FIRSTRETRACT;
+            destination[E_AXIS] = current_position[E_AXIS];
+            SET_FEEDRATE_FOR_EXTRUDER_MOVE;
+            RUNPLAN;
+            st_synchronize();
+          }
+
+          if(active_extruder == 0) {
+            printer_states.filament_state = FILAMENT_IN;
+          } else {
+            printer_states.filament2_state = FILAMENT_IN;
+          }
+          filament_direction = 0;
+        }
+        else {
+          SERIAL_ECHOLNPGM( "pause: filament insertion aborted: no more filament" );
+
+          filament_direction = FILAMENT_NEED_TO_BE_EXPULSED;
+        }
+        //}
 
         current_position[E_AXIS] = destination[E_AXIS];
         sync_plan_position_e();
@@ -7632,6 +7648,9 @@ inline void gcode_M503() {
         && printer_states.hotend_state == HOTEND_HOT
       ) {
         SERIAL_ECHOLNPGM( "pause: filament extraction" );
+        #if ENABLED(ULTRA_LCD) && DISABLED(NO_LCD_FOR_FILAMENTCHANGEABLE)
+          LCD_MESSAGEPGM(MSG_FILAMENTEJECTION);
+        #endif
 
         current_position[E_AXIS] = destination[E_AXIS];
         sync_plan_position_e();

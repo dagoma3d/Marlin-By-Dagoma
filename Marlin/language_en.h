@@ -427,6 +427,15 @@
 #ifndef MSG_FILAMENTCHANGE
   #define MSG_FILAMENTCHANGE                  "Change filament"
 #endif
+#ifndef MSG_FILAMENTEJECTION
+  #define MSG_FILAMENTEJECTION                "Filament ejection"
+#endif
+#ifndef MSG_FILAMENTINSERTION
+  #define MSG_FILAMENTINSERTION               "Filament insertion"
+#endif
+#ifndef MSG_FILAMENTSEJECTION
+  #define MSG_FILAMENTSEJECTION               "Filaments ejection"
+#endif
 #ifndef MSG_INIT_SDCARD
   #define MSG_INIT_SDCARD                     "Init. SD card"
 #endif
