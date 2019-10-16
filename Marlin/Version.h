@@ -42,7 +42,7 @@
  * here we define this default string as the date where the latest release
  * version was tagged.
  */
-#define STRING_DISTRIBUTION_DATE "2019-09-09"
+#define STRING_DISTRIBUTION_DATE "2019-10-15"
 
 /**
  * @todo: Missing documentation block
@@ -71,4 +71,4 @@
  * The WEBSITE_URL is the location where users can get more information such as
  * documentation about a specific Marlin release.
  */
-#define WEBSITE_URL "https://dagoma.fr"
+#define WEBSITE_URL "https://www.dagoma3d.com"
