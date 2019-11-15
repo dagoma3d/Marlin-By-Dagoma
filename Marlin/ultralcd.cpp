@@ -1164,7 +1164,7 @@ void lcd_parallel_x(){
 
 #endif  // MANUAL_BED_LEVELING
 
-#if ENABLED(FILAMENTCHANGEENABLE)
+#if ENABLED(FILAMENT_RUNOUT_SENSOR)
   #define FILAMENT_CAN_BE_EJECTED (READ(FILRUNOUT_PIN) ^ FIL_RUNOUT_INVERTING)
   void lcd_eject_filament1(){
     lcd_return_to_status();
@@ -2005,7 +2005,7 @@ static void lcd_control_volumetric_menu() {
     #endif //EXTRUDERS > 1
   }
 
-  #if ENABLED(FILAMENTCHANGEENABLE)
+  #if ENABLED(FILAMENT_RUNOUT_SENSOR)
     if(FILAMENT_CAN_BE_EJECTED) {
       MENU_ITEM(function, "Ejecter filament 1", lcd_eject_filament1);
     }
