@@ -1976,13 +1976,16 @@ static void setup_for_endstop_move() {
       #if ENABLED(DELTA_EXTRA)
         if (fast) {
           feedrate = homing_feedrate[Z_AXIS] / 2;
+          SERIAL_ECHOPAIR("fast probing, feedrate = ", feedrate);
         }
         else {
       #endif
           feedrate = homing_feedrate[Z_AXIS] / 4;
+          SERIAL_ECHOPAIR("slow probing, feedrate = ", feedrate);
       #if ENABLED(DELTA_EXTRA)
         }
       #endif
+      log_z_magic_raw_value = true;
       destination[Z_AXIS] = -100;
       prepare_move_raw(); // this will also set_current_to_destination
       st_synchronize();
@@ -1990,6 +1993,7 @@ static void setup_for_endstop_move() {
         handle_emergency_stop();
       #endif
       endstops_hit_on_purpose(); // clear endstop hit flags
+      log_z_magic_raw_value = false;
 
       /**
        * We have to let the planner know where we are right now as it

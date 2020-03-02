@@ -206,6 +206,7 @@ FORCE_INLINE void autotempShutdown() {
 
   extern bool enable_z_magic_probe;
   extern bool enable_z_magic_tap;
+  extern bool log_z_magic_raw_value;
   void reset_z_magic();
 #endif
 

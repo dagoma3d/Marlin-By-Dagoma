@@ -1395,6 +1395,7 @@ static void set_current_temp_raw() {
   float z_magic_threshold = Z_MAGIC_THRESHOLD;
   bool enable_z_magic_probe = false;
   bool enable_z_magic_tap = false;
+  bool log_z_magic_raw_value = false;
 
   float z_magic_raw_value = 0; // Extern
   float z_magic_previous = 0; // Extern
@@ -1422,6 +1423,12 @@ static void set_current_temp_raw() {
     #endif
 
     z_magic_raw_value = float(ADC);
+    #if ENABLED(DEBUG_LEVELING_FEATURE)
+      if (DEBUGGING(LEVELING) && log_z_magic_raw_value) {
+        SERIAL_ECHOPAIR("z_magic_raw_value = ", z_magic_raw_value);
+        SERIAL_EOL;
+      }
+    #endif
 
     if (enable_z_magic_probe || enable_z_magic_tap) {
 
