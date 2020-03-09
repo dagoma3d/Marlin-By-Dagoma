@@ -39,6 +39,14 @@
 #define MSG_SD_INSERTED                     "SDKarte erkannt."
 #define MSG_SD_REMOVED                      "SDKarte entfernt."
 #define MSG_MAIN                            "Hauptmenü"
+#define MSG_LCD_OK                          "OK"
+#define MSG_PINCH                           "Kneifen das Blatt"
+#define MSG_SET_OFFSET                      "durch Anpassen des Offset"
+#define MSG_VALIDATE                        "dann validieren"
+#define MSG_ADD_SHEET                       "Schieben ein Blatt"
+#define MSG_BESIDE_NOZZLE                   "unter der Düse"
+#define MSG_CLICK_OK                        "Drücken dann OK"
+#define MSG_PARALLEL_X                      "Parallel X"
 #define MSG_AUTOSTART                       "Autostart"
 #define MSG_DISABLE_STEPPERS                "Motoren Aus" // M84
 #define MSG_AUTO_HOME                       "Home" // G28
@@ -65,6 +73,7 @@
 #define MSG_EXTRUDE                         "Extrudieren"
 #define MSG_RETRACT                         "Retract"
 #define MSG_MOVE_AXIS                       "Bewegen"
+#define MSG_Z_OFFSET                        "Z Offset Korrektur"
 #define MSG_LEVEL_BED                       "Bett Korrektur"
 #define MSG_MOVE_X                          "X"
 #define MSG_MOVE_Y                          "Y"
@@ -120,6 +129,7 @@
 #define MSG_REFRESH                         "Aktualisieren"
 #define MSG_WATCH                           "Info"
 #define MSG_PREPARE                         "Vorbereitung"
+#define MSG_PREPARE_ADVENCED                "Erweiterte Optionen"
 #define MSG_TUNE                            "Justierung"
 #define MSG_PAUSE_PRINT                     "SD-Druck Pause"
 #define MSG_RESUME_PRINT                    "SD-Druck Weiter"
@@ -128,6 +138,12 @@
 #define MSG_NO_CARD                         "Keine SDKarte"
 #define MSG_DWELL                           "Warten..."
 #define MSG_USERWAIT                        "Warte auf Nutzer."
+#ifdef MSG_WAIT
+  #undef MSG_WAIT
+  #define MSG_WAIT                          "   Bitte warten..."
+#endif
+#define MSG_PARAMETERS                      "   Parameter"
+#define MSG_SAVED                           "   Gespeichert"
 #define MSG_RESUMING                        "Druck geht weiter"
 #define MSG_PRINT_ABORTED                   "Druck abgebrochen"
 #define MSG_NO_MOVE                         "Motoren Eingesch."
@@ -142,6 +158,9 @@
 #define MSG_CONTROL_RETRACT_RECOVERF        "UnRet  V"
 #define MSG_AUTORETRACT                     "AutoRetr."
 #define MSG_FILAMENTCHANGE                  "Filament wechseln"
+#define MSG_FILAMENTEJECTION                "Filament Auswurf"
+#define MSG_FILAMENTINSERTION               "Filament Einfügen"
+#define MSG_FILAMENTSEJECTION               "Filaments Auswurf"
 #define MSG_INIT_SDCARD                     "SDKarte erkennen"// Manually initialize the SD-card via user interface
 #define MSG_CNG_SDCARD                      "SDKarte erkennen"// SD-card changed by user. For machines with no autocarddetect. Both send "M21"
 #define MSG_ZPROBE_OUT                      "Sensor ausserhalb"

@@ -55,6 +55,30 @@
 #ifndef MSG_MAIN
   #define MSG_MAIN                            "Main"
 #endif
+#ifndef MSG_LCD_OK
+  #define MSG_LCD_OK                          "OK"
+#endif
+#ifndef MSG_PINCH
+  #define MSG_PINCH                           "Pinch the sheet"
+#endif
+#ifndef MSG_SET_OFFSET
+  #define MSG_SET_OFFSET                      "by adjusting the offset"
+#endif
+#ifndef MSG_VALIDATE
+  #define MSG_VALIDATE                        "then validate"
+#endif
+#ifndef MSG_ADD_SHEET
+  #define MSG_ADD_SHEET                       "Slide a sheet"
+#endif
+#ifndef MSG_BESIDE_NOZZLE
+  #define MSG_BESIDE_NOZZLE                   "under the nozzle"
+#endif
+#ifndef MSG_CLICK_OK
+  #define MSG_CLICK_OK                        "then click OK"
+#endif
+#ifndef MSG_PARALLEL_X
+  #define MSG_PARALLEL_X                      "Parallel X"
+#endif
 #ifndef MSG_AUTOSTART
   #define MSG_AUTOSTART                       "Autostart"
 #endif
@@ -147,6 +171,9 @@
 #endif
 #ifndef MSG_MOVE_AXIS
   #define MSG_MOVE_AXIS                       "Move axis"
+#endif
+#ifndef MSG_Z_OFFSET
+  #define MSG_Z_OFFSET                        "Setting Z Offset"
 #endif
 #ifndef MSG_LEVEL_BED
   #define MSG_LEVEL_BED                       "Level bed"
@@ -361,6 +388,9 @@
 #ifndef MSG_PREPARE
   #define MSG_PREPARE                         "Prepare"
 #endif
+#ifndef MSG_PREPARE_ADVENCED
+  #define MSG_PREPARE_ADVENCED                "Advanced options"
+#endif
 #ifndef MSG_TUNE
   #define MSG_TUNE                            "Tune"
 #endif
@@ -384,6 +414,15 @@
 #endif
 #ifndef MSG_USERWAIT
   #define MSG_USERWAIT                        "Wait for user..."
+#endif
+#ifdef MSG_WAIT
+  #define MSG_WAIT                            "   Please wait..."
+#endif
+#ifdef MSG_PARAMETERS
+  #define MSG_PARAMETERS                      "   Parameters"
+#endif
+#ifdef MSG_SAVED
+  #define MSG_SAVED                           "   Saved"
 #endif
 #ifndef MSG_RESUMING
   #define MSG_RESUMING                        "Resuming print"
