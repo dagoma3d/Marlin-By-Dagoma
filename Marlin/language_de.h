@@ -138,10 +138,7 @@
 #define MSG_NO_CARD                         "Keine SDKarte"
 #define MSG_DWELL                           "Warten..."
 #define MSG_USERWAIT                        "Warte auf Nutzer."
-#ifdef MSG_WAIT
-  #undef MSG_WAIT
-  #define MSG_WAIT                          "   Bitte warten..."
-#endif
+#define MSG_PLEASE_WAIT                     "   Bitte warten..."
 #define MSG_PARAMETERS                      "   Parameter"
 #define MSG_SAVED                           "   Gespeichert"
 #define MSG_RESUMING                        "Druck geht weiter"

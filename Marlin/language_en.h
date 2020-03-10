@@ -415,13 +415,13 @@
 #ifndef MSG_USERWAIT
   #define MSG_USERWAIT                        "Wait for user..."
 #endif
-#ifdef MSG_WAIT
-  #define MSG_WAIT                            "   Please wait..."
+#ifndef MSG_PLEASE_WAIT
+  #define MSG_PLEASE_WAIT                     "   Please wait..."
 #endif
-#ifdef MSG_PARAMETERS
+#ifndef MSG_PARAMETERS
   #define MSG_PARAMETERS                      "   Parameters"
 #endif
-#ifdef MSG_SAVED
+#ifndef MSG_SAVED
   #define MSG_SAVED                           "   Saved"
 #endif
 #ifndef MSG_RESUMING

@@ -1528,7 +1528,7 @@ static void _lcd_reinit_z_offsets_saved(){
 static void _lcd_reinit_z_offsets_wait(){
   START_MENU();
 
-  lcd_implementation_drawmenu_generic(0, 2, PSTR(MSG_WAIT), ' ', ' ');
+  lcd_implementation_drawmenu_generic(0, 2, PSTR(MSG_PLEASE_WAIT), ' ', ' ');
 
   END_MENU();
 }
