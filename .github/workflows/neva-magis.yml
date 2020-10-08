@@ -10,7 +10,7 @@ on:
 
 jobs:
   firmware-compilation-checks:
-    name: Neva/Magis firmware compilation
+    name: Firmware compilation for Neva:[version:${{ github.event.inputs.version }}]
     runs-on: ubuntu-latest
 
     steps:
