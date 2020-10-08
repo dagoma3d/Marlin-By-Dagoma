@@ -1,11 +1,12 @@
 name: Build Neva/Magis firmware
 
-workflow_dispatch:
-  inputs:
-    version:
-      description: 'The printer version (values: [V1, V1Mod, Magis])'
-      required: true
-      default: 'Magis'
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'The printer version (values: [V1, V1Mod, Magis])'
+        required: true
+        default: 'Magis'
 
 jobs:
   firmware-compilation-checks:
