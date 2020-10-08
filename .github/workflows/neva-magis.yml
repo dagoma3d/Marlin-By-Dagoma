@@ -1,4 +1,4 @@
-name: Build Neva/Magis firmware version:${{ github.event.inputs.version }}
+name: Build Neva/Magis firmware
 
 on:
   workflow_dispatch:
