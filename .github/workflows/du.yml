@@ -22,7 +22,7 @@ on:
 
 jobs:
   firmware-compilation-checks:
-    name: Disco Ultimate firmware compilation
+    name: Firmware compilation for DiscoUltimate:[bicolor:${{ github.event.inputs.bicolor }}, screen:${{ github.event.inputs.screen }}, thermistance:${{ github.event.inputs.thermistance }}, xl:${{ github.event.inputs.xl }}]
     runs-on: ubuntu-latest
 
     steps:

@@ -30,7 +30,7 @@ on:
 
 jobs:
   firmware-compilation-checks:
-    name: Disco Easy200 firmware compilation
+    name: Firmware compilation for DiscoEasy200:[bicolor:${{ github.event.inputs.bicolor }}, filamentRunout:${{ github.event.inputs.filamentRunout }}, screen:${{ github.event.inputs.screen }}, thermistance:${{ github.event.inputs.thermistance }}, trapez:${{ github.event.inputs.trapez }}, xl:${{ github.event.inputs.xl }}]
     runs-on: ubuntu-latest
 
     steps:
