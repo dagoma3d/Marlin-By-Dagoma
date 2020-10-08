@@ -3,7 +3,7 @@ name: PlatformIO CI
 on:
   push:
     branches:
-    - Dagoma-Development
+    - master
 
 jobs:
   firmware-compilation-checks:
@@ -19,7 +19,7 @@ jobs:
         python -m pip install --upgrade pip
         pip install platformio
     - name: Apply DE200 with all options configuration
-      run: ./LinuxAddons/Dagoma/bin/apply_configuration -gcof E200 bed:Enabled bicolor:Enabled filamentRunout:Enabled screen:French thermistance:New_18 trapez:Enabled xl:Enabled
+      run: ./LinuxAddons/Dagoma/bin/apply_configuration -gcof E200 bicolor:Enabled filamentRunout:Enabled screen:French thermistance:New_18 trapez:Enabled xl:Enabled
     - name: Run PlatformIO for DE200 with all options
       run: platformio run --environment megaatmega2560
     - name: Apply Magis configuration
@@ -27,6 +27,6 @@ jobs:
     - name: Run PlatformIO for Magis
       run: platformio run --environment megaatmega2560
     - name: Apply DU with all options configuration
-      run: ./LinuxAddons/Dagoma/bin/apply_configuration -gcof E200 bed:Enabled bicolor:Enabled filamentRunout:Enabled screen:French thermistance:New_18 trapez:Enabled xl:Enabled
+      run: ./LinuxAddons/Dagoma/bin/apply_configuration -gcof Ultimate bicolor:Enabled screen:French thermistance:New_18 xl:Enabled
     - name: Run PlatformIO for DU with all options
       run: platformio run --environment megaatmega2560
