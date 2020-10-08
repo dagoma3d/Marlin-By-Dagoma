@@ -1,0 +1,44 @@
+name: Build Disco Ultimate firmware
+
+on:
+  workflow_dispatch:
+    inputs:
+      bicolor:
+        description: 'Bicolor (values : [Enabled, Disabled]) :'
+        required: true
+        default: 'Enabled'
+      screen:
+        description: 'Screen (values : [Disabled, English, French, German]) :'
+        required: true
+        default: 'English'
+      thermistance:
+        description: 'Thermistance (values : [Black, White]) :'
+        required: true
+        default: 'Black'
+      xl:
+        description: 'Addon XL (values : [Enabled, Disabled]) : '
+        required: true
+        default: 'Disabled'
+
+jobs:
+  firmware-compilation-checks:
+    name: Disco Ultimate firmware compilation
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v1
+    - name: Set up Python
+      uses: actions/setup-python@v1
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install platformio
+    - name: Apply selected configuration
+      run: ./LinuxAddons/Dagoma/bin/apply_configuration -gcof Ultimate bicolor:${{ github.event.inputs.bicolor }} screen:${{ github.event.inputs.screen }} thermistance:${{ github.event.inputs.thermistance }} xl:${{ github.event.inputs.xl }}
+    - name: Run PlatformIO
+      run: platformio run --environment megaatmega2560
+    - name: Archive compiled firmware
+      uses: actions/upload-artifact@v2
+      with:
+        name: firmware
+        path: .pio/build/megaatmega2560/firmware.hex

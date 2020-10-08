@@ -1,10 +1,10 @@
-name: Build Neva/Magis firmware
+name: Build Neva/Magis firmware version:${{ github.event.inputs.version }}
 
 on:
   workflow_dispatch:
     inputs:
       version:
-        description: 'The printer version (values: [V1, V1Mod, Magis])'
+        description: 'The printer version (values: [V1, V1Mod, Magis]) :'
         required: true
         default: 'Magis'
 

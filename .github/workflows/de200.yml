@@ -1,0 +1,52 @@
+name: Build Disco Easy200 firmware
+
+on:
+  workflow_dispatch:
+    inputs:
+      bicolor:
+        description: 'Bicolor (values : [Enabled, Disabled]) :'
+        required: true
+        default: 'Enabled'
+      filamentRunout:
+        description: 'Extruder+ (values : [Enabled, Disabled]) :'
+        required: true
+        default: 'Enabled'
+      screen:
+        description: 'Screen (values : [Disabled, English, French, German]) :'
+        required: true
+        default: 'English'
+      thermistance:
+        description: 'Thermistance (values : [Black, White]) :'
+        required: true
+        default: 'Black'
+      trapez:
+        description: 'Expert pack (values : [Enabled, Disabled]) :'
+        required: true
+        default: 'Enabled'
+      xl:
+        description: 'Addon XL (values : [Enabled, Disabled]) : '
+        required: true
+        default: 'Disabled'
+
+jobs:
+  firmware-compilation-checks:
+    name: Disco Easy200 firmware compilation
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v1
+    - name: Set up Python
+      uses: actions/setup-python@v1
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install platformio
+    - name: Apply selected configuration
+      run: ./LinuxAddons/Dagoma/bin/apply_configuration -gcof E200 bicolor:${{ github.event.inputs.bicolor }} filamentRunout:${{ github.event.inputs.filamentRunout }} screen:${{ github.event.inputs.screen }} thermistance:${{ github.event.inputs.thermistance }} trapez:${{ github.event.inputs.trapez }} xl:${{ github.event.inputs.xl }}
+    - name: Run PlatformIO
+      run: platformio run --environment megaatmega2560
+    - name: Archive compiled firmware
+      uses: actions/upload-artifact@v2
+      with:
+        name: firmware
+        path: .pio/build/megaatmega2560/firmware.hex
