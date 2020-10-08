@@ -25,3 +25,8 @@ jobs:
       run: ./LinuxAddons/Dagoma/bin/apply_configuration -gcof Neva version:${{ github.event.inputs.version }}
     - name: Run PlatformIO
       run: platformio run --environment megaatmega2560
+    - name: Archive compiled firmware
+      uses: actions/upload-artifact@v2
+      with:
+        name: firmware
+        path: .pio/build/megaatmega2560/firmware.hex
