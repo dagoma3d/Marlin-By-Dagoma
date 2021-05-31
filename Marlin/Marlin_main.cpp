@@ -7236,6 +7236,8 @@ inline void gcode_M503() {
    * T[index]        - Extruder choice
    * B               - Extracts both filaments
    * R[value]        - Final retract value
+   * 
+   * N               - No heat
    *
    *  Default values are used for omitted arguments.
    *
@@ -7351,7 +7353,7 @@ inline void gcode_M503() {
       z_heat_to += read_z;
     }
 
-    bool extract_both = code_seen('B') ? true : false; // Extract_both filaments
+    bool extract_both = code_seen('B'); // Extract_both filaments
 
     // Security: Clamp Z height
     // We need to not go higher than max height ...
@@ -7430,8 +7432,14 @@ inline void gcode_M503() {
       } // pin_number > -1
     } // pin_state -1 0 1
 
+    bool heat_needed = !code_seen('N');
+
     // Do we have to retract and hop
-    if (previous_activity_state == ACTIVITY_PRINTING) {
+    if (!heat_needed) {
+      SERIAL_ECHOLNPGM ( "pause_summoned_from_start_sequence" );
+      printer_states.hotend_state = HOTEND_HOT;
+    }
+    else if (previous_activity_state == ACTIVITY_PRINTING) {
       SERIAL_ECHOLNPGM ( "pause_summoned_from_printing" );
 
       // Retract
@@ -7464,10 +7472,7 @@ inline void gcode_M503() {
     // the extruder move we have to do
     // 0 : None
     // -1 or 1 : like above defines
-    short filament_direction = 0;
-    if (code_seen('I')) {
-      filament_direction = code_value_short();
-    }
+    short filament_direction = code_seen('I') ? code_value_short() : 0;
 
     //
     // Preparting pause loop
@@ -7492,12 +7497,12 @@ inline void gcode_M503() {
       // Goto Heat position
       // and Heat/Re-Heat in case if needed
       #if DISABLED(COLD_EXTRUDE)
-      if (
-        need_to_go_first
+      if (heat_needed &&
+        (need_to_go_first
         || (
           (filament_direction != 0 || exit_pause_asked)
           && printer_states.hotend_state == HOTEND_COOL
-        )
+        ))
       ) {
         SERIAL_ECHOLNPGM( "pause: go to heat position" );
 
@@ -8050,7 +8055,7 @@ inline void gcode_M503() {
     // Return back to normal positions
     destination[X_AXIS] = previous_position[X_AXIS];
     destination[Y_AXIS] = previous_position[Y_AXIS];
-    if (previous_activity_state == ACTIVITY_PRINTING) {
+    if (heat_needed && previous_activity_state == ACTIVITY_PRINTING) {
       // We have to go just a bit higher on top of the last print position
 
       float z_destination = previous_position[Z_AXIS];
@@ -8085,7 +8090,7 @@ inline void gcode_M503() {
     }
 
     // Restore retract if needed
-    if (previous_activity_state == ACTIVITY_PRINTING) {
+    if (heat_needed && previous_activity_state == ACTIVITY_PRINTING) {
       destination[E_AXIS] -= FILAMENTCHANGE_FIRSTRETRACT;
 
       SET_FEEDRATE_FOR_EXTRUDER_MOVE;
