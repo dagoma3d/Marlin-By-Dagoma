@@ -8128,6 +8128,41 @@ inline void gcode_M503() {
     #endif
   }
 
+  // Gcode to make a simple pause-resume only command
+  #if ENABLED(DELTA_EXTRA)
+    inline void gcode_M601() {
+      int pin_number = -1;
+      int target = -1;
+      
+      #if ENABLED(ONE_BUTTON)
+        pin_number = ONE_BUTTON_PIN;
+        #if ONE_BUTTON_INVERTING
+          target = LOW;
+        #else
+          target = HIGH;
+        #endif
+      #endif
+
+      if(pin_number != -1) {
+        SERIAL_ECHOLNPGM("M601: pause");
+        KEEPALIVE_STATE(PAUSED_FOR_USER);
+
+        do {
+          if (digitalRead(pin_number) == target) {
+            SERIAL_ECHOLNPGM("M601: button pushed");
+            delay(1000);
+            break;
+          }
+          idle(true);
+        } while(true);
+
+        KEEPALIVE_STATE(IN_HANDLER);
+      } else {
+        SERIAL_ECHOLNPGM("M601: no pin defined, exit pause");
+      }
+    }
+  #endif
+
 #endif // FILAMENTCHANGEENABLE
 
 #if ENABLED(DUAL_X_CARRIAGE)
@@ -9583,6 +9618,11 @@ void process_next_command() {
         case 600: //Pause for filament change X[pos] Y[pos] Z[relative lift] E[initial retract] L[later retract distance for removal]
           gcode_M600();
           break;
+        #if ENABLED(DELTA_EXTRA)
+          case 601:
+            gcode_M601();
+            break;
+        #endif
       #endif // FILAMENTCHANGEENABLE
 
       #if ENABLED(DUAL_X_CARRIAGE)
