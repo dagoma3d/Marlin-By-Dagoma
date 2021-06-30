@@ -452,6 +452,7 @@ static uint8_t target_extruder;
 
   #if ENABLED( DELTA_EXTRA )
     bool postcompute_tri_ready = false;
+    bool startup_auto_calibration = false;
     float z_smooth_tri_leveling_height = 0.0;
     #if ENABLED( SDSUPPORT )
       inline void abort_sd_printing();
