@@ -1,6 +1,6 @@
 # Prérequis
 
-Les sources sont téléchargeables en tant qu'[archive zip](https://github.com/dagoma3d/Marlin-By-Dagoma/archive/Dagoma-Development.zip).
+Les sources sont téléchargeables en tant qu'[archive zip](https://github.com/dagoma3d/Marlin-By-Dagoma/archive/refs/heads/master.zip).
 Néanmoins, la méthode recommandée pour récupérer les sources est d'utiliser [Git](https://git-scm.com/). Ce faisant, il est beaucoup plus facile d'avoir accès aux derniers développements.
 
 Pour les utilisateurs sous **Linux/MacOS**, git peut s'utiliser facilement en ligne de commande depuis le terminal.
