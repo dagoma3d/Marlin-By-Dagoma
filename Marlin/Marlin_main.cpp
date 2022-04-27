@@ -1093,10 +1093,10 @@ void setup() {
       } while( ONE_BUTTON_PRESSED && PENDING( now, timeout ) );
       if ( ELAPSED( now, timeout ) ) {
         printer_states.activity_state = ACTIVITY_STARTUP_CALIBRATION;
-        enqueue_and_echo_commands_P( PSTR("M106 S255\nD851") );
+        enqueue_and_echo_commands_P( PSTR("D851") );
       }
       else {
-        enqueue_and_echo_commands_P( PSTR("M106 S255\nG28") );
+        enqueue_and_echo_commands_P( PSTR("G28") );
         if (NOT_YET_CALIBRATED) set_notify_not_calibrated();
       }
     #endif
