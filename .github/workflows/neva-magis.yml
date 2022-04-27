@@ -14,7 +14,7 @@ on:
 
 jobs:
   firmware-compilation-checks:
-    name: Firmware compilation for Neva:[version:${{ github.event.inputs.version }}]:[head:${{ github.event.inputs.head }}]
+    name: Firmware compilation for Neva:[version:${{ github.event.inputs.version }}, head:${{ github.event.inputs.head }}]
     runs-on: ubuntu-latest
 
     steps:
