@@ -25,7 +25,7 @@ jobs:
     - name: Run PlatformIO for DE200 with all options
       run: platformio run --environment megaatmega2560
     - name: Apply Magis configuration
-      run: ./LinuxAddons/Dagoma/bin/apply_configuration -gcof Neva version:Magis
+      run: ./LinuxAddons/Dagoma/bin/apply_configuration -gcof Neva version:Magis head:standard
     - name: Run PlatformIO for Magis
       run: platformio run --environment megaatmega2560
     - name: Apply DU with all options configuration

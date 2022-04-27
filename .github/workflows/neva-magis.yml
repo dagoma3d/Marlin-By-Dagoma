@@ -7,10 +7,14 @@ on:
         description: 'The printer version (values: [V1, V1Mod, Magis]) :'
         required: true
         default: 'Magis'
+      head:
+        description: 'The printer head (values: [standard, sigma]) :'
+        required: true
+        default: 'standard'
 
 jobs:
   firmware-compilation-checks:
-    name: Firmware compilation for Neva:[version:${{ github.event.inputs.version }}]
+    name: Firmware compilation for Neva:[version:${{ github.event.inputs.version }}]:[head:${{ github.event.inputs.head }}]
     runs-on: ubuntu-latest
 
     steps:
@@ -22,7 +26,7 @@ jobs:
         python -m pip install --upgrade pip
         pip install platformio
     - name: Apply selected configuration
-      run: ./LinuxAddons/Dagoma/bin/apply_configuration -gcof Neva version:${{ github.event.inputs.version }}
+      run: ./LinuxAddons/Dagoma/bin/apply_configuration -gcof Neva version:${{ github.event.inputs.version }} head:${{ github.event.inputs.head }}
     - name: Run PlatformIO
       run: platformio run --environment megaatmega2560
     - name: Archive compiled firmware
