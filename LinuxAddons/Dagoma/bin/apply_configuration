@@ -576,6 +576,10 @@ do
 
 	echo "Applying variant: ${variant_name}=${variant_value}"
 
+	# Just in case, remove \r from variant files...
+	sed -i 's/\r$//' "${PROFILE_DIR}/${PROFILE_TO_APPLY}/variants/${variant_name}/${variant_value}"
+
+	# And finally apply config viriant
 	apply_configuration_file "${PROFILE_DIR}/${PROFILE_TO_APPLY}/variants/${variant_name}/${variant_value}"
 done
 
